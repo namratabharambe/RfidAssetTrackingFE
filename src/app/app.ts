@@ -1309,7 +1309,7 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected readonly availableGroupsForSelectedCategory = computed(() => {
     const catId = this.formCategory();
-    const matchedCat = this.apiCategories().find(c => c.id === catId);
+    const matchedCat = this.apiCategories().find(c => c.id && catId && c.id.toLowerCase() === catId.toLowerCase());
     const catName = matchedCat ? matchedCat.name : '';
 
     // Only show custom groups that belong to this category
@@ -1317,7 +1317,7 @@ export class App implements AfterViewInit, OnDestroy {
     const customForCat = this.customGroups().filter(g => g.categoryName === catName);
 
     const usedGroups = this.assets()
-      .filter(a => a.category === catName && a.group)
+      .filter(a => a.category === catName && a.group && a.group !== '—' && a.group !== 'Ungrouped')
       .map(a => ({ name: a.group!, categoryName: catName }));
 
     const merged = [...customForCat];
@@ -1559,7 +1559,7 @@ export class App implements AfterViewInit, OnDestroy {
         const gpsPool = this.gpsDevicesPool();
 
         const mapped = data.map(item => {
-          const matchedCat = this.apiCategories().find(c => c.id === item.assetCategoryId);
+          const matchedCat = this.apiCategories().find(c => c.id && item.assetCategoryId && c.id.toLowerCase() === item.assetCategoryId.toLowerCase());
           const category = matchedCat ? matchedCat.name : (item.categoryName || 'Uncategorized');
 
           let status = 'Available';
@@ -1636,8 +1636,26 @@ export class App implements AfterViewInit, OnDestroy {
           allAssets.filter(a => a.category === 'Consumables').length
         ];
 
+        const totalAll = allAssets.length;
+        const inUseAll = allAssets.filter(a => a.status === 'In Use').length;
+        const availableAll = allAssets.filter(a => a.status === 'Available').length;
+        const maintAll = allAssets.filter(a => a.status === 'Under Maintenance').length;
+        const checkedOutAll = allAssets.filter(a => a.status === 'Checked Out').length;
+        const activeAll = inUseAll + availableAll + maintAll;
+        const activePctAll = totalAll > 0 ? ((activeAll / totalAll) * 100).toFixed(1) + '%' : '0%';
+        const inUsePctAll = totalAll > 0 ? ((inUseAll / totalAll) * 100).toFixed(1) + '%' : '0%';
+        const maintPctAll = totalAll > 0 ? ((maintAll / totalAll) * 100).toFixed(1) + '%' : '0%';
+
         this.siteData['All Sites'] = {
           ...this.siteData['All Sites'],
+          totalAssets: totalAll,
+          activeAssets: activeAll,
+          activePct: activePctAll,
+          assetsInUse: inUseAll,
+          inUsePct: inUsePctAll,
+          underMaintenance: maintAll,
+          maintenancePct: maintPctAll,
+          checkedOut: checkedOutAll,
           statusCategory,
           topCategories
         };
@@ -1645,13 +1663,31 @@ export class App implements AfterViewInit, OnDestroy {
         const sites = ['Pune DC', 'Mumbai Warehouse', 'Chennai Plant', 'Bengaluru Hub'];
         sites.forEach(siteName => {
           const siteAssets = allAssets.filter(a => a.site === siteName);
+          const totalS = siteAssets.length;
+          const inUseS = siteAssets.filter(a => a.status === 'In Use').length;
+          const availableS = siteAssets.filter(a => a.status === 'Available').length;
+          const maintS = siteAssets.filter(a => a.status === 'Under Maintenance').length;
+          const checkedOutS = siteAssets.filter(a => a.status === 'Checked Out').length;
+          const activeS = inUseS + availableS + maintS;
+          const activePctS = totalS > 0 ? ((activeS / totalS) * 100).toFixed(1) + '%' : '0%';
+          const inUsePctS = totalS > 0 ? ((inUseS / totalS) * 100).toFixed(1) + '%' : '0%';
+          const maintPctS = totalS > 0 ? ((maintS / totalS) * 100).toFixed(1) + '%' : '0%';
+
           this.siteData[siteName] = {
             ...this.siteData[siteName],
+            totalAssets: totalS,
+            activeAssets: activeS,
+            activePct: activePctS,
+            assetsInUse: inUseS,
+            inUsePct: inUsePctS,
+            underMaintenance: maintS,
+            maintenancePct: maintPctS,
+            checkedOut: checkedOutS,
             statusCategory: [
-              siteAssets.filter(a => a.status === 'In Use').length,
-              siteAssets.filter(a => a.status === 'Available').length,
-              siteAssets.filter(a => a.status === 'Under Maintenance').length,
-              siteAssets.filter(a => a.status === 'Checked Out').length,
+              inUseS,
+              availableS,
+              maintS,
+              checkedOutS,
               0
             ],
             topCategories: [
@@ -2041,7 +2077,7 @@ export class App implements AfterViewInit, OnDestroy {
     }
 
     const catId = this.formGroupCategory();
-    const matched = this.apiCategories().find(c => c.id === catId);
+    const matched = this.apiCategories().find(c => c.id && catId && c.id.toLowerCase() === catId.toLowerCase());
     const catName = matched ? matched.name : '';
 
     const newGroup = { name: this.formGroupName().trim(), categoryName: catName };
@@ -4090,6 +4126,10 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected saveReader() {
+    if (!this.formReaderName || !this.formReaderIpAddress) {
+      alert('Please fill out Reader Name and IP Address.');
+      return;
+    }
     const payload = {
       name: this.formReaderName,
       ipAddress: this.formReaderIpAddress,
@@ -4104,18 +4144,26 @@ export class App implements AfterViewInit, OnDestroy {
     if (this.readerModalMode() === 'add') {
       this.apiService.createReader(payload).subscribe({
         next: () => {
+          alert('Reader registered successfully!');
           this.loadAllApiData();
           this.isReaderModalOpen.set(false);
         },
-        error: (err) => console.error('Error creating reader', err)
+        error: (err) => {
+          console.error('Error creating reader', err);
+          alert('Failed to register reader: ' + (err.error?.message || err.message || 'Unknown error'));
+        }
       });
     } else {
       this.apiService.updateReader(this.formReaderId(), payload).subscribe({
         next: () => {
+          alert('Reader details updated successfully!');
           this.loadAllApiData();
           this.isReaderModalOpen.set(false);
         },
-        error: (err) => console.error('Error updating reader', err)
+        error: (err) => {
+          console.error('Error updating reader', err);
+          alert('Failed to update reader: ' + (err.error?.message || err.message || 'Unknown error'));
+        }
       });
     }
   }
@@ -4123,8 +4171,14 @@ export class App implements AfterViewInit, OnDestroy {
   protected deleteReader(id: string) {
     if (confirm('Are you sure you want to delete this reader profile?')) {
       this.apiService.deleteReader(id).subscribe({
-        next: () => this.loadAllApiData(),
-        error: (err) => console.error('Error deleting reader', err)
+        next: () => {
+          alert('Reader deleted successfully.');
+          this.loadAllApiData();
+        },
+        error: (err) => {
+          console.error('Error deleting reader', err);
+          alert('Failed to delete reader: ' + (err.error?.message || err.message || 'Unknown error'));
+        }
       });
     }
   }
@@ -4151,6 +4205,10 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected saveHandheld() {
+    if (!this.formHandheldName || !this.formHandheldSerial) {
+      alert('Please fill out Device Name and Device Serial Number.');
+      return;
+    }
     const payload = {
       name: this.formHandheldName,
       deviceSerial: this.formHandheldSerial,
@@ -4161,18 +4219,26 @@ export class App implements AfterViewInit, OnDestroy {
     if (this.handheldModalMode() === 'add') {
       this.apiService.createHandheld(payload).subscribe({
         next: () => {
+          alert('Handheld scanner registered successfully!');
           this.loadAllApiData();
           this.isHandheldModalOpen.set(false);
         },
-        error: (err) => console.error('Error creating handheld device', err)
+        error: (err) => {
+          console.error('Error creating handheld device', err);
+          alert('Failed to register handheld device: ' + (err.error?.message || err.message || 'Unknown error'));
+        }
       });
     } else {
       this.apiService.updateHandheld(this.formHandheldId(), payload).subscribe({
         next: () => {
+          alert('Handheld scanner details updated successfully!');
           this.loadAllApiData();
           this.isHandheldModalOpen.set(false);
         },
-        error: (err) => console.error('Error updating handheld device', err)
+        error: (err) => {
+          console.error('Error updating handheld device', err);
+          alert('Failed to update handheld device: ' + (err.error?.message || err.message || 'Unknown error'));
+        }
       });
     }
   }
@@ -4180,8 +4246,14 @@ export class App implements AfterViewInit, OnDestroy {
   protected deleteHandheld(id: string) {
     if (confirm('Are you sure you want to delete this handheld scanner?')) {
       this.apiService.deleteHandheld(id).subscribe({
-        next: () => this.loadAllApiData(),
-        error: (err) => console.error('Error deleting handheld device', err)
+        next: () => {
+          alert('Handheld scanner deleted successfully.');
+          this.loadAllApiData();
+        },
+        error: (err) => {
+          console.error('Error deleting handheld device', err);
+          alert('Failed to delete handheld device: ' + (err.error?.message || err.message || 'Unknown error'));
+        }
       });
     }
   }
