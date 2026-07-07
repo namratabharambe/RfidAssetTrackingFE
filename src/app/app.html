@@ -7653,7 +7653,7 @@
           style="background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;">
           Cancel
         </button>
-        <button type="submit"
+        <button type="submit" (click)="saveReader()"
           style="background: linear-gradient(135deg, #2563eb, #1d4ed8); border: none; color: white; padding: 8px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.25);">
           {{ readerModalMode() === 'add' ? 'Register Reader' : 'Save Changes' }}
         </button>
@@ -7704,7 +7704,7 @@
           style="background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;">
           Cancel
         </button>
-        <button type="submit"
+        <button type="submit" (click)="saveHandheld()"
           style="background: linear-gradient(135deg, #2563eb, #1d4ed8); border: none; color: white; padding: 8px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.25);">
           {{ handheldModalMode() === 'add' ? 'Register Device' : 'Save Changes' }}
         </button>
@@ -7741,19 +7741,19 @@
           
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset ID / Number *</label>
-            <input type="text" [(ngModel)]="formAssetNumber" name="formAssetNumber" required placeholder="e.g. AST-00124"
+            <input type="text" [ngModel]="formAssetNumber()" (ngModelChange)="formAssetNumber.set($event)" name="formAssetNumber" required placeholder="e.g. AST-00124"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset Name *</label>
-            <input type="text" [(ngModel)]="formName" name="formName" required placeholder="e.g. ThinkPad Workstation"
+            <input type="text" [ngModel]="formName()" (ngModelChange)="formName.set($event)" name="formName" required placeholder="e.g. ThinkPad Workstation"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset Category *</label>
-            <select [(ngModel)]="formCategory" name="formCategory"
+            <select [ngModel]="formCategory()" (ngModelChange)="formCategory.set($event)" name="formCategory"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               @for (cat of apiCategories(); track cat.id) {
                 <option [value]="cat.id">{{ cat.name }}</option>
@@ -7763,8 +7763,9 @@
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset Group</label>
-            <select [(ngModel)]="formGroup" name="formGroup"
+            <select [ngModel]="formGroup()" (ngModelChange)="formGroup.set($event)" name="formGroup"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
+              <option value="">— No Group —</option>
               @for (grp of availableGroupsForSelectedCategory(); track grp.name) {
                 <option [value]="grp.name">{{ grp.name }}</option>
               }
@@ -7773,7 +7774,7 @@
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset Type</label>
-            <select [(ngModel)]="formAssetType" name="formAssetType"
+            <select [ngModel]="formAssetType()" (ngModelChange)="formAssetType.set($event)" name="formAssetType"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="Serialized">Serialized</option>
               <option value="Non Serialized">Non Serialized</option>
@@ -7786,13 +7787,13 @@
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Serial Number</label>
-            <input type="text" [(ngModel)]="formSerialNumber" name="formSerialNumber" placeholder="e.g. SN-8924017A"
+            <input type="text" [ngModel]="formSerialNumber()" (ngModelChange)="formSerialNumber.set($event)" name="formSerialNumber" placeholder="e.g. SN-8924017A"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">RFID EPC Code (Optional)</label>
-            <select [(ngModel)]="formRfid" name="formRfid"
+            <select [ngModel]="formRfid()" (ngModelChange)="formRfid.set($event)" name="formRfid"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Unassigned / None —</option>
               @for (tag of unassignedRfidTags(); track tag.id) {
@@ -7803,7 +7804,7 @@
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">QR Code / Barcode (Optional)</label>
-            <select [(ngModel)]="formQrCode" name="formQrCode"
+            <select [ngModel]="formQrCode()" (ngModelChange)="formQrCode.set($event)" name="formQrCode"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Unassigned / None —</option>
               @for (bc of unassignedBarcodes(); track bc.id) {
@@ -7814,7 +7815,7 @@
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">GPS Device Code (Optional)</label>
-            <select [(ngModel)]="formGps" name="formGps"
+            <select [ngModel]="formGps()" (ngModelChange)="formGps.set($event)" name="formGps"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Unassigned / None —</option>
               @for (gps of unassignedGpsDevices(); track gps.id) {
@@ -7825,13 +7826,13 @@
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Manufacturer</label>
-            <input type="text" [(ngModel)]="formManufacturer" name="formManufacturer" placeholder="e.g. Lenovo / Dell"
+            <input type="text" [ngModel]="formManufacturer()" (ngModelChange)="formManufacturer.set($event)" name="formManufacturer" placeholder="e.g. Lenovo / Dell"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Model</label>
-            <input type="text" [(ngModel)]="formModel" name="formModel" placeholder="e.g. ThinkPad L14 Gen 4"
+            <input type="text" [ngModel]="formModel()" (ngModelChange)="formModel.set($event)" name="formModel" placeholder="e.g. ThinkPad L14 Gen 4"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
         </div>
@@ -7842,7 +7843,7 @@
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset Lifecycle Status</label>
-            <select [(ngModel)]="formStatus" name="formStatus"
+            <select [ngModel]="formStatus()" (ngModelChange)="formStatus.set($event)" name="formStatus"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="Available">Procured / Available</option>
               <option value="Assigned">Assigned / In Use</option>
@@ -7854,55 +7855,55 @@
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Purchase Date</label>
-            <input type="date" [(ngModel)]="formPurchaseDate" name="formPurchaseDate"
+            <input type="date" [ngModel]="formPurchaseDate()" (ngModelChange)="formPurchaseDate.set($event)" name="formPurchaseDate"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Warranty Expiry Date</label>
-            <input type="date" [(ngModel)]="formWarranty" name="formWarranty"
+            <input type="date" [ngModel]="formWarranty()" (ngModelChange)="formWarranty.set($event)" name="formWarranty"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Warranty Provider</label>
-            <input type="text" [(ngModel)]="formWarrantyProvider" name="formWarrantyProvider" placeholder="e.g. Dell Technologies, HP Care"
+            <input type="text" [ngModel]="formWarrantyProvider()" (ngModelChange)="formWarrantyProvider.set($event)" name="formWarrantyProvider" placeholder="e.g. Dell Technologies, HP Care"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Current Custodian</label>
-            <input type="text" [(ngModel)]="formCustodian" name="formCustodian" placeholder="e.g. Ramesh Kumar"
+            <input type="text" [ngModel]="formCustodian()" (ngModelChange)="formCustodian.set($event)" name="formCustodian" placeholder="e.g. Ramesh Kumar"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Custodian Email</label>
-            <input type="email" [(ngModel)]="formCustodianEmail" name="formCustodianEmail" placeholder="e.g. ramesh@trackit.in"
+            <input type="email" [ngModel]="formCustodianEmail()" (ngModelChange)="formCustodianEmail.set($event)" name="formCustodianEmail" placeholder="e.g. ramesh@trackit.in"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Owner Department</label>
-            <input type="text" [(ngModel)]="formDepartment" name="formDepartment" placeholder="e.g. Logistics / IT Operations"
+            <input type="text" [ngModel]="formDepartment()" (ngModelChange)="formDepartment.set($event)" name="formDepartment" placeholder="e.g. Logistics / IT Operations"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Industry</label>
-            <input type="text" [(ngModel)]="formIndustry" name="formIndustry" placeholder="e.g. Automotive / E-commerce"
+            <input type="text" [ngModel]="formIndustry()" (ngModelChange)="formIndustry.set($event)" name="formIndustry" placeholder="e.g. Automotive / E-commerce"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Business Unit</label>
-            <input type="text" [(ngModel)]="formBusinessUnit" name="formBusinessUnit" placeholder="e.g. Supply Chain / Tech Services"
+            <input type="text" [ngModel]="formBusinessUnit()" (ngModelChange)="formBusinessUnit.set($event)" name="formBusinessUnit" placeholder="e.g. Supply Chain / Tech Services"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Site</label>
-            <select [(ngModel)]="formSiteId" name="formSiteId"
+            <select [ngModel]="formSiteId()" (ngModelChange)="formSiteId.set($event)" name="formSiteId"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Select Site —</option>
               @for (site of apiSites(); track site.id) {
@@ -7913,7 +7914,7 @@
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Warehouse <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
-            <select [(ngModel)]="formWarehouseId" name="formWarehouseId"
+            <select [ngModel]="formWarehouseId()" (ngModelChange)="formWarehouseId.set($event)" name="formWarehouseId"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Select Warehouse —</option>
               @for (wh of filteredWarehouses(); track wh.id) {
@@ -7924,7 +7925,7 @@
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Zone <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
-            <select [(ngModel)]="formZoneId" name="formZoneId"
+            <select [ngModel]="formZoneId()" (ngModelChange)="formZoneId.set($event)" name="formZoneId"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Select Zone —</option>
               @for (zone of filteredZones(); track zone.id) {
@@ -7972,13 +7973,13 @@
     <form (submit)="$event.preventDefault(); saveCategory();" style="display: flex; flex-direction: column; gap: 14px;">
       <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
         <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-main, #0f172a);">Category Name *</label>
-        <input type="text" [(ngModel)]="formCategoryName" name="formCategoryName" required placeholder="e.g. Returnable containers"
+        <input type="text" [ngModel]="formCategoryName()" (ngModelChange)="formCategoryName.set($event)" name="formCategoryName" required placeholder="e.g. Returnable containers"
           style="padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.85rem; width: 100%; box-sizing: border-box;" />
       </div>
 
       <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
         <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-main, #0f172a);">Description</label>
-        <textarea [(ngModel)]="formCategoryDescription" name="formCategoryDescription" placeholder="Provide category purpose / scope" rows="3"
+        <textarea [ngModel]="formCategoryDescription()" (ngModelChange)="formCategoryDescription.set($event)" name="formCategoryDescription" placeholder="Provide category purpose / scope" rows="3"
           style="padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.85rem; width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
       </div>
 
@@ -8018,13 +8019,13 @@
     <form (submit)="$event.preventDefault(); saveGroup();" style="display: flex; flex-direction: column; gap: 14px;">
       <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
         <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-main, #0f172a);">Group Name *</label>
-        <input type="text" [(ngModel)]="formGroupName" name="formGroupName" required placeholder="e.g. Laptop / Excavator"
+        <input type="text" [ngModel]="formGroupName()" (ngModelChange)="formGroupName.set($event)" name="formGroupName" required placeholder="e.g. Laptop / Excavator"
           style="padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.85rem; width: 100%; box-sizing: border-box;" />
       </div>
 
       <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
         <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-main, #0f172a);">Parent Category *</label>
-        <select [(ngModel)]="formGroupCategory" name="formGroupCategory" required
+        <select [ngModel]="formGroupCategory()" (ngModelChange)="formGroupCategory.set($event)" name="formGroupCategory" required
           style="padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.85rem; width: 100%; box-sizing: border-box;">
           @for (cat of apiCategories(); track cat.id) {
             <option [value]="cat.id">{{ cat.name }}</option>
