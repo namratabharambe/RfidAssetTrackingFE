@@ -2487,7 +2487,31 @@ export class App implements AfterViewInit, OnDestroy {
   protected fetchSitesZonesWarehouses() {
     if (!this.isLoggedIn()) return;
     this.http.get<any[]>('http://localhost:5025/api/sites?page=1&size=200').subscribe({
-      next: (data) => { if (Array.isArray(data)) this.apiSites.set(data); },
+      next: (data) => { 
+        if (Array.isArray(data)) {
+          this.apiSites.set(data);
+          data.forEach(s => {
+            if (s && s.name && !this.siteData[s.name]) {
+              this.siteData[s.name] = {
+                totalAssets: 0, activeAssets: 0, activePct: '0%',
+                assetsInUse: 0, inUsePct: '0%', checkedOut: 0,
+                underMaintenance: 0, maintenancePct: '0%', lowBatteryGps: 0,
+                rfidReadsToday: 0, gpsPingsToday: 0, exceptionAlerts: 0, complianceTasks: 0,
+                utilizationSpark: [0, 0, 0, 0, 0, 0, 0],
+                accuracySpark: [0, 0, 0, 0, 0, 0, 0],
+                savingsSpark: [0, 0, 0, 0, 0, 0, 0],
+                turnaroundSpark: [0, 0, 0, 0, 0, 0, 0],
+                utilizationOverTime: [0, 0, 0, 0, 0, 0, 0],
+                statusCategory: [0, 0, 0, 0, 0],
+                movementInbound: [0, 0, 0, 0, 0, 0],
+                movementOutbound: [0, 0, 0, 0, 0, 0],
+                movementUtilization: [0, 0, 0, 0, 0, 0],
+                topCategories: [0, 0, 0, 0, 0, 0]
+              };
+            }
+          });
+        }
+      },
       error: (err) => console.error('Failed to load sites', err)
     });
     this.http.get<any[]>('http://localhost:5025/api/warehouses?page=1&size=200').subscribe({

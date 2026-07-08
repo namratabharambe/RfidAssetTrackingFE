@@ -1,4 +1,4 @@
-@if (isLoggedIn()) {
+esar+  @if (isLoggedIn()) {
 <div class="app-container" [class.loading]="isLoading()">
 
   <!-- Sidebar Navigation -->
@@ -145,30 +145,17 @@
                 <span class="material-symbols-outlined check">check</span>
                 }
               </li>
-              <li (click)="selectSite('Pune DC')" [class.selected]="selectedSite() === 'Pune DC'">
-                <span class="material-symbols-outlined">domain</span> Pune DC
-                @if (selectedSite() === 'Pune DC') {
+              @for (site of apiSites(); track site.id) {
+              <li (click)="selectSite(site.name)" [class.selected]="selectedSite() === site.name">
+                <span class="material-symbols-outlined">
+                  {{ site.name.toLowerCase().includes('warehouse') || site.name.toLowerCase().includes('dc') ? 'warehouse' : site.name.toLowerCase().includes('plant') || site.name.toLowerCase().includes('factory') ? 'factory' : 'domain' }}
+                </span>
+                {{ site.name }}
+                @if (selectedSite() === site.name) {
                 <span class="material-symbols-outlined check">check</span>
                 }
               </li>
-              <li (click)="selectSite('Mumbai Warehouse')" [class.selected]="selectedSite() === 'Mumbai Warehouse'">
-                <span class="material-symbols-outlined">warehouse</span> Mumbai Warehouse
-                @if (selectedSite() === 'Mumbai Warehouse') {
-                <span class="material-symbols-outlined check">check</span>
-                }
-              </li>
-              <li (click)="selectSite('Chennai Plant')" [class.selected]="selectedSite() === 'Chennai Plant'">
-                <span class="material-symbols-outlined">factory</span> Chennai Plant
-                @if (selectedSite() === 'Chennai Plant') {
-                <span class="material-symbols-outlined check">check</span>
-                }
-              </li>
-              <li (click)="selectSite('Bengaluru Hub')" [class.selected]="selectedSite() === 'Bengaluru Hub'">
-                <span class="material-symbols-outlined">hub</span> Bengaluru Hub
-                @if (selectedSite() === 'Bengaluru Hub') {
-                <span class="material-symbols-outlined check">check</span>
-                }
-              </li>
+              }
             </ul>
             }
           </div>
@@ -2068,13 +2055,12 @@
           <div class="audit-controls-card">
             <h3>Audit Configuration</h3>
 
-            <div class="form-group">
+             <div class="form-group">
               <label>Audit Location</label>
               <select [value]="auditLocation()" (change)="auditLocation.set($any($event.target).value)">
-                <option value="Pune DC">Pune DC</option>
-                <option value="Mumbai Warehouse">Mumbai Warehouse</option>
-                <option value="Chennai Plant">Chennai Plant</option>
-                <option value="Bengaluru Hub">Bengaluru Hub</option>
+                @for (site of apiSites(); track site.id) {
+                <option [value]="site.name">{{ site.name }}</option>
+                }
               </select>
             </div>
 
@@ -2082,20 +2068,18 @@
               <label>Expected Zone</label>
               <select [value]="auditZone()" (change)="auditZone.set($any($event.target).value)">
                 <option value="All Zones">All Zones</option>
-                <option value="Zone A">Zone A</option>
-                <option value="Zone B">Zone B</option>
-                <option value="Zone C">Zone C</option>
-                <option value="IT Zone">IT Zone</option>
-                <option value="Utility Yard">Utility Yard</option>
+                @for (zone of apiZones(); track zone.id) {
+                <option [value]="zone.name">{{ zone.name }}</option>
+                }
               </select>
             </div>
 
             <div class="form-group">
               <label>RFID Reader / Portal</label>
               <select [value]="auditReader()" (change)="auditReader.set($any($event.target).value)">
-                <option value="Fixed Gate 2 Reader">Fixed Gate 2 Reader</option>
-                <option value="IT Store Handheld 1">IT Store Handheld 1</option>
-                <option value="Warehouse Portal 4">Warehouse Portal 4</option>
+                @for (reader of fixedReadersList(); track reader.id) {
+                <option [value]="reader.name">{{ reader.name }}</option>
+                }
               </select>
             </div>
 
@@ -4959,13 +4943,9 @@
                   <select [ngModel]="maintSiteFilter()" (ngModelChange)="maintSiteFilter.set($event)"
                     style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 0.72rem; outline: none;">
                     <option value="All">All Sites</option>
-                    <option value="Pune">Pune DC</option>
-                    <option value="Mumbai">Mumbai Hub</option>
-                    <option value="Bengaluru">Bengaluru Plant</option>
-                    <option value="Chennai">Chennai Hub</option>
-                    <option value="Hyderabad">Hyderabad DC</option>
-                    <option value="Delhi">Delhi NCR</option>
-                    <option value="Ahmedabad">Ahmedabad DC</option>
+                    @for (site of apiSites(); track site.id) {
+                    <option [value]="site.name">{{ site.name }}</option>
+                    }
                   </select>
 
                   <div style="position: relative; display: flex; align-items: center;">
@@ -5515,12 +5495,9 @@
             <select [ngModel]="reportsSelectedSite()" (ngModelChange)="reportsSelectedSite.set($event)"
               style="padding: 6px 8px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 0.7rem; font-weight: 600; cursor: pointer; outline: none;">
               <option value="All Sites">All Sites</option>
-              <option value="Pune DC">Pune DC</option>
-              <option value="Mumbai Warehouse">Mumbai Warehouse</option>
-              <option value="Chennai Plant">Chennai Plant</option>
-              <option value="Bengaluru Hub">Bengaluru Hub</option>
-              <option value="Delhi NCR">Delhi NCR</option>
-              <option value="Hyderabad DC">Hyderabad DC</option>
+              @for (site of apiSites(); track site.id) {
+              <option [value]="site.name">{{ site.name }}</option>
+              }
             </select>
           </div>
 
@@ -5530,12 +5507,9 @@
             <select [ngModel]="reportsSelectedCategory()" (ngModelChange)="reportsSelectedCategory.set($event)"
               style="padding: 6px 8px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 0.7rem; font-weight: 600; cursor: pointer; outline: none;">
               <option value="All Categories">All Categories</option>
-              <option value="IT Assets">IT Assets</option>
-              <option value="Material Handling Equipment">Material Handling</option>
-              <option value="Vehicles">Vehicles</option>
-              <option value="Tools & Equipment">Tools & Equipment</option>
-              <option value="RFID Tags">RFID Tags</option>
-              <option value="Returnable Container">Returnable Containers</option>
+              @for (category of apiCategories(); track category.id) {
+              <option [value]="category.name">{{ category.name }}</option>
+              }
             </select>
           </div>
 
@@ -6224,9 +6198,9 @@
                 Site Zone</label>
               <select
                 style="padding: 6px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 0.72rem; font-weight: 600; outline: none; cursor: pointer;">
-                <option>Pune DC - Dock Doors</option>
-                <option>Pune DC - Finished Goods</option>
-                <option>Mumbai WH - Loading Area</option>
+                @for (zone of apiZones(); track zone.id) {
+                <option>{{ zone.warehouseName }} - {{ zone.name }}</option>
+                }
               </select>
             </div>
             <div style="display: flex; flex-direction: column; gap: 6px;">
