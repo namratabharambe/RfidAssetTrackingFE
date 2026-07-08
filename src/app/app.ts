@@ -1397,6 +1397,103 @@ export class App implements AfterViewInit, OnDestroy {
   protected cancelUpload() {
     this.isBulkFileUploaded.set(false);
   }
+
+  protected downloadBulkUploadTemplate() {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    const headers = [
+      'Asset ID',
+      'Asset Name',
+      'Category',
+      'RFID Tag EPC',
+      'GPS Device ID',
+      'Site',
+      'Zone',
+      'Status',
+      'Serial Number',
+      'Custodian',
+      'Description'
+    ];
+
+    const rows = [
+      [
+        'AST-TRC-005121',
+        'Plastic Bin - Large C1',
+        'Returnable Container',
+        'E280689400107B2A00002A11',
+        '-',
+        'Pune DC',
+        'Zone B',
+        'Available',
+        'PB-998231',
+        'R. Kumar',
+        'Standard industrial plastic crate'
+      ],
+      [
+        'AST-FL-00987',
+        'Toyota Forklift Model-X',
+        'Vehicle',
+        'E28011702000021A3F4B2C91',
+        '16512010049',
+        'Pune DC',
+        'Yard A',
+        'In Use',
+        'TY-88746-FL',
+        'A. Sharma',
+        'Yard operations forklift'
+      ],
+      [
+        'AST-LT-10292',
+        'Dell Latitude 5420 Laptop',
+        'IT Assets',
+        'E28011702000021A3F4B2CA1',
+        '-',
+        'Mumbai Warehouse',
+        'Office Area',
+        'Available',
+        'DL-5420-9982',
+        'P. Patel',
+        'Custodian office laptop'
+      ],
+      [
+        'AST-PL-0082',
+        'Standard Wooden Pallet P12',
+        'Pallets',
+        'E28011702000021A3F4B2C92',
+        '-',
+        'Chennai Plant',
+        'Staging Zone',
+        'Available',
+        'PL-0082-WD',
+        '-',
+        'Standard EUR 1200x800mm wooden pallet'
+      ],
+      [
+        'AST-GEN-55',
+        'Cummins 250kVA Generator',
+        'Power Equipment',
+        'E28011702000021A3F4B2C93',
+        '-',
+        'Bengaluru Hub',
+        'Power Room',
+        'Under Maintenance',
+        'CM-9982-GEN',
+        'M. Gowda',
+        'Back-up power diesel generator'
+      ]
+    ];
+
+    const sheetData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Asset_Bulk_Template');
+
+    // Auto-fit column widths
+    const wscols = headers.map(() => ({ wch: 22 }));
+    ws['!cols'] = wscols;
+
+    XLSX.writeFile(wb, 'Asset_Bulk_Upload_Template.xlsx');
+  }
   
   protected getCategoryCount(cat: string): number {
     return this.assets().filter(a => a.category === cat).length;
