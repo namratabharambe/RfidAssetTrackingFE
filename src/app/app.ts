@@ -683,7 +683,8 @@ export class App implements AfterViewInit, OnDestroy {
       },
       error: (err) => {
         console.error('Failed to register tag', err);
-        alert('Failed to register tag');
+        const detail = err.error?.message || err.error || err.message || 'Unknown error';
+        alert('Failed to register tag: ' + detail);
       }
     });
   }
