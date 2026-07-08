@@ -2053,6 +2053,7 @@ export class App implements AfterViewInit, OnDestroy {
         });
 
         this.assets.set(mapped);
+        this.fetchTags();
         
         const allAssets = mapped;
         const statusCategory = [
@@ -3175,6 +3176,8 @@ export class App implements AfterViewInit, OnDestroy {
     this.activeNav.set(parentName);
     if (parentName === 'Assets') {
       this.fetchAssets();
+    } else if (parentName === 'RFID Operations' && sub === 'Tag Management') {
+      this.fetchTags();
     }
   }
 
