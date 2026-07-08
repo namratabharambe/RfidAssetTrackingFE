@@ -1308,6 +1308,12 @@ export class App implements AfterViewInit, OnDestroy {
 
   // Submenu custom states & helper methods
   protected readonly isBulkFileUploaded = signal<boolean>(false);
+  protected readonly uploadedFileName = signal<string>('');
+  protected readonly uploadedFileSize = signal<string>('');
+  protected readonly parsedAssetsCount = signal<number>(0);
+  protected readonly parsedAssets = signal<any[]>([]);
+  protected readonly validAssetsCount = signal<number>(0);
+  protected readonly warningAssetsCount = signal<number>(0);
   
   // Audit states
   protected readonly isAuditActive = signal<boolean>(false);
@@ -1389,12 +1395,190 @@ export class App implements AfterViewInit, OnDestroy {
     })));
   }
   
-  protected simulateFileUpload() {
-    this.isBulkFileUploaded.set(true);
+  protected onFileDropped(event: DragEvent) {
+    event.preventDefault();
+    if (event.dataTransfer && event.dataTransfer.files.length > 0) {
+      this.parseFile(event.dataTransfer.files[0]);
+    }
+  }
+
+  protected onFileUploaded(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.parseFile(input.files[0]);
+    }
+  }
+
+  private parseFile(file: File) {
+    this.uploadedFileName.set(file.name);
+    
+    // Format file size
+    const kb = (file.size / 1024).toFixed(1);
+    this.uploadedFileSize.set(`${kb} KB`);
+
+    const reader = new FileReader();
+    reader.onload = (e: any) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Parse to JSON array of objects
+        const json: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        if (json.length === 0) {
+          window.alert('The selected file is empty.');
+          return;
+        }
+
+        const headers = json[0].map((h: any) => h?.toString().trim().toLowerCase());
+        
+        // Map columns
+        const assetIdIdx = headers.indexOf('asset id');
+        const nameIdx = headers.indexOf('asset name');
+        const categoryIdx = headers.indexOf('category');
+        const rfidIdx = headers.indexOf('rfid tag epc');
+        const gpsIdx = headers.indexOf('gps device id');
+        const siteIdx = headers.indexOf('site');
+        const zoneIdx = headers.indexOf('zone');
+        const statusIdx = headers.indexOf('status');
+        const serialIdx = headers.indexOf('serial number');
+        const custodianIdx = headers.indexOf('custodian');
+        const descIdx = headers.indexOf('description');
+
+        const list: any[] = [];
+        let validCount = 0;
+        let warningCount = 0;
+
+        for (let i = 1; i < json.length; i++) {
+          const row = json[i];
+          if (!row || row.length === 0) continue;
+
+          // Skip rows that don't have name and asset number
+          const assetId = row[assetIdIdx] || row[0] || '';
+          const name = row[nameIdx] || row[1] || '';
+          if (!assetId && !name) continue;
+
+          const category = row[categoryIdx] || '';
+          const rfidTag = row[rfidIdx] || '';
+          const gpsId = row[gpsIdx] || '';
+          const site = row[siteIdx] || 'Pune DC';
+          const zone = row[zoneIdx] || 'Zone A';
+          const status = row[statusIdx] || 'Available';
+          const serialNumber = row[serialIdx] || '';
+          const custodian = row[custodianIdx] || '';
+          const description = row[descIdx] || '';
+
+          // Validate RFID Tag EPC: typically hex string of length 24
+          const isRfidValid = !rfidTag || rfidTag === '-' || /^[0-9A-Fa-f]{24}$/.test(rfidTag.trim());
+
+          if (isRfidValid) validCount++;
+          else warningCount++;
+
+          list.push({
+            assetNumber: assetId.toString(),
+            name: name.toString(),
+            category: category.toString(),
+            rfidTag: rfidTag.toString() === '-' ? '' : rfidTag.toString(),
+            gpsId: gpsId.toString() === '-' ? '' : gpsId.toString(),
+            site: site.toString(),
+            zone: zone.toString(),
+            status: status.toString(),
+            serialNumber: serialNumber.toString(),
+            custodian: custodian.toString(),
+            description: description.toString(),
+            isRfidValid: isRfidValid
+          });
+        }
+
+        this.parsedAssets.set(list);
+        this.parsedAssetsCount.set(list.length);
+        this.validAssetsCount.set(validCount);
+        this.warningAssetsCount.set(warningCount);
+        this.isBulkFileUploaded.set(true);
+      } catch (err) {
+        console.error('Error parsing file', err);
+        window.alert('Failed to parse file. Make sure it is a valid CSV or Excel template.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
   }
   
   protected cancelUpload() {
     this.isBulkFileUploaded.set(false);
+    this.parsedAssets.set([]);
+    this.parsedAssetsCount.set(0);
+    this.validAssetsCount.set(0);
+    this.warningAssetsCount.set(0);
+  }
+
+  protected proceedBulkImport() {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    const list = this.parsedAssets();
+    if (list.length === 0) return;
+
+    // Map fields to CreateAssetCommand matching the backend Command schema
+    const commands = list.map(a => {
+      // Find category Guid
+      const matchedCat = this.apiCategories().find(c => c.name.toLowerCase() === a.category.toLowerCase());
+      const catId = matchedCat ? matchedCat.id : 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d'; // fallback to Returnable Container id
+
+      // Find site Guid
+      const matchedSite = this.apiSites().find(s => s.name.toLowerCase() === a.site.toLowerCase());
+      const siteId = matchedSite ? matchedSite.id : 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91'; // fallback to Pune DC id
+
+      // Find zone Guid
+      const matchedZone = this.apiZones().find(z => z.name.toLowerCase() === a.zone.toLowerCase());
+      const zoneId = matchedZone ? matchedZone.id : null;
+
+      // Status mapping: In Use => Assigned, Checked Out => InTransit, Under Maintenance => UnderMaintenance, etc.
+      let statusEnum = 0; // Available
+      if (a.status === 'In Use' || a.status === 'Assigned') statusEnum = 1; // Assigned
+      else if (a.status === 'Checked Out' || a.status === 'InTransit') statusEnum = 2; // InTransit
+      else if (a.status === 'Under Maintenance' || a.status === 'UnderMaintenance') statusEnum = 3; // UnderMaintenance
+      else if (a.status === 'Retired') statusEnum = 4; // Retired
+
+      return {
+        assetNumber: a.assetNumber,
+        name: a.name,
+        assetCategoryId: catId,
+        description: a.description,
+        serialNumber: a.serialNumber,
+        status: statusEnum,
+        qrCode: a.assetNumber,
+        group: 'Ungrouped',
+        assetType: 'Physical',
+        ownerDepartment: 'Operations',
+        industry: 'Logistics',
+        businessUnit: 'Supply Chain',
+        currentCustodian: a.custodian,
+        custodianEmail: a.custodian ? `${a.custodian.toLowerCase().replace(/\s+/g, '.')}@prosper.com` : '',
+        model: '',
+        warrantyProvider: '',
+        purchaseDate: new Date(),
+        purchasePrice: 0,
+        warrantyExpiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+        manufacturerId: null,
+        siteId: siteId,
+        zoneId: zoneId,
+        warehouseId: null
+      };
+    });
+
+    // Call API Bulk Create endpoint
+    this.http.post('http://localhost:5025/api/assets/bulk', commands).subscribe({
+      next: (res: any) => {
+        alert(`Successfully imported ${res.count} assets into the database!`);
+        this.isBulkFileUploaded.set(false);
+        this.parsedAssets.set([]);
+        this.fetchAssets(); // Refresh asset master grid and dashboard counts
+      },
+      error: (err) => {
+        console.error('Failed to import assets in bulk', err);
+        alert('Failed to import assets. Please verify the template formats and try again.');
+      }
+    });
   }
 
   protected downloadBulkUploadTemplate() {
