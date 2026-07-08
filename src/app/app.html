@@ -2152,457 +2152,98 @@ esar+  @if (isLoggedIn()) {
       </div>
       }
       } @else if (activeNav() === 'Check in/Check out') {
-      <div class="checkout-view animate-fade-in" style="display: flex; flex-direction: column; gap: 12px;">
+      <div class="checkout-view animate-fade-in" style="display: flex; flex-direction: column; gap: 24px; padding: 24px; background: #f8fafc; min-height: 100%;">
         
-        <!-- Start New Transaction Sub-Header -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-main);">Start New Transaction</h2>
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <!-- Date Picker matching screenshot -->
-            <div style="position: relative;">
-              <input type="text" readonly value="20 May 2025" style="padding: 8px 12px 8px 34px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-weight: 600; font-size: 0.85rem;" />
-              <span class="material-symbols-outlined" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 1.15rem; color: var(--text-muted); pointer-events: none;">calendar_month</span>
-            </div>
-            <button class="action-btn-outline" (click)="resetWorkflow()" style="padding: 8px 16px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.85rem;">
-              <span class="material-symbols-outlined" style="font-size: 1.1rem; color: var(--color-primary);">refresh</span> Refresh
+        <!-- Header -->
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <h1 style="margin: 0; font-size: 1.5rem; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: #1e293b;">Check-Out / Check-In Workflow</h1>
+          <p style="margin: 0; font-size: 0.88rem; color: #64748b; font-family: 'Plus Jakarta Sans', sans-serif;">Select one item to review equipment status</p>
+        </div>
+
+        <!-- Filter pills -->
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+          @for (pill of equipmentPills(); track pill) {
+            <button (click)="selectedEquipmentFilter.set(pill)"
+              [style.background]="selectedEquipmentFilter() === pill ? '#0f766e' : '#ffffff'"
+              [style.color]="selectedEquipmentFilter() === pill ? '#ffffff' : '#1e293b'"
+              [style.border]="selectedEquipmentFilter() === pill ? 'none' : '1px solid #cbd5e1'"
+              style="padding: 6px 16px; border-radius: 9999px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+              {{ pill }}
             </button>
-          </div>
+          }
         </div>
 
-        <!-- Mode Cards Row -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-bottom: 8px;">
-          <!-- Card 1: Material Issue -->
-          <div (click)="checkoutMode.set('issue')" 
-               [style.border]="checkoutMode() === 'issue' ? '2px solid var(--color-primary, #3b82f6)' : '1px solid var(--border-color)'"
-               [style.background]="checkoutMode() === 'issue' ? 'rgba(59, 130, 246, 0.05)' : 'var(--bg-card)'"
-               style="border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; position: relative; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
-            <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(59, 130, 246, 0.1); color: var(--color-primary, #3b82f6); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-              <span class="material-symbols-outlined" style="font-size: 1.4rem;">output</span>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 2px;">
-              <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Material Issue</span>
-              <span style="font-size: 0.75rem; color: var(--text-muted);">Issue asset(s) to user, vehicle or department</span>
-            </div>
-            @if (checkoutMode() === 'issue') {
-              <span class="material-symbols-outlined" style="position: absolute; top: 12px; right: 12px; color: var(--color-primary, #3b82f6); font-size: 1.2rem;">check_circle</span>
-            }
-          </div>
-
-          <!-- Card 2: Material Return -->
-          <div (click)="checkoutMode.set('return')" 
-               [style.border]="checkoutMode() === 'return' ? '2px solid var(--color-success, #10b981)' : '1px solid var(--border-color)'"
-               [style.background]="checkoutMode() === 'return' ? 'rgba(16, 185, 129, 0.05)' : 'var(--bg-card)'"
-               style="border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; position: relative; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
-            <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(16, 185, 129, 0.1); color: var(--color-success, #10b981); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-              <span class="material-symbols-outlined" style="font-size: 1.4rem;">input</span>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 2px;">
-              <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Material Return</span>
-              <span style="font-size: 0.75rem; color: var(--text-muted);">Return previously issued asset(s)</span>
-            </div>
-            @if (checkoutMode() === 'return') {
-              <span class="material-symbols-outlined" style="position: absolute; top: 12px; right: 12px; color: var(--color-success, #10b981); font-size: 1.2rem;">check_circle</span>
-            }
-          </div>
-
-          <!-- Card 3: Inter-Site Transfer -->
-          <div (click)="checkoutMode.set('transfer')" 
-               [style.border]="checkoutMode() === 'transfer' ? '2px solid #8b5cf6' : '1px solid var(--border-color)'"
-               [style.background]="checkoutMode() === 'transfer' ? 'rgba(139, 92, 246, 0.05)' : 'var(--bg-card)'"
-               style="border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; position: relative; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
-            <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(139, 92, 246, 0.1); color: #8b5cf6; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-              <span class="material-symbols-outlined" style="font-size: 1.4rem;">swap_horiz</span>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 2px;">
-              <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Inter-Site Transfer</span>
-              <span style="font-size: 0.75rem; color: var(--text-muted);">Transfer asset(s) to another site/location</span>
-            </div>
-            @if (checkoutMode() === 'transfer') {
-              <span class="material-symbols-outlined" style="position: absolute; top: 12px; right: 12px; color: #8b5cf6; font-size: 1.2rem;">check_circle</span>
-            }
-          </div>
-        </div>
-
-        <!-- Stepper Tracker -->
-        <div class="stepper-wrapper" style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-body); padding: 8px 16px; border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-color); overflow-x: auto; gap: 12px;">
-          <!-- Step 1 -->
-          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-            <div style="width: 24px; height: 24px; border-radius: 50%; background: var(--color-primary, #3b82f6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">1</div>
-            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); white-space: nowrap;">Select Mode</span>
-          </div>
-          <div style="flex-grow: 1; height: 1px; border-top: 1px dashed var(--border-color); min-width: 20px;"></div>
-          
-          <!-- Step 2 -->
-          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-            <div style="width: 24px; height: 24px; border-radius: 50%;" 
-                 [style.background]="checkoutRfidTag() ? 'var(--color-primary, #3b82f6)' : 'var(--border-color)'" 
-                 [style.color]="checkoutRfidTag() ? '#fff' : 'var(--text-muted)'" 
-                 style="display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">2</div>
-            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); white-space: nowrap;">Scan RFID Tag</span>
-          </div>
-          <div style="flex-grow: 1; height: 1px; border-top: 1px dashed var(--border-color); min-width: 20px;"></div>
-          
-          <!-- Step 3 -->
-          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-            <div style="width: 24px; height: 24px; border-radius: 50%;" 
-                 [style.background]="checkoutAssetDetails() ? 'var(--color-primary, #3b82f6)' : 'var(--border-color)'" 
-                 [style.color]="checkoutAssetDetails() ? '#fff' : 'var(--text-muted)'" 
-                 style="display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">3</div>
-            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); white-space: nowrap;">Validate Asset</span>
-          </div>
-          <div style="flex-grow: 1; height: 1px; border-top: 1px dashed var(--border-color); min-width: 20px;"></div>
-          
-          <!-- Step 4 -->
-          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-            <div style="width: 24px; height: 24px; border-radius: 50%;" 
-                 [style.background]="checkoutAssignee() ? 'var(--color-primary, #3b82f6)' : 'var(--border-color)'" 
-                 [style.color]="checkoutAssignee() ? '#fff' : 'var(--text-muted)'" 
-                 style="display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">4</div>
-            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); white-space: nowrap;">Assign To</span>
-          </div>
-          <div style="flex-grow: 1; height: 1px; border-top: 1px dashed var(--border-color); min-width: 20px;"></div>
-          
-          <!-- Step 5 -->
-          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-            <div style="width: 24px; height: 24px; border-radius: 50%;" 
-                 [style.background]="checkoutPurpose() ? 'var(--color-primary, #3b82f6)' : 'var(--border-color)'" 
-                 [style.color]="checkoutPurpose() ? '#fff' : 'var(--text-muted)'" 
-                 style="display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">5</div>
-            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); white-space: nowrap;">Capture Purpose</span>
-          </div>
-          <div style="flex-grow: 1; height: 1px; border-top: 1px dashed var(--border-color); min-width: 20px;"></div>
-          
-          <!-- Step 6 -->
-          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-            <div style="width: 24px; height: 24px; border-radius: 50%; background: var(--color-primary, #3b82f6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">6</div>
-            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); white-space: nowrap;">Expected Return</span>
-          </div>
-          <div style="flex-grow: 1; height: 1px; border-top: 1px dashed var(--border-color); min-width: 20px;"></div>
-          
-          <!-- Step 7 -->
-          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-            <div style="width: 24px; height: 24px; border-radius: 50%; background: var(--border-color); color: var(--text-muted); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">7</div>
-            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); white-space: nowrap;">Submit</span>
-          </div>
-        </div>
-
-        <!-- Input Grid -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(225px, 1fr)); gap: 12px; margin-bottom: 8px;">
-          
-          <!-- Col 1: Select Asset Category -->
-          <div class="card-new" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; height: 160px;">
-            <div>
-              <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Select Asset Category</span>
-              <div style="margin-top: 8px; position: relative;">
-                <span class="material-symbols-outlined" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 1.15rem; color: var(--text-muted);">build</span>
-                <select [value]="checkoutCategory()" (change)="checkoutCategory.set($any($event.target).value)"
-                  style="width: 100%; padding: 10px 10px 10px 34px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-weight: 600; font-size: 0.85rem; appearance: none;">
-                  <option value="Tool Room Tools">Tool Room Tools</option>
-                  <option value="IT Assets">IT Assets</option>
-                  <option value="Material Handling Equipment">Material Handling Equipment</option>
-                  <option value="Power Equipment">Power Equipment</option>
-                  <option value="Consumables">Consumables</option>
-                </select>
-              </div>
-            </div>
-            <div style="font-size: 0.75rem; color: var(--text-muted);">
-              Choose category of tools to issue
-            </div>
-          </div>
-
-          <!-- Col 2: Scan RFID Tag -->
-          <div class="card-new" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; height: 160px;">
-            <div>
-              <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Scan RFID Tag</span>
-              <div style="margin-top: 8px; position: relative;">
-                <input type="text" placeholder="AST-TRC-001245" [value]="checkoutRfidTag()" (input)="checkoutRfidTag.set($any($event.target).value)"
-                  style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-family: monospace; font-size: 0.85rem;" />
-                <span class="material-symbols-outlined" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 1.15rem; color: var(--color-primary);">sensors</span>
-              </div>
-              <div style="text-align: center; margin: 4px 0; font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">or</div>
-              <button class="action-btn-outline" (click)="simulateRfidScan()" style="width: 100%; padding: 6px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.78rem; border-radius: 8px;">
-                <span class="material-symbols-outlined" style="font-size: 1.1rem;">radar</span> Open RFID Reader
-              </button>
-            </div>
-          </div>
-
-          <!-- Col 3: Asset Details (Auto-filled) -->
-          <div class="card-new" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; height: 160px;">
-            <div>
-              <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Asset Details (Auto-filled)</span>
-              @if (checkoutAssetDetails(); as asset) {
-                <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: flex-start;">
-                  <div style="display: flex; flex-direction: column; gap: 2px;">
-                    <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); line-height: 1.2;">{{ asset.name }}</span>
-                    <span style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace;">{{ asset.assetNumber || asset.id }}</span>
-                    <span style="font-size: 0.72rem; color: var(--color-primary); font-weight: 600;">{{ asset.category }}</span>
-                    <div style="margin-top: 4px;">
-                      <span class="status-pill success" style="padding: 2px 6px; font-size: 0.68rem; display: inline-flex; align-items: center; gap: 4px;">
-                        <span class="material-symbols-outlined" style="font-size: 0.85rem;">check_circle</span> Valid
-                      </span>
-                    </div>
-                  </div>
-                  <span class="material-symbols-outlined" style="font-size: 1.8rem; color: var(--text-muted);">construction</span>
-                </div>
-              } @else {
-                <div style="margin-top: 24px; text-align: center; color: var(--text-muted); font-size: 0.78rem;">
-                  <span class="material-symbols-outlined" style="font-size: 1.8rem; display: block; margin-bottom: 4px; color: var(--border-color);">info</span>
-                  Scan tag to autofill details
-                </div>
-              }
-            </div>
-            @if (checkoutAssetDetails()) {
-              <a style="font-size: 0.75rem; color: var(--color-primary); font-weight: 600; text-decoration: none; cursor: pointer;">View full details</a>
-            }
-          </div>
-
-          <!-- Col 4: Assign To -->
-          <div class="card-new" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; height: 160px;">
-            <div>
-              <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Assign To</span>
-              <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
-                <select [value]="checkoutAssigneeType()" (change)="checkoutAssigneeType.set($any($event.target).value); checkoutAssignee.set($any($event.target).value === 'Employee' ? 'Amit Verma' : $any($event.target).value === 'Vehicle' ? 'MH12AB1234' : 'Production Line 3')"
-                  style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.8rem; font-weight: 600;">
-                  <option value="Employee">Employee</option>
-                  <option value="Vehicle">Vehicle</option>
-                  <option value="Department">Department</option>
-                </select>
-                <select [value]="checkoutAssignee()" (change)="checkoutAssignee.set($any($event.target).value)"
-                  style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.8rem; font-weight: 600;">
-                  @if (checkoutAssigneeType() === 'Employee') {
-                    <option value="Amit Verma">Amit Verma</option>
-                    <option value="Sunil Chauhan">Sunil Chauhan</option>
-                    <option value="Prakash Koli">Prakash Koli</option>
-                  } @else if (checkoutAssigneeType() === 'Vehicle') {
-                    <option value="MH12AB1234">MH12AB1234 (Truck)</option>
-                    <option value="MH14XY5678">MH14XY5678 (Forklift)</option>
-                  } @else {
-                    <option value="Production Line 3">Production Line 3</option>
-                    <option value="Stores">Stores Department</option>
-                    <option value="Maintenance">Maintenance Team</option>
-                  }
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- Col 5: Purpose -->
-          <div class="card-new" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; height: 160px;">
-            <div>
-              <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Purpose</span>
-              <div style="margin-top: 6px; position: relative;">
-                <textarea placeholder="e.g. Preventive maintenance - CNC Machine 12" [value]="checkoutPurpose()" (input)="checkoutPurpose.set($any($event.target).value)" maxlength="250"
-                  style="width: 100%; height: 64px; padding: 6px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.78rem; resize: none;"></textarea>
-                <div style="text-align: right; font-size: 0.65rem; color: var(--text-muted); margin-top: 2px;">
-                  {{ checkoutPurpose().length }}/250
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Col 6: Expected Return -->
-          <div class="card-new" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; height: 160px;">
-            <div>
-              <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Expected Return</span>
-              <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
-                <div style="position: relative;">
-                  <input type="date" [value]="checkoutExpectedReturnDate()" (change)="checkoutExpectedReturnDate.set($any($event.target).value)"
-                    style="width: 100%; padding: 8px 8px 8px 30px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.78rem;" />
-                  <span class="material-symbols-outlined" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 1.05rem; color: var(--text-muted);">calendar_month</span>
-                </div>
-                <div style="position: relative;">
-                  <input type="time" [value]="checkoutExpectedReturnTime()" (change)="checkoutExpectedReturnTime.set($any($event.target).value)"
-                    style="width: 100%; padding: 8px 8px 8px 30px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.78rem;" />
-                  <span class="material-symbols-outlined" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 1.05rem; color: var(--text-muted);">schedule</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Col 7: Submit -->
-          <div class="card-new" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; justify-content: center; gap: 8px; height: 160px;">
-            <button class="action-btn-primary" (click)="submitWorkflow()" style="width: 100%; padding: 12px; border-radius: 8px; font-weight: 700; font-size: 0.85rem;">
-              Review & Submit
-            </button>
-            <button class="action-btn-outline" (click)="resetWorkflow()" style="width: 100%; padding: 10px; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">
-              Reset
-            </button>
-          </div>
-
-        </div>
-
-        <!-- Policy strip -->
-        <div style="display: flex; gap: 16px; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); padding: 8px 0; margin-bottom: 8px; font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">
-          <span style="display: flex; align-items: center; gap: 6px;">
-            <span class="material-symbols-outlined" style="font-size: 1.1rem; color: var(--color-primary);">shield</span> Policy: Default Issue Policy
-          </span>
-          <span style="display: flex; align-items: center; gap: 6px;">
-            <span class="material-symbols-outlined" style="font-size: 1.1rem; color: var(--color-success, #10b981);">check_circle</span> Auto-approval up to ₹ 50,000
-          </span>
-          <span style="display: flex; align-items: center; gap: 6px;">
-            <span class="material-symbols-outlined" style="font-size: 1.1rem; color: var(--text-muted);">notifications_active</span> Overdue reminders enabled
-          </span>
-        </div>
-
-        <!-- Transactions Card -->
-        <div class="card-new" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
-              Recent Issue / Return Transactions 
-              <span class="material-symbols-outlined" style="font-size: 1.1rem; color: var(--text-muted); cursor: pointer;" title="Transactions Log Details">info</span>
-            </h3>
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <select style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.85rem; font-weight: 600;">
-                <option value="all">All Transactions</option>
-                <option value="issue">Material Issue</option>
-                <option value="return">Material Return</option>
-                <option value="transfer">Inter-Site Transfer</option>
-              </select>
-              <select style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.85rem; font-weight: 600;">
-                <option value="all">All Status</option>
-                <option value="approved">Approved</option>
-                <option value="transit">In Transit</option>
-                <option value="completed">Completed</option>
-                <option value="overdue">Overdue</option>
-              </select>
-              <div style="position: relative;">
-                <input type="text" placeholder="Search by asset, person, or tag..." style="padding: 8px 12px 8px 34px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.85rem; width: 260px;" />
-                <span class="material-symbols-outlined" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 1.15rem; color: var(--text-muted);">search</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Table Responsive -->
-          <div class="table-responsive">
-            <table class="table-modern">
-              <thead>
-                <tr>
-                  <th>Transaction ID</th>
-                  <th>Date & Time</th>
-                  <th>Mode</th>
-                  <th>Asset Details</th>
-                  <th>Issued To</th>
-                  <th>Department / Vehicle</th>
-                  <th>Purpose</th>
-                  <th>Expected Return</th>
-                  <th>Status</th>
-                  <th>Location / GPS</th>
-                  <th style="text-align: right;">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (tx of checkoutTransactions(); track tx.id) {
-                  <tr>
-                    <td class="text-semibold cell-id" style="font-family: monospace;">{{ tx.id }}</td>
-                    <td class="cell-datetime" style="font-size: 0.78rem;">{{ tx.time }}</td>
-                    <td>
-                      <!-- Pill Mode style mapping -->
-                      @if (tx.mode === 'Material Issue') {
-                        <span class="status-pill" style="background: rgba(59, 130, 246, 0.08); color: var(--color-primary); border: 1px solid rgba(59, 130, 246, 0.15); display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 0.78rem;">
-                          <span class="material-symbols-outlined" style="font-size: 0.95rem;">output</span> Material Issue
-                        </span>
-                      } @else if (tx.mode === 'Material Return') {
-                        <span class="status-pill" style="background: rgba(16, 185, 129, 0.08); color: var(--color-success, #10b981); border: 1px solid rgba(16, 185, 129, 0.15); display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 0.78rem;">
-                          <span class="material-symbols-outlined" style="font-size: 0.95rem;">input</span> Material Return
-                        </span>
-                      } @else {
-                        <span class="status-pill" style="background: rgba(139, 92, 246, 0.08); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.15); display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 0.78rem;">
-                          <span class="material-symbols-outlined" style="font-size: 0.95rem;">swap_horiz</span> Inter-Site Transfer
-                        </span>
-                      }
-                    </td>
-                    <td>
-                      <div style="font-weight: 600; color: var(--text-main);">{{ tx.assetName }}</div>
-                      <div style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace;">{{ tx.assetCode }}</div>
-                    </td>
-                    <td>
-                      <div style="display: flex; align-items: center; gap: 8px;">
-                        @if (tx.issuedToType === 'vehicle') {
-                          <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-body); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; color: var(--text-muted);">
-                            <span class="material-symbols-outlined" style="font-size: 1.1rem;">local_shipping</span>
-                          </div>
-                        } @else if (tx.issuedToType === 'internal') {
-                          <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-body); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; color: var(--text-muted);">
-                            <span class="material-symbols-outlined" style="font-size: 1.1rem;">factory</span>
-                          </div>
-                        } @else {
-                          <div [style.background]="tx.issuedToInitials === 'AV' ? '#3b82f6' : tx.issuedToInitials === 'SC' ? '#06b6d4' : '#ec4899'" 
-                               style="width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.75rem; font-weight: 700;">
-                            {{ tx.issuedToInitials }}
-                          </div>
-                        }
-                        <div style="display: flex; flex-direction: column;">
-                          <span style="font-weight: 600; color: var(--text-main); font-size: 0.82rem;">{{ tx.issuedToName }}</span>
-                          <span style="font-size: 0.7rem; color: var(--text-muted);">{{ tx.issuedToRole }}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span class="zone-badge" style="background: rgba(59, 130, 246, 0.08); color: var(--color-primary); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem;">
-                        {{ tx.department }}
-                      </span>
-                    </td>
-                    <td style="max-width: 150px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; font-size: 0.8rem;">{{ tx.purpose }}</td>
-                    <td style="font-size: 0.8rem;">{{ tx.expectedReturn }}</td>
-                    <td>
-                      @if (tx.status === 'Approved') {
-                        <div style="display: flex; flex-direction: column;">
-                          <span class="status-pill success" style="padding: 2px 8px; font-size: 0.72rem; font-weight: 700; border-radius: 6px;">Approved</span>
-                          <span style="font-size: 0.65rem; color: var(--text-muted); margin-top: 1px;">by {{ tx.statusAuthor }}</span>
-                        </div>
-                      } @else if (tx.status === 'In Transit') {
-                        <div style="display: flex; flex-direction: column;">
-                          <span class="status-pill warning" style="background: rgba(59, 130, 246, 0.08); color: var(--color-primary); padding: 2px 8px; font-size: 0.72rem; font-weight: 700; border-radius: 6px;">In Transit</span>
-                          <span style="font-size: 0.65rem; color: var(--text-muted); margin-top: 1px;">by {{ tx.statusAuthor }}</span>
-                        </div>
-                      } @else if (tx.status === 'Completed') {
-                        <div style="display: flex; flex-direction: column;">
-                          <span class="status-pill success" style="padding: 2px 8px; font-size: 0.72rem; font-weight: 700; border-radius: 6px;">Completed</span>
-                          <span style="font-size: 0.65rem; color: var(--text-muted); margin-top: 1px;">by {{ tx.statusAuthor }}</span>
-                        </div>
-                      } @else if (tx.status === 'Overdue') {
-                        <div style="display: flex; flex-direction: column;">
-                          <span class="status-pill danger" style="padding: 2px 8px; font-size: 0.72rem; font-weight: 700; border-radius: 6px;">Overdue</span>
-                          <span style="font-size: 0.65rem; color: var(--text-danger); font-weight: 600; margin-top: 1px;">{{ tx.statusSubtext }}</span>
-                        </div>
-                      }
-                    </td>
-                    <td>
-                      <div style="display: flex; align-items: center; gap: 4px;">
-                        <span class="material-symbols-outlined" [style.color]="tx.gpsStatus === 'On' ? 'var(--color-primary)' : 'var(--text-muted)'" style="font-size: 1.05rem;">location_on</span>
-                        <div style="display: flex; flex-direction: column;">
-                          <span style="font-weight: 600; font-size: 0.78rem; color: var(--text-main);">{{ tx.location }}</span>
-                          <span style="font-size: 0.68rem; color: var(--text-muted);">GPS {{ tx.gpsStatus }}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td style="text-align: right;">
-                      <button style="background: none; border: none; color: var(--text-muted); cursor: pointer;" title="More Actions">
-                        <span class="material-symbols-outlined" style="font-size: 1.15rem;">more_vert</span>
-                      </button>
-                    </td>
+        <!-- Two Columns Container -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 24px; width: 100%; align-items: start;">
+          <!-- Left Column: Check-Out -->
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 16px;">
+            <h2 style="margin: 0; font-size: 1.15rem; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: #1e293b;">Check-Out</h2>
+            <div style="overflow-x: auto; width: 100%;">
+              <table style="width: 100%; border-collapse: collapse; text-align: left; font-family: 'Plus Jakarta Sans', sans-serif;">
+                <thead>
+                  <tr style="background: #e9eff6;">
+                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Checkout Entity</th>
+                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Equipment</th>
+                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Type</th>
+                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">EPC</th>
+                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Detected</th>
+                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">CheckOutTime</th>
                   </tr>
-                }
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  @for (item of filteredCheckoutItems(); track item.epc) {
+                    <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s;">
+                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #1e293b; font-weight: 500;">{{ item.checkoutEntity }}</td>
+                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #1e293b; font-weight: 500;">{{ item.equipment }}</td>
+                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #475569;">{{ item.type }}</td>
+                      <td style="padding: 14px 16px; font-size: 0.78rem; font-family: monospace; color: #334155;">{{ item.epc }}</td>
+                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #94a3b8; font-weight: 500;">{{ item.detected }}</td>
+                      <td style="padding: 14px 16px; font-size: 0.82rem; color: #475569;">{{ item.checkoutTime }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="6" style="padding: 32px 0; text-align: center; color: #94a3b8; font-size: 0.88rem;">No check-out data</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <!-- Pagination -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
-            <span style="font-size: 0.8rem; color: var(--text-muted);">Showing 1 to 6 of 156 transactions</span>
-            <div style="display: flex; gap: 4px;">
-              <button class="action-btn-outline sm-btn" style="padding: 4px 8px; border-radius: 6px;"><span class="material-symbols-outlined" style="font-size: 0.95rem;">chevron_left</span></button>
-              <button class="action-btn-primary sm-btn" style="padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem;">1</button>
-              <button class="action-btn-outline sm-btn" style="padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;">2</button>
-              <button class="action-btn-outline sm-btn" style="padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;">3</button>
-              <span style="padding: 4px 6px; color: var(--text-muted); font-size: 0.8rem;">...</span>
-              <button class="action-btn-outline sm-btn" style="padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;">26</button>
-              <button class="action-btn-outline sm-btn" style="padding: 4px 8px; border-radius: 6px;"><span class="material-symbols-outlined" style="font-size: 0.95rem;">chevron_right</span></button>
+          <!-- Right Column: Check-In -->
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 16px;">
+            <h2 style="margin: 0; font-size: 1.15rem; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: #1e293b;">Check-In</h2>
+            <div style="overflow-x: auto; width: 100%;">
+              <table style="width: 100%; border-collapse: collapse; text-align: left; font-family: 'Plus Jakarta Sans', sans-serif;">
+                <thead>
+                  <tr style="background: #e9eff6;">
+                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Checkin Entity</th>
+                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Equipment</th>
+                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Type</th>
+                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Gate Status</th>
+                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">CheckInTime</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of filteredCheckinItems(); track item.epc) {
+                    <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s;">
+                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #1e293b; font-weight: 500;">{{ item.checkinEntity }}</td>
+                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #1e293b; font-weight: 500;">{{ item.equipment }}</td>
+                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #475569;">{{ item.type }}</td>
+                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #1e293b;">{{ item.gateStatus }}</td>
+                      <td style="padding: 14px 16px; font-size: 0.82rem; color: #475569;">{{ item.checkinTime }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="5" style="padding: 32px 0; text-align: center; color: #94a3b8; font-size: 0.88rem;">No check-in data</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
       </div>
-
       } @else if (activeNav() === 'RFID Operations') {
       @if (activeSubNav() === 'Scan Session Monitor') {
       <div class="scan-session-view animate-fade-in"

@@ -380,6 +380,47 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected readonly checkoutTransactions = signal<any[]>([]);
 
+  protected readonly selectedEquipmentFilter = signal<string>('All');
+  protected readonly checkoutItems = signal<any[]>([
+    {
+      checkoutEntity: 'Mower-1001',
+      equipment: 'Mower-1001',
+      type: 'HandHeld Reader',
+      epc: 'E200470E524068214B040111',
+      detected: '-',
+      checkoutTime: '2026-07-03 06:01'
+    },
+    {
+      checkoutEntity: 'Trimmer-1001',
+      equipment: 'Trimmer-1001',
+      type: 'HandHeld Reader',
+      epc: 'E200470559E06821BB7E010C',
+      detected: '-',
+      checkoutTime: '2026-07-03 06:01'
+    }
+  ]);
+  protected readonly checkinItems = signal<any[]>([]);
+
+  protected readonly equipmentPills = computed(() => {
+    const list = new Set<string>();
+    list.add('All');
+    this.checkoutItems().forEach(item => list.add(item.equipment));
+    this.checkinItems().forEach(item => list.add(item.equipment));
+    return Array.from(list);
+  });
+
+  protected readonly filteredCheckoutItems = computed(() => {
+    const filter = this.selectedEquipmentFilter();
+    if (filter === 'All') return this.checkoutItems();
+    return this.checkoutItems().filter(item => item.equipment === filter);
+  });
+
+  protected readonly filteredCheckinItems = computed(() => {
+    const filter = this.selectedEquipmentFilter();
+    if (filter === 'All') return this.checkinItems();
+    return this.checkinItems().filter(item => item.equipment === filter);
+  });
+
   // Issue Return Work Orders state
   protected readonly issueActiveTab = signal<'active' | 'history' | 'create'>('active');
   protected readonly issueWorkOrders = signal<any[]>([]);
