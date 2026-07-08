@@ -2591,6 +2591,7 @@ export class App implements AfterViewInit, OnDestroy {
     this.fetchAssignments();
     this.fetchAlerts();
     this.fetchSitesZonesWarehouses();
+    this.fetchScanEvents();
     // Categories must load first, which then triggers fetchAssets
     this.fetchCategories(() => {
       // After categories are loaded, load tags then assets (so tag pools are ready for asset mapping)
