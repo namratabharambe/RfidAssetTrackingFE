@@ -1924,7 +1924,7 @@ esar+ @if (isLoggedIn()) {
       <div class="bulk-upload-view animate-fade-in">
         <!-- Header -->
         <div class="subpage-header" style="justify-content: flex-end; margin-bottom: 0.5rem; padding: 0;">
-          <button class="action-btn-outline" style="display: flex; align-items: center; gap: 6px;">
+          <button class="action-btn-outline" (click)="downloadBulkUploadTemplate()" style="display: flex; align-items: center; gap: 6px;">
             <span class="material-symbols-outlined">download</span> Download Template
           </button>
         </div>
