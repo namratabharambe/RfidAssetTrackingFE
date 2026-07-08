@@ -1211,10 +1211,10 @@ esar+ @if (isLoggedIn()) {
             </div>
 
             <div class="asset-toolbar-actions">
-              <button class="action-btn-outline select-badge-count-btn">
-                <span class="material-symbols-outlined">tune</span> Filters <span class="badge-count">2</span>
+              <button class="action-btn-outline" (click)="toggleAssetFilters()" [class.active]="showAssetFilters()">
+                <span class="material-symbols-outlined">tune</span> Filters
               </button>
-              <button class="action-btn-outline">
+              <button class="action-btn-outline" (click)="exportAssetsToExcel()">
                 <span class="material-symbols-outlined">upload</span> Export
               </button>
               <button class="action-btn-icon" (click)="clearAssetFilters()">
@@ -1228,6 +1228,7 @@ esar+ @if (isLoggedIn()) {
           </div>
 
           <!-- Quick Badges Filters Bar -->
+          @if (showAssetFilters()) {
           <div class="quick-badges-bar">
             <div class="badge-group">
               <!-- Group 1: Sites/Categories -->
@@ -1273,6 +1274,7 @@ esar+ @if (isLoggedIn()) {
 
             <button class="clear-filters-link" (click)="clearAssetFilters()">Clear All</button>
           </div>
+          }
 
           <!-- Assets Data Table -->
           <div class="asset-table-card">
@@ -2166,7 +2168,7 @@ esar+ @if (isLoggedIn()) {
           <div class="audit-table-card">
             <div class="table-header-row">
               <h3>Session Reconciled Assets</h3>
-              <button class="action-btn-outline sm-btn" style="display: flex; align-items: center; gap: 6px;">
+              <button class="action-btn-outline sm-btn" (click)="exportAuditReportToExcel()" style="display: flex; align-items: center; gap: 6px;">
                 <span class="material-symbols-outlined">summarize</span> Export Audit Report
               </button>
             </div>

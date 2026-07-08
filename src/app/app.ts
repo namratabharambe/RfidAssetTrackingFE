@@ -1147,6 +1147,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly activeAssetSite = signal<string>('All Assets');
   protected readonly activeAssetStatus = signal<string>('');
   protected readonly assetSearchQuery = signal<string>('');
+  protected readonly showAssetFilters = signal<boolean>(false);
 
   protected readonly filteredAssets = computed(() => {
     const q = this.assetSearchQuery().toLowerCase();
@@ -1213,6 +1214,96 @@ export class App implements AfterViewInit, OnDestroy {
   protected onAssetSearch(event: Event) {
     const value = (event.target as HTMLInputElement).value;
     this.assetSearchQuery.set(value);
+  }
+
+  protected toggleAssetFilters() {
+    this.showAssetFilters.set(!this.showAssetFilters());
+  }
+
+  protected exportAssetsToExcel() {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    const assetsList = this.filteredAssets();
+    if (assetsList.length === 0) {
+      window.alert('No assets to export.');
+      return;
+    }
+
+    const headers = [
+      'Asset ID',
+      'Asset Number',
+      'Asset Name',
+      'RFID Tag EPC',
+      'GPS Device ID',
+      'Serial Number',
+      'Category',
+      'Status',
+      'Site',
+      'Zone',
+      'Last Seen'
+    ];
+
+    const rows = assetsList.map(a => [
+      a.id || '',
+      a.assetNumber || '',
+      a.name || '',
+      a.rfidTag || '',
+      a.gpsId || '',
+      a.serialNumber || '',
+      a.category || '',
+      a.status || '',
+      a.site || '',
+      a.zone || '',
+      a.lastSeen || ''
+    ]);
+
+    const sheetData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Assets');
+
+    const wscols = headers.map(() => ({ wch: 20 }));
+    ws['!cols'] = wscols;
+
+    XLSX.writeFile(wb, 'Asset_Master_Report.xlsx');
+  }
+
+  protected exportAuditReportToExcel() {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    const list = this.auditAssetsList();
+    if (list.length === 0) {
+      window.alert('No audit assets to export.');
+      return;
+    }
+
+    const headers = [
+      'Asset ID',
+      'Asset Name',
+      'Expected Zone',
+      'Last Scanned Zone',
+      'Audit Status',
+      'Timestamp'
+    ];
+
+    const rows = list.map(item => [
+      item.id || '',
+      item.name || '',
+      item.expectedZone || '',
+      item.scannedZone || '',
+      item.status || '',
+      item.lastScanned || ''
+    ]);
+
+    const sheetData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Audit_Report');
+
+    const wscols = headers.map(() => ({ wch: 20 }));
+    ws['!cols'] = wscols;
+
+    XLSX.writeFile(wb, 'Audit_Session_Report.xlsx');
   }
 
   // Submenu custom states & helper methods
@@ -3686,15 +3777,34 @@ export class App implements AfterViewInit, OnDestroy {
       else if (reportName === 'User Activity') endpoint = 'users';
 
       this.apiService.downloadReport(endpoint).subscribe({
-        next: (blob) => {
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${reportName.replace(/\s+/g, '_')}_Report.csv`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          window.URL.revokeObjectURL(url);
+        next: async (blob) => {
+          try {
+            const csvText = await blob.text();
+            const wb = XLSX.read(csvText, { type: 'string', raw: true });
+            
+            // Adjust column widths for better display
+            if (wb.SheetNames.length > 0) {
+              const ws = wb.Sheets[wb.SheetNames[0]];
+              const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+              const wscols = [];
+              for (let col = range.s.c; col <= range.e.c; col++) {
+                wscols.push({ wch: 22 });
+              }
+              ws['!cols'] = wscols;
+            }
+            
+            XLSX.writeFile(wb, `${reportName.replace(/\s+/g, '_')}_Report.xlsx`);
+          } catch (err) {
+            console.error('Failed to convert CSV to Excel, falling back to raw download', err);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${reportName.replace(/\s+/g, '_')}_Report.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          }
         },
         error: (err) => {
           console.error('Failed to download report', err);
