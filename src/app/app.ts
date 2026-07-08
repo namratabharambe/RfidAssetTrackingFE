@@ -378,48 +378,70 @@ export class App implements AfterViewInit, OnDestroy {
     return null;
   });
 
+  protected readonly checkoutFilter = signal<string>('All');
+  protected readonly checkoutRecords = signal<any[]>([]);
+  protected readonly checkinRecords = signal<any[]>([]);
+
+  protected readonly checkoutFilterOptions = computed(() => {
+    const names = new Set<string>();
+    this.checkoutRecords().forEach(r => names.add(r.equipment));
+    this.checkinRecords().forEach(r => names.add(r.equipment));
+    return ['All', ...Array.from(names)];
+  });
+
+  protected readonly filteredCheckoutRecords = computed(() => {
+    const f = this.checkoutFilter();
+    if (f === 'All') return this.checkoutRecords();
+    return this.checkoutRecords().filter(r => r.equipment === f);
+  });
+
+  protected readonly filteredCheckinRecords = computed(() => {
+    const f = this.checkoutFilter();
+    if (f === 'All') return this.checkinRecords();
+    return this.checkinRecords().filter(r => r.equipment === f);
+  });
+
+  protected toggleCheckOutStatus(record: any) {
+    if (!record.raw || !record.raw.id) return;
+    const updated = {
+      ...record.raw,
+      actualReturnDate: new Date().toISOString(),
+      status: 'Returned'
+    };
+    this.apiService.updateAssignment(record.raw.id, updated).subscribe({
+      next: () => {
+        this.fetchAssignments();
+      },
+      error: (err) => {
+        console.error('Failed to check in asset assignment', err);
+      }
+    });
+  }
+
+  protected toggleCheckInStatus(record: any) {
+    if (!record.raw || !record.raw.id) return;
+    const newAssignment = {
+      assetId: record.raw.assetId,
+      assignedToUserId: record.raw.assignedToUserId,
+      custodianName: record.raw.custodianName,
+      assignedDate: new Date().toISOString(),
+      expectedReturnDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      purpose: record.raw.purpose || 'Re-checked out from dashboard',
+      status: 'Active'
+    };
+    this.apiService.createAssignment(newAssignment).subscribe({
+      next: () => {
+        this.fetchAssignments();
+      },
+      error: (err) => {
+        console.error('Failed to create check out assignment', err);
+      }
+    });
+  }
+
   protected readonly checkoutTransactions = signal<any[]>([]);
 
-  protected readonly selectedEquipmentFilter = signal<string>('All');
-  protected readonly checkoutItems = signal<any[]>([
-    {
-      checkoutEntity: 'Mower-1001',
-      equipment: 'Mower-1001',
-      type: 'HandHeld Reader',
-      epc: 'E200470E524068214B040111',
-      detected: '-',
-      checkoutTime: '2026-07-03 06:01'
-    },
-    {
-      checkoutEntity: 'Trimmer-1001',
-      equipment: 'Trimmer-1001',
-      type: 'HandHeld Reader',
-      epc: 'E200470559E06821BB7E010C',
-      detected: '-',
-      checkoutTime: '2026-07-03 06:01'
-    }
-  ]);
-  protected readonly checkinItems = signal<any[]>([]);
 
-  protected readonly equipmentPills = computed(() => {
-    const list = new Set<string>();
-    list.add('All');
-    this.checkoutItems().forEach(item => list.add(item.equipment));
-    this.checkinItems().forEach(item => list.add(item.equipment));
-    return Array.from(list);
-  });
-
-  protected readonly filteredCheckoutItems = computed(() => {
-    const filter = this.selectedEquipmentFilter();
-    if (filter === 'All') return this.checkoutItems();
-    return this.checkoutItems().filter(item => item.equipment === filter);
-  });
-
-  protected readonly filteredCheckinItems = computed(() => {
-    const filter = this.selectedEquipmentFilter();
-    if (filter === 'All') return this.checkinItems();
-    return this.checkinItems().filter(item => item.equipment === filter);
-  });
 
   // Issue Return Work Orders state
   protected readonly issueActiveTab = signal<'active' | 'history' | 'create'>('active');
@@ -1126,6 +1148,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly activeAssetSite = signal<string>('All Assets');
   protected readonly activeAssetStatus = signal<string>('');
   protected readonly assetSearchQuery = signal<string>('');
+  protected readonly showAssetFilters = signal<boolean>(false);
 
   protected readonly filteredAssets = computed(() => {
     const q = this.assetSearchQuery().toLowerCase();
@@ -1192,6 +1215,96 @@ export class App implements AfterViewInit, OnDestroy {
   protected onAssetSearch(event: Event) {
     const value = (event.target as HTMLInputElement).value;
     this.assetSearchQuery.set(value);
+  }
+
+  protected toggleAssetFilters() {
+    this.showAssetFilters.set(!this.showAssetFilters());
+  }
+
+  protected exportAssetsToExcel() {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    const assetsList = this.filteredAssets();
+    if (assetsList.length === 0) {
+      window.alert('No assets to export.');
+      return;
+    }
+
+    const headers = [
+      'Asset ID',
+      'Asset Number',
+      'Asset Name',
+      'RFID Tag EPC',
+      'GPS Device ID',
+      'Serial Number',
+      'Category',
+      'Status',
+      'Site',
+      'Zone',
+      'Last Seen'
+    ];
+
+    const rows = assetsList.map(a => [
+      a.id || '',
+      a.assetNumber || '',
+      a.name || '',
+      a.rfidTag || '',
+      a.gpsId || '',
+      a.serialNumber || '',
+      a.category || '',
+      a.status || '',
+      a.site || '',
+      a.zone || '',
+      a.lastSeen || ''
+    ]);
+
+    const sheetData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Assets');
+
+    const wscols = headers.map(() => ({ wch: 20 }));
+    ws['!cols'] = wscols;
+
+    XLSX.writeFile(wb, 'Asset_Master_Report.xlsx');
+  }
+
+  protected exportAuditReportToExcel() {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    const list = this.auditAssetsList();
+    if (list.length === 0) {
+      window.alert('No audit assets to export.');
+      return;
+    }
+
+    const headers = [
+      'Asset ID',
+      'Asset Name',
+      'Expected Zone',
+      'Last Scanned Zone',
+      'Audit Status',
+      'Timestamp'
+    ];
+
+    const rows = list.map(item => [
+      item.id || '',
+      item.name || '',
+      item.expectedZone || '',
+      item.scannedZone || '',
+      item.status || '',
+      item.lastScanned || ''
+    ]);
+
+    const sheetData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Audit_Report');
+
+    const wscols = headers.map(() => ({ wch: 20 }));
+    ws['!cols'] = wscols;
+
+    XLSX.writeFile(wb, 'Audit_Session_Report.xlsx');
   }
 
   // Submenu custom states & helper methods
@@ -2589,6 +2702,30 @@ export class App implements AfterViewInit, OnDestroy {
               actualReturnDate: a.actualReturnDate ? new Date(a.actualReturnDate).toLocaleDateString() : undefined
             };
           }));
+
+          const checkouts: any[] = [];
+          const checkins: any[] = [];
+          list.forEach(a => {
+            const isReturned = a.actualReturnDate != null || a.status === 'Returned';
+            const item = {
+              entity: a.custodianName || a.assignedToUsername || 'System',
+              equipment: a.assetName || (a.asset ? a.asset.name : 'Unknown Equipment'),
+              type: 'HandHeld Reader',
+              epc: a.asset ? a.asset.rfidTag : (a.assetNumber || 'Unknown EPC'),
+              detected: '-',
+              time: new Date(a.assignedDate).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+              gateStatus: isReturned ? 'Passed' : '-',
+              checkinTime: a.actualReturnDate ? new Date(a.actualReturnDate).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '-',
+              raw: a
+            };
+            if (isReturned) {
+              checkins.push(item);
+            } else {
+              checkouts.push(item);
+            }
+          });
+          this.checkoutRecords.set(checkouts);
+          this.checkinRecords.set(checkins);
         }
       },
       error: (err) => {
@@ -2652,7 +2789,11 @@ export class App implements AfterViewInit, OnDestroy {
         }, 100);
       },
       error: (err) => {
-        this.loginErrorMessage.set(err.error?.message || err.error || 'Invalid username or password.');
+        if (err.status === 0) {
+          this.loginErrorMessage.set('Unable to connect to the server. Please ensure the backend API is running.');
+        } else {
+          this.loginErrorMessage.set(err.error?.message || (typeof err.error === 'string' ? err.error : null) || 'Invalid username or password.');
+        }
       }
     });
   }
@@ -3637,15 +3778,34 @@ export class App implements AfterViewInit, OnDestroy {
       else if (reportName === 'User Activity') endpoint = 'users';
 
       this.apiService.downloadReport(endpoint).subscribe({
-        next: (blob) => {
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${reportName.replace(/\s+/g, '_')}_Report.csv`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          window.URL.revokeObjectURL(url);
+        next: async (blob) => {
+          try {
+            const csvText = await blob.text();
+            const wb = XLSX.read(csvText, { type: 'string', raw: true });
+            
+            // Adjust column widths for better display
+            if (wb.SheetNames.length > 0) {
+              const ws = wb.Sheets[wb.SheetNames[0]];
+              const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+              const wscols = [];
+              for (let col = range.s.c; col <= range.e.c; col++) {
+                wscols.push({ wch: 22 });
+              }
+              ws['!cols'] = wscols;
+            }
+            
+            XLSX.writeFile(wb, `${reportName.replace(/\s+/g, '_')}_Report.xlsx`);
+          } catch (err) {
+            console.error('Failed to convert CSV to Excel, falling back to raw download', err);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${reportName.replace(/\s+/g, '_')}_Report.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          }
         },
         error: (err) => {
           console.error('Failed to download report', err);

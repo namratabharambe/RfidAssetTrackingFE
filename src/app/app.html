@@ -1,4 +1,4 @@
-esar+  @if (isLoggedIn()) {
+esar+ @if (isLoggedIn()) {
 <div class="app-container" [class.loading]="isLoading()">
 
   <!-- Sidebar Navigation -->
@@ -148,7 +148,9 @@ esar+  @if (isLoggedIn()) {
               @for (site of apiSites(); track site.id) {
               <li (click)="selectSite(site.name)" [class.selected]="selectedSite() === site.name">
                 <span class="material-symbols-outlined">
-                  {{ site.name.toLowerCase().includes('warehouse') || site.name.toLowerCase().includes('dc') ? 'warehouse' : site.name.toLowerCase().includes('plant') || site.name.toLowerCase().includes('factory') ? 'factory' : 'domain' }}
+                  {{ site.name.toLowerCase().includes('warehouse') || site.name.toLowerCase().includes('dc') ?
+                  'warehouse' : site.name.toLowerCase().includes('plant') || site.name.toLowerCase().includes('factory')
+                  ? 'factory' : 'domain' }}
                 </span>
                 {{ site.name }}
                 @if (selectedSite() === site.name) {
@@ -1209,10 +1211,10 @@ esar+  @if (isLoggedIn()) {
             </div>
 
             <div class="asset-toolbar-actions">
-              <button class="action-btn-outline select-badge-count-btn">
-                <span class="material-symbols-outlined">tune</span> Filters <span class="badge-count">2</span>
+              <button class="action-btn-outline" (click)="toggleAssetFilters()" [class.active]="showAssetFilters()">
+                <span class="material-symbols-outlined">tune</span> Filters
               </button>
-              <button class="action-btn-outline">
+              <button class="action-btn-outline" (click)="exportAssetsToExcel()">
                 <span class="material-symbols-outlined">upload</span> Export
               </button>
               <button class="action-btn-icon" (click)="clearAssetFilters()">
@@ -1226,6 +1228,7 @@ esar+  @if (isLoggedIn()) {
           </div>
 
           <!-- Quick Badges Filters Bar -->
+          @if (showAssetFilters()) {
           <div class="quick-badges-bar">
             <div class="badge-group">
               <!-- Group 1: Sites/Categories -->
@@ -1271,6 +1274,7 @@ esar+  @if (isLoggedIn()) {
 
             <button class="clear-filters-link" (click)="clearAssetFilters()">Clear All</button>
           </div>
+          }
 
           <!-- Assets Data Table -->
           <div class="asset-table-card">
@@ -1303,22 +1307,24 @@ esar+  @if (isLoggedIn()) {
                     <td>{{ asset.category }}</td>
                     <td class="cell-rfid">
                       @if (asset.rfidTag && asset.rfidTag !== '—') {
-                        <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.1); color: #2563eb; font-weight: 500; font-family: monospace; font-size: 0.72rem;">
-                          <span class="material-symbols-outlined" style="font-size: 0.8rem;">tag</span>
-                          {{ asset.rfidTag }}
-                        </span>
+                      <span
+                        style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.1); color: #2563eb; font-weight: 500; font-family: monospace; font-size: 0.72rem;">
+                        <span class="material-symbols-outlined" style="font-size: 0.8rem;">tag</span>
+                        {{ asset.rfidTag }}
+                      </span>
                       } @else {
-                        <span style="color: var(--text-muted); font-style: italic;">None</span>
+                      <span style="color: var(--text-muted); font-style: italic;">None</span>
                       }
                     </td>
                     <td class="cell-gps">
                       @if (asset.gpsId && asset.gpsId !== '—') {
-                        <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(249, 115, 22, 0.1); color: #ea580c; font-weight: 500; font-family: monospace; font-size: 0.72rem;">
-                          <span class="material-symbols-outlined" style="font-size: 0.8rem;">share_location</span>
-                          {{ asset.gpsId }}
-                        </span>
+                      <span
+                        style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(249, 115, 22, 0.1); color: #ea580c; font-weight: 500; font-family: monospace; font-size: 0.72rem;">
+                        <span class="material-symbols-outlined" style="font-size: 0.8rem;">share_location</span>
+                        {{ asset.gpsId }}
+                      </span>
                       } @else {
-                        <span style="color: var(--text-muted); font-style: italic;">None</span>
+                      <span style="color: var(--text-muted); font-style: italic;">None</span>
                       }
                     </td>
                     <td>{{ asset.site }}</td>
@@ -1419,69 +1425,89 @@ esar+  @if (isLoggedIn()) {
             <!-- Tab: Overview -->
 
             <!-- Interactive Asset Lifecycle Stepper -->
-            <div class="overview-card" style="padding: 16px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 12px;">
-              <span class="card-title" style="margin: 0; font-size: 0.85rem; color: var(--text-primary);">Asset Lifecycle Tracker</span>
-              
+            <div class="overview-card"
+              style="padding: 16px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 12px;">
+              <span class="card-title" style="margin: 0; font-size: 0.85rem; color: var(--text-primary);">Asset
+                Lifecycle Tracker</span>
+
               <!-- The Stepper Row -->
-              <div style="display: flex; align-items: center; justify-content: space-between; position: relative; margin: 10px 0;">
+              <div
+                style="display: flex; align-items: center; justify-content: space-between; position: relative; margin: 10px 0;">
                 <!-- Connector Line -->
-                <div style="position: absolute; top: 12px; left: 4%; right: 4%; height: 3px; background: var(--border-color, #e2e8f0); z-index: 1;"></div>
-                
+                <div
+                  style="position: absolute; top: 12px; left: 4%; right: 4%; height: 3px; background: var(--border-color, #e2e8f0); z-index: 1;">
+                </div>
+
                 <!-- Step 1: Procured -->
-                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;" (click)="changeAssetStatus(asset.id, 'Available')">
-                  <div [style.background]="asset.status === 'Available' || asset.status === 'In Use' || asset.status === 'Checked Out' || asset.status === 'Under Maintenance' ? '#10b981' : 'var(--bg-card)'"
-                       [style.border-color]="asset.status === 'Available' || asset.status === 'In Use' || asset.status === 'Checked Out' || asset.status === 'Under Maintenance' ? '#10b981' : 'var(--border-color)'"
-                       style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
+                <div
+                  style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;"
+                  (click)="changeAssetStatus(asset.id, 'Available')">
+                  <div
+                    [style.background]="asset.status === 'Available' || asset.status === 'In Use' || asset.status === 'Checked Out' || asset.status === 'Under Maintenance' ? '#10b981' : 'var(--bg-card)'"
+                    [style.border-color]="asset.status === 'Available' || asset.status === 'In Use' || asset.status === 'Checked Out' || asset.status === 'Under Maintenance' ? '#10b981' : 'var(--border-color)'"
+                    style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
                     1
                   </div>
                   <span style="font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">Procured</span>
                 </div>
 
                 <!-- Step 2: Available -->
-                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;" (click)="changeAssetStatus(asset.id, 'Available')">
-                  <div [style.background]="asset.status === 'Available' || asset.status === 'In Use' || asset.status === 'Checked Out' || asset.status === 'Under Maintenance' ? '#3b82f6' : 'var(--bg-card)'"
-                       [style.border-color]="asset.status === 'Available' || asset.status === 'In Use' || asset.status === 'Checked Out' || asset.status === 'Under Maintenance' ? '#3b82f6' : 'var(--border-color)'"
-                       style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
+                <div
+                  style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;"
+                  (click)="changeAssetStatus(asset.id, 'Available')">
+                  <div
+                    [style.background]="asset.status === 'Available' || asset.status === 'In Use' || asset.status === 'Checked Out' || asset.status === 'Under Maintenance' ? '#3b82f6' : 'var(--bg-card)'"
+                    [style.border-color]="asset.status === 'Available' || asset.status === 'In Use' || asset.status === 'Checked Out' || asset.status === 'Under Maintenance' ? '#3b82f6' : 'var(--border-color)'"
+                    style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
                     2
                   </div>
                   <span style="font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">Available</span>
                 </div>
 
                 <!-- Step 3: Assigned / In Use -->
-                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;" (click)="changeAssetStatus(asset.id, 'In Use')">
-                  <div [style.background]="asset.status === 'In Use' || asset.status === 'Checked Out' ? '#8b5cf6' : 'var(--bg-card)'"
-                       [style.border-color]="asset.status === 'In Use' || asset.status === 'Checked Out' ? '#8b5cf6' : 'var(--border-color)'"
-                       style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
+                <div
+                  style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;"
+                  (click)="changeAssetStatus(asset.id, 'In Use')">
+                  <div
+                    [style.background]="asset.status === 'In Use' || asset.status === 'Checked Out' ? '#8b5cf6' : 'var(--bg-card)'"
+                    [style.border-color]="asset.status === 'In Use' || asset.status === 'Checked Out' ? '#8b5cf6' : 'var(--border-color)'"
+                    style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
                     3
                   </div>
                   <span style="font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">Assigned</span>
                 </div>
 
                 <!-- Step 4: Transit -->
-                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;" (click)="changeAssetStatus(asset.id, 'Checked Out')">
+                <div
+                  style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;"
+                  (click)="changeAssetStatus(asset.id, 'Checked Out')">
                   <div [style.background]="asset.status === 'Checked Out' ? '#f59e0b' : 'var(--bg-card)'"
-                       [style.border-color]="asset.status === 'Checked Out' ? '#f59e0b' : 'var(--border-color)'"
-                       style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
+                    [style.border-color]="asset.status === 'Checked Out' ? '#f59e0b' : 'var(--border-color)'"
+                    style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
                     4
                   </div>
                   <span style="font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">Transit</span>
                 </div>
 
                 <!-- Step 5: Maintenance -->
-                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;" (click)="changeAssetStatus(asset.id, 'Under Maintenance')">
+                <div
+                  style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;"
+                  (click)="changeAssetStatus(asset.id, 'Under Maintenance')">
                   <div [style.background]="asset.status === 'Under Maintenance' ? '#ef4444' : 'var(--bg-card)'"
-                       [style.border-color]="asset.status === 'Under Maintenance' ? '#ef4444' : 'var(--border-color)'"
-                       style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
+                    [style.border-color]="asset.status === 'Under Maintenance' ? '#ef4444' : 'var(--border-color)'"
+                    style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
                     5
                   </div>
                   <span style="font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">Maintenance</span>
                 </div>
 
                 <!-- Step 6: Retired -->
-                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;" (click)="changeAssetStatus(asset.id, 'Retired')">
+                <div
+                  style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;"
+                  (click)="changeAssetStatus(asset.id, 'Retired')">
                   <div [style.background]="asset.status === 'Retired' ? '#64748b' : 'var(--bg-card)'"
-                       [style.border-color]="asset.status === 'Retired' ? '#64748b' : 'var(--border-color)'"
-                       style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
+                    [style.border-color]="asset.status === 'Retired' ? '#64748b' : 'var(--border-color)'"
+                    style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
                     6
                   </div>
                   <span style="font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">Retired</span>
@@ -1489,11 +1515,19 @@ esar+  @if (isLoggedIn()) {
               </div>
 
               <!-- Stepper Fast Transition Actions -->
-              <div style="display: flex; gap: 6px; flex-wrap: wrap; border-top: 1px solid var(--border-color, #e2e8f0); padding-top: 8px; margin-top: 4px;">
-                <button (click)="changeAssetStatus(asset.id, 'Available')" style="flex: 1; min-width: 80px; padding: 6px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 4px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Set Available</button>
-                <button (click)="changeAssetStatus(asset.id, 'In Use')" style="flex: 1; min-width: 80px; padding: 6px; background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; border-radius: 4px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Assign / Deploy</button>
-                <button (click)="changeAssetStatus(asset.id, 'Under Maintenance')" style="flex: 1; min-width: 80px; padding: 6px; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; border-radius: 4px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Send to Repair</button>
-                <button (click)="changeAssetStatus(asset.id, 'Retired')" style="flex: 1; min-width: 80px; padding: 6px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Decommission</button>
+              <div
+                style="display: flex; gap: 6px; flex-wrap: wrap; border-top: 1px solid var(--border-color, #e2e8f0); padding-top: 8px; margin-top: 4px;">
+                <button (click)="changeAssetStatus(asset.id, 'Available')"
+                  style="flex: 1; min-width: 80px; padding: 6px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 4px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Set
+                  Available</button>
+                <button (click)="changeAssetStatus(asset.id, 'In Use')"
+                  style="flex: 1; min-width: 80px; padding: 6px; background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; border-radius: 4px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Assign
+                  / Deploy</button>
+                <button (click)="changeAssetStatus(asset.id, 'Under Maintenance')"
+                  style="flex: 1; min-width: 80px; padding: 6px; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; border-radius: 4px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Send
+                  to Repair</button>
+                <button (click)="changeAssetStatus(asset.id, 'Retired')"
+                  style="flex: 1; min-width: 80px; padding: 6px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Decommission</button>
               </div>
             </div>
 
@@ -1577,7 +1611,8 @@ esar+  @if (isLoggedIn()) {
             <div class="overview-card">
               <span class="card-title">Asset Specifications</span>
 
-              <div class="asset-details-grid-mock" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
+              <div class="asset-details-grid-mock"
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
                 <div class="info-cell">
                   <label>Asset Number / ID</label>
                   <span class="val">{{ asset.assetNumber }}</span>
@@ -1604,9 +1639,11 @@ esar+  @if (isLoggedIn()) {
                 </div>
                 <div class="info-cell">
                   <label>Custodian</label>
-                  <span class="val custodian-name-block" style="font-weight: 700; color: #3b82f6;">{{ asset.currentCustodian }}</span>
+                  <span class="val custodian-name-block" style="font-weight: 700; color: #3b82f6;">{{
+                    asset.currentCustodian }}</span>
                   @if (asset.custodianEmail && asset.custodianEmail !== '—') {
-                  <span class="custodian-email-block" style="font-size: 0.72rem; color: var(--text-muted);">{{ asset.custodianEmail }}</span>
+                  <span class="custodian-email-block" style="font-size: 0.72rem; color: var(--text-muted);">{{
+                    asset.custodianEmail }}</span>
                   }
                 </div>
                 <div class="info-cell">
@@ -1643,7 +1680,8 @@ esar+  @if (isLoggedIn()) {
                   </div>
                   <div class="info-cell">
                     <label>Status</label>
-                    <span class="status-pill active-w" style="font-size: 0.7rem; font-weight: 700;">{{ asset.warrantyStatus || 'Active' }}</span>
+                    <span class="status-pill active-w" style="font-size: 0.7rem; font-weight: 700;">{{
+                      asset.warrantyStatus || 'Active' }}</span>
                   </div>
                 </div>
               </div>
@@ -1752,47 +1790,67 @@ esar+  @if (isLoggedIn()) {
         </div>
 
         <!-- Categories Grid -->
-        <div class="categories-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 1rem;">
+        <div class="categories-grid"
+          style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 1rem;">
           @for (cat of apiCategories(); track cat.id) {
-          <div class="category-card blue-card" style="display: flex; flex-direction: column; justify-content: space-between; border-radius: 12px; border: 1px solid var(--border-color, #e2e8f0); background: var(--card-bg, #ffffff); padding: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.03); transition: transform 0.2s;">
+          <div class="category-card blue-card"
+            style="display: flex; flex-direction: column; justify-content: space-between; border-radius: 12px; border: 1px solid var(--border-color, #e2e8f0); background: var(--card-bg, #ffffff); padding: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.03); transition: transform 0.2s;">
             <div class="card-top" style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px;">
-              <div class="icon-box blue" style="background: #e0f2fe; color: #0284c7; width: 42px; height: 42px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+              <div class="icon-box blue"
+                style="background: #e0f2fe; color: #0284c7; width: 42px; height: 42px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
                 <span class="material-symbols-outlined">widgets</span>
               </div>
               <div class="card-meta">
-                <h3 style="margin: 0 0 4px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.95rem; font-weight: 700; color: var(--text-main, #0f172a);">{{ cat.name }}</h3>
-                <p class="desc" style="margin: 0; font-size: 0.75rem; color: var(--text-muted, #64748b); line-height: 1.4;">{{ cat.description || 'Custom Asset Category classification' }}</p>
+                <h3
+                  style="margin: 0 0 4px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.95rem; font-weight: 700; color: var(--text-main, #0f172a);">
+                  {{ cat.name }}</h3>
+                <p class="desc"
+                  style="margin: 0; font-size: 0.75rem; color: var(--text-muted, #64748b); line-height: 1.4;">{{
+                  cat.description || 'Custom Asset Category classification' }}</p>
               </div>
             </div>
-            <div class="card-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--border-color, #e2e8f0); border-bottom: 1px solid var(--border-color, #e2e8f0); padding: 10px 0; margin-bottom: 12px; gap: 8px; text-align: center;">
+            <div class="card-stats"
+              style="display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--border-color, #e2e8f0); border-bottom: 1px solid var(--border-color, #e2e8f0); padding: 10px 0; margin-bottom: 12px; gap: 8px; text-align: center;">
               <div class="stat-item" style="display: flex; flex-direction: column;">
-                <span class="lbl" style="font-size: 0.65rem; color: var(--text-muted, #64748b); font-weight: 500;">Total</span>
-                <span class="val" style="font-size: 0.9rem; font-weight: 700; color: var(--text-main, #0f172a);">{{ getCategoryCount(cat.name) }}</span>
+                <span class="lbl"
+                  style="font-size: 0.65rem; color: var(--text-muted, #64748b); font-weight: 500;">Total</span>
+                <span class="val" style="font-size: 0.9rem; font-weight: 700; color: var(--text-main, #0f172a);">{{
+                  getCategoryCount(cat.name) }}</span>
               </div>
               <div class="stat-item" style="display: flex; flex-direction: column;">
-                <span class="lbl" style="font-size: 0.65rem; color: var(--text-muted, #64748b); font-weight: 500;">In Use</span>
-                <span class="val highlight-blue" style="font-size: 0.9rem; font-weight: 700; color: #3b82f6;">{{ getCategoryInUseCount(cat.name) }}</span>
+                <span class="lbl" style="font-size: 0.65rem; color: var(--text-muted, #64748b); font-weight: 500;">In
+                  Use</span>
+                <span class="val highlight-blue" style="font-size: 0.9rem; font-weight: 700; color: #3b82f6;">{{
+                  getCategoryInUseCount(cat.name) }}</span>
               </div>
               <div class="stat-item" style="display: flex; flex-direction: column;">
-                <span class="lbl" style="font-size: 0.65rem; color: var(--text-muted, #64748b); font-weight: 500;">Available</span>
-                <span class="val text-success" style="font-size: 0.9rem; font-weight: 700; color: #10b981;">{{ getCategoryAvailableCount(cat.name) }}</span>
+                <span class="lbl"
+                  style="font-size: 0.65rem; color: var(--text-muted, #64748b); font-weight: 500;">Available</span>
+                <span class="val text-success" style="font-size: 0.9rem; font-weight: 700; color: #10b981;">{{
+                  getCategoryAvailableCount(cat.name) }}</span>
               </div>
             </div>
             <div class="card-progress" style="margin-bottom: 12px;">
-              <div class="progress-info" style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted, #64748b); margin-bottom: 4px;">
+              <div class="progress-info"
+                style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted, #64748b); margin-bottom: 4px;">
                 <span>Utilization Rate</span>
                 <span>{{ getCategoryUtilizationRate(cat.name) }}</span>
               </div>
-              <div class="progress-bar-bg" style="height: 6px; background: var(--border-color, #e2e8f0); border-radius: 3px; overflow: hidden;">
-                <div class="progress-bar-fill blue" [style.width]="getCategoryUtilizationRate(cat.name)" style="height: 100%; background: #3b82f6; border-radius: 3px;"></div>
+              <div class="progress-bar-bg"
+                style="height: 6px; background: var(--border-color, #e2e8f0); border-radius: 3px; overflow: hidden;">
+                <div class="progress-bar-fill blue" [style.width]="getCategoryUtilizationRate(cat.name)"
+                  style="height: 100%; background: #3b82f6; border-radius: 3px;"></div>
               </div>
             </div>
             <div class="card-actions" style="display: flex; justify-content: space-between; align-items: center;">
-              <button class="btn-text-action" (click)="selectSubNav('Asset Master & Inventory', 'Assets')" style="background: none; border: none; color: #3b82f6; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 0;">
+              <button class="btn-text-action" (click)="selectSubNav('Asset Master & Inventory', 'Assets')"
+                style="background: none; border: none; color: #3b82f6; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 0;">
                 View Assets &rarr;
               </button>
               <div style="display: flex; gap: 6px;">
-                <button class="btn-icon-action delete-btn" (click)="deleteCategory(cat.id)" style="background: transparent; border: 1px solid var(--border-color, #e2e8f0); border-radius: 6px; color: #ef4444; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;"><span class="material-symbols-outlined" style="font-size: 16px;">delete</span></button>
+                <button class="btn-icon-action delete-btn" (click)="deleteCategory(cat.id)"
+                  style="background: transparent; border: 1px solid var(--border-color, #e2e8f0); border-radius: 6px; color: #ef4444; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;"><span
+                    class="material-symbols-outlined" style="font-size: 16px;">delete</span></button>
               </div>
             </div>
           </div>
@@ -1831,7 +1889,8 @@ esar+  @if (isLoggedIn()) {
                   <td class="text-semibold">{{ grp.name }}</td>
                   <td>{{ grp.category }}</td>
                   <td>
-                    <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; background: rgba(59,130,246,0.08); color: #2563eb; font-size: 0.78rem; font-weight: 600;">
+                    <span
+                      style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; background: rgba(59,130,246,0.08); color: #2563eb; font-size: 0.78rem; font-weight: 600;">
                       {{ grp.assetsLabel }}
                     </span>
                   </td>
@@ -1848,8 +1907,11 @@ esar+  @if (isLoggedIn()) {
                 } @empty {
                 <tr>
                   <td colspan="8" style="text-align: center; padding: 2rem;">
-                    <span class="material-symbols-outlined" style="font-size: 2rem; color: var(--text-muted); display: block; margin-bottom: 8px;">folder_open</span>
-                    <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">No asset groups yet. Use <strong>Create Group</strong> above to add your first group.</p>
+                    <span class="material-symbols-outlined"
+                      style="font-size: 2rem; color: var(--text-muted); display: block; margin-bottom: 8px;">folder_open</span>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">No asset groups yet. Use
+                      <strong>Create Group</strong> above to add your first group.
+                    </p>
                   </td>
                 </tr>
                 }
@@ -2055,7 +2117,7 @@ esar+  @if (isLoggedIn()) {
           <div class="audit-controls-card">
             <h3>Audit Configuration</h3>
 
-             <div class="form-group">
+            <div class="form-group">
               <label>Audit Location</label>
               <select [value]="auditLocation()" (change)="auditLocation.set($any($event.target).value)">
                 @for (site of apiSites(); track site.id) {
@@ -2106,7 +2168,7 @@ esar+  @if (isLoggedIn()) {
           <div class="audit-table-card">
             <div class="table-header-row">
               <h3>Session Reconciled Assets</h3>
-              <button class="action-btn-outline sm-btn" style="display: flex; align-items: center; gap: 6px;">
+              <button class="action-btn-outline sm-btn" (click)="exportAuditReportToExcel()" style="display: flex; align-items: center; gap: 6px;">
                 <span class="material-symbols-outlined">summarize</span> Export Audit Report
               </button>
             </div>
@@ -2152,102 +2214,156 @@ esar+  @if (isLoggedIn()) {
       </div>
       }
       } @else if (activeNav() === 'Check in/Check out') {
-      <div class="checkout-view animate-fade-in" style="display: flex; flex-direction: column; gap: 24px; padding: 24px; background: #f8fafc; min-height: 100%;">
-        
-        <!-- Header -->
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <h1 style="margin: 0; font-size: 1.5rem; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: #1e293b;">Check-Out / Check-In Workflow</h1>
-          <p style="margin: 0; font-size: 0.88rem; color: #64748b; font-family: 'Plus Jakarta Sans', sans-serif;">Select one item to review equipment status</p>
+      <div class="checkout-view animate-fade-in" style="display: flex; flex-direction: column; gap: 16px;">
+
+        <!-- Header Card -->
+        <div class="card-new"
+          style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+          <h2 style="margin: 0 0 6px 0; font-size: 1.35rem; font-weight: 700; color: var(--text-main);">Workflow</h2>
+          <p style="margin: 0 0 16px 0; font-size: 0.85rem; color: var(--text-muted);">Select one item to review
+            equipment status</p>
+          <div class="filter-pills-row">
+            @for (opt of checkoutFilterOptions(); track opt) {
+            <button class="pill-btn" [class.active]="checkoutFilter() === opt" (click)="checkoutFilter.set(opt)">{{ opt
+              }}</button>
+            }
+          </div>
         </div>
 
-        <!-- Filter pills -->
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
-          @for (pill of equipmentPills(); track pill) {
-            <button (click)="selectedEquipmentFilter.set(pill)"
-              [style.background]="selectedEquipmentFilter() === pill ? '#0f766e' : '#ffffff'"
-              [style.color]="selectedEquipmentFilter() === pill ? '#ffffff' : '#1e293b'"
-              [style.border]="selectedEquipmentFilter() === pill ? 'none' : '1px solid #cbd5e1'"
-              style="padding: 6px 16px; border-radius: 9999px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-              {{ pill }}
-            </button>
-          }
-        </div>
+        <!-- Workflow Grid -->
+        <div class="workflow-grid">
+          <!-- Left Side: Check-Out Panel -->
+          <div class="card-new"
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); display: flex; flex-direction: column;">
+            <div class="panel-header-row">
+              <h3 class="panel-title"
+                style="color: var(--text-primary); font-size: 1.05rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 6px;">
+                <span class="material-symbols-outlined" style="color: #0d9488; font-size: 1.25rem;">logout</span>
+                Check-Out
+              </h3>
+              <span class="records-badge green"
+                style="background: rgba(13, 148, 136, 0.1); color: #0d9488; font-weight: 700; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem;">
+                {{ filteredCheckoutRecords().length }} records
+              </span>
+            </div>
 
-        <!-- Two Columns Container -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 24px; width: 100%; align-items: start;">
-          <!-- Left Column: Check-Out -->
-          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 16px;">
-            <h2 style="margin: 0; font-size: 1.15rem; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: #1e293b;">Check-Out</h2>
-            <div style="overflow-x: auto; width: 100%;">
-              <table style="width: 100%; border-collapse: collapse; text-align: left; font-family: 'Plus Jakarta Sans', sans-serif;">
+            <div class="table-responsive" style="flex: 1; min-height: 250px;">
+              <table class="table-modern">
                 <thead>
-                  <tr style="background: #e9eff6;">
-                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Checkout Entity</th>
-                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Equipment</th>
-                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Type</th>
-                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">EPC</th>
-                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Detected</th>
-                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">CheckOutTime</th>
+                  <tr>
+                    <th>Checkout Entity</th>
+                    <th>Equipment</th>
+                    <th>Type</th>
+                    <th>EPC</th>
+                    <th>Detected</th>
+                    <th>CheckoutTime</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @for (item of filteredCheckoutItems(); track item.epc) {
-                    <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s;">
-                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #1e293b; font-weight: 500;">{{ item.checkoutEntity }}</td>
-                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #1e293b; font-weight: 500;">{{ item.equipment }}</td>
-                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #475569;">{{ item.type }}</td>
-                      <td style="padding: 14px 16px; font-size: 0.78rem; font-family: monospace; color: #334155;">{{ item.epc }}</td>
-                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #94a3b8; font-weight: 500;">{{ item.detected }}</td>
-                      <td style="padding: 14px 16px; font-size: 0.82rem; color: #475569;">{{ item.checkoutTime }}</td>
-                    </tr>
+                  @for (rec of filteredCheckoutRecords(); track rec.epc) {
+                  <tr (click)="toggleCheckOutStatus(rec)" style="cursor: pointer;" title="Click to Check In">
+                    <td class="text-semibold" style="color: var(--text-primary); font-weight: 700;">{{ rec.entity }}
+                    </td>
+                    <td>{{ rec.equipment }}</td>
+                    <td>
+                      <span class="reader-badge-handheld">
+                        <span class="material-symbols-outlined"
+                          style="font-size: 0.9rem; font-variation-settings: 'FILL' 1; vertical-align: middle; margin-right: 4px;">contactless</span>
+                        {{ rec.type }}
+                      </span>
+                    </td>
+                    <td style="font-family: monospace; font-size: 0.78rem; color: var(--text-secondary);">{{ rec.epc }}
+                    </td>
+                    <td>{{ rec.detected }}</td>
+                    <td style="font-size: 0.78rem; color: var(--text-secondary);">{{ rec.time }}</td>
+                  </tr>
                   } @empty {
-                    <tr>
-                      <td colspan="6" style="padding: 32px 0; text-align: center; color: #94a3b8; font-size: 0.88rem;">No check-out data</td>
-                    </tr>
+                  <tr>
+                    <td colspan="6" style="text-align: center; padding: 4rem 1rem;">
+                      <div class="no-data-placeholder"
+                        style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted);">
+                        <span class="material-symbols-outlined no-data-icon"
+                          style="font-size: 2.5rem; color: #cbd5e1; margin-bottom: 8px;">logout</span>
+                        <p class="no-data-text" style="color: #64748b; font-size: 0.85rem; font-weight: 500;">No
+                          check-out data</p>
+                      </div>
+                    </td>
+                  </tr>
                   }
                 </tbody>
               </table>
             </div>
           </div>
 
-          <!-- Right Column: Check-In -->
-          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 16px;">
-            <h2 style="margin: 0; font-size: 1.15rem; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: #1e293b;">Check-In</h2>
-            <div style="overflow-x: auto; width: 100%;">
-              <table style="width: 100%; border-collapse: collapse; text-align: left; font-family: 'Plus Jakarta Sans', sans-serif;">
+          <!-- Right Side: Check-In Panel -->
+          <div class="card-new"
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); display: flex; flex-direction: column;">
+            <div class="panel-header-row">
+              <h3 class="panel-title"
+                style="color: var(--text-primary); font-size: 1.05rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 6px;">
+                <span class="material-symbols-outlined" style="color: #2563eb; font-size: 1.25rem;">login</span>
+                Check-In
+              </h3>
+              <span class="records-badge blue"
+                style="background: rgba(59, 130, 246, 0.1); color: #2563eb; font-weight: 700; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem;">
+                {{ filteredCheckinRecords().length }} records
+              </span>
+            </div>
+
+            <div class="table-responsive" style="flex: 1; min-height: 250px;">
+              <table class="table-modern">
                 <thead>
-                  <tr style="background: #e9eff6;">
-                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Checkin Entity</th>
-                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Equipment</th>
-                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Type</th>
-                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">Gate Status</th>
-                    <th style="padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1;">CheckInTime</th>
+                  <tr>
+                    <th>CheckIn Entity</th>
+                    <th>Equipment</th>
+                    <th>Type</th>
+                    <th>Gate Status</th>
+                    <th>CheckInTime</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @for (item of filteredCheckinItems(); track item.epc) {
-                    <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s;">
-                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #1e293b; font-weight: 500;">{{ item.checkinEntity }}</td>
-                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #1e293b; font-weight: 500;">{{ item.equipment }}</td>
-                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #475569;">{{ item.type }}</td>
-                      <td style="padding: 14px 16px; font-size: 0.85rem; color: #1e293b;">{{ item.gateStatus }}</td>
-                      <td style="padding: 14px 16px; font-size: 0.82rem; color: #475569;">{{ item.checkinTime }}</td>
-                    </tr>
+                  @for (rec of filteredCheckinRecords(); track rec.epc) {
+                  <tr (click)="toggleCheckInStatus(rec)" style="cursor: pointer;" title="Click to Check Out">
+                    <td class="text-semibold" style="color: var(--text-primary); font-weight: 700;">{{ rec.entity }}
+                    </td>
+                    <td>{{ rec.equipment }}</td>
+                    <td>
+                      <span class="reader-badge-handheld">
+                        <span class="material-symbols-outlined"
+                          style="font-size: 0.9rem; font-variation-settings: 'FILL' 1; vertical-align: middle; margin-right: 4px;">contactless</span>
+                        {{ rec.type }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="status-pill success"
+                        style="padding: 2px 6px; font-size: 0.72rem; font-weight: 700; border-radius: 4px;">{{
+                        rec.gateStatus }}</span>
+                    </td>
+                    <td style="font-size: 0.78rem; color: var(--text-secondary);">{{ rec.checkinTime }}</td>
+                  </tr>
                   } @empty {
-                    <tr>
-                      <td colspan="5" style="padding: 32px 0; text-align: center; color: #94a3b8; font-size: 0.88rem;">No check-in data</td>
-                    </tr>
+                  <tr>
+                    <td colspan="5" style="text-align: center; padding: 4rem 1rem;">
+                      <div class="no-data-placeholder"
+                        style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted);">
+                        <span class="material-symbols-outlined no-data-icon"
+                          style="font-size: 2.5rem; color: #cbd5e1; margin-bottom: 8px;">login</span>
+                        <p class="no-data-text" style="color: #64748b; font-size: 0.85rem; font-weight: 500;">No
+                          check-in data</p>
+                      </div>
+                    </td>
+                  </tr>
                   }
                 </tbody>
               </table>
             </div>
           </div>
         </div>
+
       </div>
       } @else if (activeNav() === 'RFID Operations') {
       @if (activeSubNav() === 'Scan Session Monitor') {
-      <div class="scan-session-view animate-fade-in"
-        style="display: flex; flex-direction: column; gap: 12px;">
+      <div class="scan-session-view animate-fade-in" style="display: flex; flex-direction: column; gap: 12px;">
 
         <!-- Session Stats Row -->
         <div class="session-stats-grid"
@@ -2847,64 +2963,88 @@ esar+  @if (isLoggedIn()) {
 
       </div>
       } @else if (activeSubNav() === 'Tag Management') {
-      <div class="tag-management-view animate-fade-in" style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
-        
+      <div class="tag-management-view animate-fade-in"
+        style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+
         <!-- KPI / Stats Row -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
           <!-- Card 1: Total -->
-          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
-            <div style="background: rgba(59, 130, 246, 0.08); color: var(--color-primary); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+            <div
+              style="background: rgba(59, 130, 246, 0.08); color: var(--color-primary); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined" style="font-size: 1.25rem;">tag</span>
             </div>
             <div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Registered Tags</span>
-              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: var(--text-primary);">{{ tagStats().totalTags }}</h3>
+              <span
+                style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total
+                Registered Tags</span>
+              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: var(--text-primary);">{{
+                tagStats().totalTags }}</h3>
             </div>
           </div>
 
           <!-- Card 2: Active -->
-          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
-            <div style="background: rgba(16, 185, 129, 0.08); color: #10b981; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+            <div
+              style="background: rgba(16, 185, 129, 0.08); color: #10b981; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined" style="font-size: 1.25rem;">sensors</span>
             </div>
             <div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Active Tags</span>
-              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #10b981;">{{ tagStats().activeTags }}</h3>
+              <span
+                style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Active
+                Tags</span>
+              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #10b981;">{{
+                tagStats().activeTags }}</h3>
             </div>
           </div>
 
           <!-- Card 3: Available -->
-          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
-            <div style="background: rgba(59, 130, 246, 0.08); color: #3b82f6; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+            <div
+              style="background: rgba(59, 130, 246, 0.08); color: #3b82f6; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined" style="font-size: 1.25rem;">inventory</span>
             </div>
             <div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Unassigned Stock</span>
-              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #3b82f6;">{{ tagStats().availableTags }}</h3>
+              <span
+                style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Unassigned
+                Stock</span>
+              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #3b82f6;">{{
+                tagStats().availableTags }}</h3>
             </div>
           </div>
 
           <!-- Card 4: Battery / Damaged -->
-          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
-            <div style="background: rgba(239, 68, 68, 0.08); color: #ef4444; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+            <div
+              style="background: rgba(239, 68, 68, 0.08); color: #ef4444; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined" style="font-size: 1.25rem;">battery_alert</span>
             </div>
             <div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Exceptions / Low Battery</span>
-              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #ef4444;">{{ tagStats().damagedTags + tagStats().lowBatteryTags }}</h3>
+              <span
+                style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Exceptions
+                / Low Battery</span>
+              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #ef4444;">{{
+                tagStats().damagedTags + tagStats().lowBatteryTags }}</h3>
             </div>
           </div>
         </div>
 
         <!-- Toolbar (Filters & Register Button) -->
-        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: var(--shadow-sm);">
-          
+        <div
+          style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: var(--shadow-sm);">
+
           <!-- Filters Left -->
           <div style="display: flex; align-items: center; gap: 8px; flex: 1; flex-wrap: wrap;">
             <!-- Search -->
             <div style="position: relative; display: flex; align-items: center; max-width: 280px; flex: 1;">
-              <span class="material-symbols-outlined" style="position: absolute; left: 8px; font-size: 0.95rem; color: var(--text-muted);">search</span>
-              <input type="text" [ngModel]="tagSearchQuery()" (ngModelChange)="tagSearchQuery.set($event)" placeholder="Search tag ID, asset..."
+              <span class="material-symbols-outlined"
+                style="position: absolute; left: 8px; font-size: 0.95rem; color: var(--text-muted);">search</span>
+              <input type="text" [ngModel]="tagSearchQuery()" (ngModelChange)="tagSearchQuery.set($event)"
+                placeholder="Search tag ID, asset..."
                 style="padding: 6px 8px 6px 26px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.78rem; outline: none; width: 100%;" />
             </div>
 
@@ -2930,12 +3070,12 @@ esar+  @if (isLoggedIn()) {
 
           <!-- Register Action Right -->
           <div style="display: flex; gap: 8px;">
-            <button (click)="openBulkTagsModal()" class="action-btn-outline" 
+            <button (click)="openBulkTagsModal()" class="action-btn-outline"
               style="padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
               <span class="material-symbols-outlined" style="font-size: 1.05rem;">library_add</span>
               Bulk Add Tags
             </button>
-            <button (click)="isRegisterTagModalOpen.set(true)" class="action-btn-primary" 
+            <button (click)="isRegisterTagModalOpen.set(true)" class="action-btn-primary"
               style="padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: none;">
               <span class="material-symbols-outlined" style="font-size: 1.05rem;">add_circle</span>
               Register New Tag
@@ -2944,11 +3084,13 @@ esar+  @if (isLoggedIn()) {
         </div>
 
         <!-- Tags Grid Table -->
-        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; box-shadow: var(--shadow-sm);">
+        <div
+          style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; box-shadow: var(--shadow-sm);">
           <div class="table-responsive">
             <table class="table-modern" style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
               <thead>
-                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-weight: 600; text-align: left;">
+                <tr
+                  style="border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-weight: 600; text-align: left;">
                   <th style="padding: 8px;">EPC / Tag Identifier</th>
                   <th style="padding: 8px;">Associated Asset</th>
                   <th style="padding: 8px;">Tag Format</th>
@@ -2961,70 +3103,73 @@ esar+  @if (isLoggedIn()) {
               </thead>
               <tbody>
                 @for (tag of filteredTagsList(); track tag.epc) {
-                  <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s;">
-                    <td class="text-semibold cell-id" style="padding: 8px; font-family: monospace; font-size: 0.8rem;">
-                      {{ tag.epc }}
-                    </td>
-                    <td style="padding: 8px;">
-                      @if (tag.assetNumber !== '-') {
-                        <div style="font-weight: 600; color: var(--text-main);">{{ tag.assetNumber }}</div>
-                        <div style="font-size: 0.72rem; color: var(--text-muted);">{{ tag.assetName }}</div>
-                      } @else {
-                        <span style="color: var(--text-muted); font-style: italic;">Unassigned</span>
-                      }
-                    </td>
-                    <td style="padding: 8px;">
-                      <div style="display: flex; align-items: center; gap: 6px;">
-                        <span class="material-symbols-outlined" style="font-size: 0.95rem; color: var(--text-muted);">
-                          {{ tag.type.includes('BLE') ? 'settings_input_antenna' : 'tag' }}
-                        </span>
-                        <span>{{ tag.type }}</span>
-                      </div>
-                    </td>
-                    <td style="padding: 8px; text-align: center;">
-                      @if (tag.RSSI !== '-') {
-                        <span style="font-weight: 500; font-family: monospace;">{{ tag.RSSI }}</span>
-                      } @else {
-                        <span style="color: var(--text-muted); font-family: monospace;">-</span>
-                      }
-                    </td>
-                    <td style="padding: 8px; text-align: center;">
-                      @if (tag.battery !== '-') {
-                        <span style="font-weight: 600;" [style.color]="isLowBattery(tag.battery) ? '#ef4444' : 'var(--text-primary)'">
-                          {{ tag.battery }}
-                        </span>
-                      } @else {
-                        <span style="color: var(--text-muted); font-family: monospace;">-</span>
-                      }
-                    </td>
-                    <td style="padding: 8px;">
-                      <div style="font-weight: 500;">{{ tag.lastSeen }}</div>
-                      <div style="font-size: 0.72rem; color: var(--text-muted);">{{ tag.time }}</div>
-                    </td>
-                    <td style="padding: 8px;">
-                      <span class="status-pill" 
-                        [class.active]="tag.status === 'Active'"
-                        [class.available]="tag.status === 'Available'"
-                        [class.danger]="tag.status === 'Damaged' || tag.status === 'Decommissioned'"
-                        style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
-                        {{ tag.status }}
+                <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s;">
+                  <td class="text-semibold cell-id" style="padding: 8px; font-family: monospace; font-size: 0.8rem;">
+                    {{ tag.epc }}
+                  </td>
+                  <td style="padding: 8px;">
+                    @if (tag.assetNumber !== '-') {
+                    <div style="font-weight: 600; color: var(--text-main);">{{ tag.assetNumber }}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted);">{{ tag.assetName }}</div>
+                    } @else {
+                    <span style="color: var(--text-muted); font-style: italic;">Unassigned</span>
+                    }
+                  </td>
+                  <td style="padding: 8px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span class="material-symbols-outlined" style="font-size: 0.95rem; color: var(--text-muted);">
+                        {{ tag.type.includes('BLE') ? 'settings_input_antenna' : 'tag' }}
                       </span>
-                    </td>
-                    <td style="padding: 8px; text-align: right; white-space: nowrap;">
-                      <button (click)="toggleTagStatus(tag.epc)" class="action-btn-outline sm-btn" style="padding: 3px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; margin-right: 6px;">
-                        Toggle Status
-                      </button>
-                      <button (click)="decommissionTag(tag.epc)" class="action-btn-outline sm-btn text-danger" style="padding: 3px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; border-color: rgba(239, 68, 68, 0.2); color: #ef4444;">
-                        Decommission
-                      </button>
-                    </td>
-                  </tr>
+                      <span>{{ tag.type }}</span>
+                    </div>
+                  </td>
+                  <td style="padding: 8px; text-align: center;">
+                    @if (tag.RSSI !== '-') {
+                    <span style="font-weight: 500; font-family: monospace;">{{ tag.RSSI }}</span>
+                    } @else {
+                    <span style="color: var(--text-muted); font-family: monospace;">-</span>
+                    }
+                  </td>
+                  <td style="padding: 8px; text-align: center;">
+                    @if (tag.battery !== '-') {
+                    <span style="font-weight: 600;"
+                      [style.color]="isLowBattery(tag.battery) ? '#ef4444' : 'var(--text-primary)'">
+                      {{ tag.battery }}
+                    </span>
+                    } @else {
+                    <span style="color: var(--text-muted); font-family: monospace;">-</span>
+                    }
+                  </td>
+                  <td style="padding: 8px;">
+                    <div style="font-weight: 500;">{{ tag.lastSeen }}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted);">{{ tag.time }}</div>
+                  </td>
+                  <td style="padding: 8px;">
+                    <span class="status-pill" [class.active]="tag.status === 'Active'"
+                      [class.available]="tag.status === 'Available'"
+                      [class.danger]="tag.status === 'Damaged' || tag.status === 'Decommissioned'"
+                      style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
+                      {{ tag.status }}
+                    </span>
+                  </td>
+                  <td style="padding: 8px; text-align: right; white-space: nowrap;">
+                    <button (click)="toggleTagStatus(tag.epc)" class="action-btn-outline sm-btn"
+                      style="padding: 3px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; margin-right: 6px;">
+                      Toggle Status
+                    </button>
+                    <button (click)="decommissionTag(tag.epc)" class="action-btn-outline sm-btn text-danger"
+                      style="padding: 3px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; border-color: rgba(239, 68, 68, 0.2); color: #ef4444;">
+                      Decommission
+                    </button>
+                  </td>
+                </tr>
                 } @empty {
-                  <tr>
-                    <td colspan="8" style="padding: 24px; text-align: center; color: var(--text-muted); font-style: italic;">
-                      No tags matched your current filters.
-                    </td>
-                  </tr>
+                <tr>
+                  <td colspan="8"
+                    style="padding: 24px; text-align: center; color: var(--text-muted); font-style: italic;">
+                    No tags matched your current filters.
+                  </td>
+                </tr>
                 }
               </tbody>
             </table>
@@ -3033,150 +3178,201 @@ esar+  @if (isLoggedIn()) {
 
         <!-- Add Tag Dialog Modal -->
         @if (isRegisterTagModalOpen()) {
-          <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center;">
-            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 420px; padding: 20px; box-shadow: var(--shadow-lg);">
-              <h3 style="margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-                <span class="material-symbols-outlined" style="color: var(--color-primary);">app_registration</span>
-                Register New Tag
-              </h3>
+        <div
+          style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 420px; padding: 20px; box-shadow: var(--shadow-lg);">
+            <h3
+              style="margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+              <span class="material-symbols-outlined" style="color: var(--color-primary);">app_registration</span>
+              Register New Tag
+            </h3>
 
-              <div style="display: flex; flex-direction: column; gap: 12px;">
-                <!-- EPC Input -->
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">EPC / Tag Identifier *</label>
-                  <input type="text" placeholder="e.g. E280117020000..." [value]="newTagEpc()" (input)="newTagEpc.set($any($event.target).value)"
-                    style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.82rem;" />
-                </div>
-
-                <!-- Asset ID Input -->
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Associated Asset ID (Optional)</label>
-                  <input type="text" placeholder="e.g. FLT-0007" [value]="newTagAssetId()" (input)="newTagAssetId.set($any($event.target).value)"
-                    style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.82rem;" />
-                </div>
-
-                <!-- Tag Type Select -->
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Tag Format</label>
-                  <select [value]="newTagType()" (change)="newTagType.set($any($event.target).value)"
-                    style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.82rem; cursor: pointer;">
-                    <option value="RFID">RFID EPC Tag</option>
-                    <option value="Barcode">Barcode / QR Code</option>
-                    <option value="GPS">GPS Tracker Device</option>
-                  </select>
-                </div>
-
-                <!-- Status Select -->
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Initial Status</label>
-                  <select [value]="newTagStatus()" (change)="newTagStatus.set($any($event.target).value)"
-                    style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.82rem; cursor: pointer;">
-                    <option value="Active">Active</option>
-                    <option value="Available">Available (In Stock)</option>
-                  </select>
-                </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- EPC Input -->
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <label
+                  style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">EPC
+                  / Tag Identifier *</label>
+                <input type="text" placeholder="e.g. E280117020000..." [value]="newTagEpc()"
+                  (input)="newTagEpc.set($any($event.target).value)"
+                  style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.82rem;" />
               </div>
 
-              <!-- Actions -->
-              <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                <button (click)="isRegisterTagModalOpen.set(false)" class="action-btn-outline" style="padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">Cancel</button>
-                <button (click)="registerNewTag()" class="action-btn-primary" style="padding: 6px 16px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">Register Tag</button>
+              <!-- Asset ID Input -->
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <label
+                  style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Associated
+                  Asset ID (Optional)</label>
+                <input type="text" placeholder="e.g. FLT-0007" [value]="newTagAssetId()"
+                  (input)="newTagAssetId.set($any($event.target).value)"
+                  style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.82rem;" />
+              </div>
+
+              <!-- Tag Type Select -->
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <label
+                  style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Tag
+                  Format</label>
+                <select [value]="newTagType()" (change)="newTagType.set($any($event.target).value)"
+                  style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.82rem; cursor: pointer;">
+                  <option value="RFID">RFID EPC Tag</option>
+                  <option value="Barcode">Barcode / QR Code</option>
+                  <option value="GPS">GPS Tracker Device</option>
+                </select>
+              </div>
+
+              <!-- Status Select -->
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <label
+                  style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Initial
+                  Status</label>
+                <select [value]="newTagStatus()" (change)="newTagStatus.set($any($event.target).value)"
+                  style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.82rem; cursor: pointer;">
+                  <option value="Active">Active</option>
+                  <option value="Available">Available (In Stock)</option>
+                </select>
               </div>
             </div>
+
+            <!-- Actions -->
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+              <button (click)="isRegisterTagModalOpen.set(false)" class="action-btn-outline"
+                style="padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">Cancel</button>
+              <button (click)="registerNewTag()" class="action-btn-primary"
+                style="padding: 6px 16px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">Register
+                Tag</button>
+            </div>
           </div>
+        </div>
         @}
 
         <!-- Bulk Add Tags Dialog Modal -->
         @if (isBulkTagsModalOpen()) {
-          <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center;">
-            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 450px; padding: 20px; box-shadow: var(--shadow-lg);">
-              <h3 style="margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-                <span class="material-symbols-outlined" style="color: var(--color-primary);">library_add</span>
-                Bulk Add Traceability Tags
-              </h3>
+        <div
+          style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 450px; padding: 20px; box-shadow: var(--shadow-lg);">
+            <h3
+              style="margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+              <span class="material-symbols-outlined" style="color: var(--color-primary);">library_add</span>
+              Bulk Add Traceability Tags
+            </h3>
 
-              <div style="display: flex; flex-direction: column; gap: 12px;">
-                <!-- Tag Type Select -->
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Tag Type *</label>
-                  <select [(ngModel)]="formBulkTagsType" name="formBulkTagsType"
-                    style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.82rem; cursor: pointer;">
-                    <option value="RFID">RFID EPC Tags</option>
-                    <option value="Barcode">Barcode / QR Codes</option>
-                    <option value="GPS">GPS Device IMEIs</option>
-                  </select>
-                </div>
-
-                <!-- Bulk Text Area -->
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Tag Codes * (One per line)</label>
-                  <textarea [(ngModel)]="formBulkTagsText" name="formBulkTagsText" placeholder="Enter one code per line, e.g.&#10;E2801170200001&#10;E2801170200002" rows="6"
-                    style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.82rem; font-family: monospace; resize: vertical;"></textarea>
-                </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Tag Type Select -->
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <label
+                  style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Tag
+                  Type *</label>
+                <select [(ngModel)]="formBulkTagsType" name="formBulkTagsType"
+                  style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.82rem; cursor: pointer;">
+                  <option value="RFID">RFID EPC Tags</option>
+                  <option value="Barcode">Barcode / QR Codes</option>
+                  <option value="GPS">GPS Device IMEIs</option>
+                </select>
               </div>
 
-              <!-- Actions -->
-              <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                <button (click)="isBulkTagsModalOpen.set(false)" class="action-btn-outline" style="padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">Cancel</button>
-                <button (click)="saveBulkTags()" class="action-btn-primary" style="padding: 6px 16px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">Register Bulk</button>
+              <!-- Bulk Text Area -->
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <label
+                  style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Tag
+                  Codes * (One per line)</label>
+                <textarea [(ngModel)]="formBulkTagsText" name="formBulkTagsText"
+                  placeholder="Enter one code per line, e.g.&#10;E2801170200001&#10;E2801170200002" rows="6"
+                  style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.82rem; font-family: monospace; resize: vertical;"></textarea>
               </div>
             </div>
+
+            <!-- Actions -->
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+              <button (click)="isBulkTagsModalOpen.set(false)" class="action-btn-outline"
+                style="padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">Cancel</button>
+              <button (click)="saveBulkTags()" class="action-btn-primary"
+                style="padding: 6px 16px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">Register
+                Bulk</button>
+            </div>
           </div>
+        </div>
         }
 
       </div>
       } @else if (activeSubNav() === 'Fixed Reader Monitor') {
-      <div class="fixed-reader-view animate-fade-in" style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
-        
+      <div class="fixed-reader-view animate-fade-in"
+        style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+
         <!-- KPI Row -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
-            <div style="background: rgba(59, 130, 246, 0.08); color: var(--color-primary); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+            <div
+              style="background: rgba(59, 130, 246, 0.08); color: var(--color-primary); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined" style="font-size: 1.25rem;">router</span>
             </div>
             <div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Fixed Readers</span>
-              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: var(--text-primary);">{{ fixedReaderStats().total }}</h3>
+              <span
+                style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total
+                Fixed Readers</span>
+              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: var(--text-primary);">{{
+                fixedReaderStats().total }}</h3>
             </div>
           </div>
 
-          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
-            <div style="background: rgba(16, 185, 129, 0.08); color: #10b981; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+            <div
+              style="background: rgba(16, 185, 129, 0.08); color: #10b981; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined" style="font-size: 1.25rem;">cloud_done</span>
             </div>
             <div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Online Readers</span>
-              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #10b981;">{{ fixedReaderStats().online }}</h3>
+              <span
+                style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Online
+                Readers</span>
+              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #10b981;">{{
+                fixedReaderStats().online }}</h3>
             </div>
           </div>
 
-          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
-            <div style="background: rgba(245, 158, 11, 0.08); color: #f59e0b; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+            <div
+              style="background: rgba(245, 158, 11, 0.08); color: #f59e0b; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined" style="font-size: 1.25rem;">sync_problem</span>
             </div>
             <div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Degraded (Antenna Issue)</span>
-              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #f59e0b;">{{ fixedReaderStats().degraded }}</h3>
+              <span
+                style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Degraded
+                (Antenna Issue)</span>
+              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #f59e0b;">{{
+                fixedReaderStats().degraded }}</h3>
             </div>
           </div>
 
-          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
-            <div style="background: rgba(239, 68, 68, 0.08); color: #ef4444; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+            <div
+              style="background: rgba(239, 68, 68, 0.08); color: #ef4444; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined" style="font-size: 1.25rem;">cloud_off</span>
             </div>
             <div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Offline Readers</span>
-              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #ef4444;">{{ fixedReaderStats().offline }}</h3>
+              <span
+                style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Offline
+                Readers</span>
+              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #ef4444;">{{
+                fixedReaderStats().offline }}</h3>
             </div>
           </div>
         </div>
 
         <!-- Toolbar -->
-        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: var(--shadow-sm);">
+        <div
+          style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: var(--shadow-sm);">
           <div style="display: flex; align-items: center; gap: 8px; flex: 1; flex-wrap: wrap;">
             <div style="position: relative; display: flex; align-items: center; max-width: 280px; flex: 1;">
-              <span class="material-symbols-outlined" style="position: absolute; left: 8px; font-size: 0.95rem; color: var(--text-muted);">search</span>
-              <input type="text" [ngModel]="fixedReaderSearchQuery()" (ngModelChange)="fixedReaderSearchQuery.set($event)" placeholder="Search reader name, model, IP..."
+              <span class="material-symbols-outlined"
+                style="position: absolute; left: 8px; font-size: 0.95rem; color: var(--text-muted);">search</span>
+              <input type="text" [ngModel]="fixedReaderSearchQuery()"
+                (ngModelChange)="fixedReaderSearchQuery.set($event)" placeholder="Search reader name, model, IP..."
                 style="padding: 6px 8px 6px 26px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.78rem; outline: none; width: 100%;" />
             </div>
 
@@ -3193,121 +3389,152 @@ esar+  @if (isLoggedIn()) {
         <!-- Readers Grid Card Layout -->
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px;">
           @for (reader of filteredFixedReadersList(); track reader.id) {
-            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 12px;">
-              <div style="display: flex; align-items: flex-start; justify-content: space-between;">
-                <div>
-                  <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">{{ reader.name }}</h4>
-                  <span style="font-size: 0.75rem; color: var(--text-muted);">{{ reader.model }} | ID: {{ reader.id }}</span>
-                </div>
-                <span class="status-pill"
-                  [class.active]="reader.status === 'Online'"
-                  [class.warning]="reader.status === 'Degraded'"
-                  [class.danger]="reader.status === 'Offline'"
-                  style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
-                  {{ reader.status }}
-                </span>
-              </div>
-
-              <!-- Details Grid -->
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.78rem; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); padding: 8px 0;">
-                <div>
-                  <span style="color: var(--text-muted); display: block; font-size: 0.7rem;">IP Address</span>
-                  <span style="font-weight: 600; font-family: monospace;">{{ reader.ipAddress }}</span>
-                </div>
-                <div>
-                  <span style="color: var(--text-muted); display: block; font-size: 0.7rem;">MAC Address</span>
-                  <span style="font-weight: 600; font-family: monospace;">{{ reader.macAddress }}</span>
-                </div>
-                <div>
-                  <span style="color: var(--text-muted); display: block; font-size: 0.7rem;">RF Power Level</span>
-                  <span style="font-weight: 600;">{{ reader.powerLevel }}</span>
-                </div>
-                <div>
-                  <span style="color: var(--text-muted); display: block; font-size: 0.7rem;">Last Heartbeat</span>
-                  <span style="font-weight: 600;">{{ reader.lastActive }}</span>
-                </div>
-              </div>
-
-              <!-- Antennas list -->
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between;">
               <div>
-                <span style="color: var(--text-muted); font-size: 0.7rem; display: block; margin-bottom: 4px; font-weight: 600; text-transform: uppercase;">Antennas Port Status</span>
-                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                  @for (ant of reader.antennas; track ant) {
-                    <span style="font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 500;
+                <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">{{ reader.name
+                  }}</h4>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">{{ reader.model }} | ID: {{ reader.id
+                  }}</span>
+              </div>
+              <span class="status-pill" [class.active]="reader.status === 'Online'"
+                [class.warning]="reader.status === 'Degraded'" [class.danger]="reader.status === 'Offline'"
+                style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
+                {{ reader.status }}
+              </span>
+            </div>
+
+            <!-- Details Grid -->
+            <div
+              style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.78rem; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); padding: 8px 0;">
+              <div>
+                <span style="color: var(--text-muted); display: block; font-size: 0.7rem;">IP Address</span>
+                <span style="font-weight: 600; font-family: monospace;">{{ reader.ipAddress }}</span>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); display: block; font-size: 0.7rem;">MAC Address</span>
+                <span style="font-weight: 600; font-family: monospace;">{{ reader.macAddress }}</span>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); display: block; font-size: 0.7rem;">RF Power Level</span>
+                <span style="font-weight: 600;">{{ reader.powerLevel }}</span>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); display: block; font-size: 0.7rem;">Last Heartbeat</span>
+                <span style="font-weight: 600;">{{ reader.lastActive }}</span>
+              </div>
+            </div>
+
+            <!-- Antennas list -->
+            <div>
+              <span
+                style="color: var(--text-muted); font-size: 0.7rem; display: block; margin-bottom: 4px; font-weight: 600; text-transform: uppercase;">Antennas
+                Port Status</span>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                @for (ant of reader.antennas; track ant) {
+                <span
+                  style="font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 500;
                       background: {{ ant.includes('OK') ? 'rgba(16, 185, 129, 0.08)' : (ant.includes('Degraded') ? 'rgba(245, 158, 11, 0.08)' : 'rgba(239, 68, 68, 0.08)') }};
                       color: {{ ant.includes('OK') ? '#10b981' : (ant.includes('Degraded') ? '#f59e0b' : '#ef4444') }};">
-                      {{ ant }}
-                    </span>
-                  }
-                </div>
+                  {{ ant }}
+                </span>
+                }
               </div>
+            </div>
 
-              <!-- Action button row -->
-              <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: auto; padding-top: 8px;">
-                <button (click)="rebootReader(reader.id)" class="action-btn-outline sm-btn" style="padding: 4px 8px; font-size: 0.75rem; font-weight: 600; border-radius: 4px;">
-                  Reboot Reader
-                </button>
-              </div>
+            <!-- Action button row -->
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: auto; padding-top: 8px;">
+              <button (click)="rebootReader(reader.id)" class="action-btn-outline sm-btn"
+                style="padding: 4px 8px; font-size: 0.75rem; font-weight: 600; border-radius: 4px;">
+                Reboot Reader
+              </button>
             </div>
+          </div>
           } @empty {
-            <div style="grid-column: 1 / -1; padding: 24px; text-align: center; color: var(--text-muted); font-style: italic; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-color);">
-              No fixed readers match your search filters.
-            </div>
+          <div
+            style="grid-column: 1 / -1; padding: 24px; text-align: center; color: var(--text-muted); font-style: italic; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-color);">
+            No fixed readers match your search filters.
+          </div>
           }
         </div>
       </div>
       } @else if (activeSubNav() === 'Handheld Sessions') {
-      <div class="handheld-sessions-view animate-fade-in" style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
-        
+      <div class="handheld-sessions-view animate-fade-in"
+        style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+
         <!-- KPI Row -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
-            <div style="background: rgba(59, 130, 246, 0.08); color: var(--color-primary); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+            <div
+              style="background: rgba(59, 130, 246, 0.08); color: var(--color-primary); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined" style="font-size: 1.25rem;">devices_other</span>
             </div>
             <div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Devices Logged</span>
-              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: var(--text-primary);">{{ handheldStats().total }}</h3>
+              <span
+                style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total
+                Devices Logged</span>
+              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: var(--text-primary);">{{
+                handheldStats().total }}</h3>
             </div>
           </div>
 
-          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
-            <div style="background: rgba(16, 185, 129, 0.08); color: #10b981; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+            <div
+              style="background: rgba(16, 185, 129, 0.08); color: #10b981; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined" style="font-size: 1.25rem;">play_circle</span>
             </div>
             <div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Active Sessions</span>
-              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #10b981;">{{ handheldStats().active }}</h3>
+              <span
+                style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Active
+                Sessions</span>
+              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #10b981;">{{
+                handheldStats().active }}</h3>
             </div>
           </div>
 
-          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
-            <div style="background: rgba(59, 130, 246, 0.08); color: #3b82f6; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+            <div
+              style="background: rgba(59, 130, 246, 0.08); color: #3b82f6; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined" style="font-size: 1.25rem;">task_alt</span>
             </div>
             <div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Completed / Synced</span>
-              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #3b82f6;">{{ handheldStats().completed }}</h3>
+              <span
+                style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Completed
+                / Synced</span>
+              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #3b82f6;">{{
+                handheldStats().completed }}</h3>
             </div>
           </div>
 
-          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
-            <div style="background: rgba(239, 68, 68, 0.08); color: #ef4444; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+            <div
+              style="background: rgba(239, 68, 68, 0.08); color: #ef4444; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined" style="font-size: 1.25rem;">rule_folder</span>
             </div>
             <div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Audit Discrepancies</span>
-              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #ef4444;">{{ handheldStats().discrepancies }}</h3>
+              <span
+                style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Audit
+                Discrepancies</span>
+              <h3 style="font-size: 1.4rem; font-weight: 700; margin: 2px 0 0 0; color: #ef4444;">{{
+                handheldStats().discrepancies }}</h3>
             </div>
           </div>
         </div>
 
         <!-- Toolbar -->
-        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: var(--shadow-sm);">
+        <div
+          style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: var(--shadow-sm);">
           <div style="display: flex; align-items: center; gap: 8px; flex: 1; flex-wrap: wrap;">
             <div style="position: relative; display: flex; align-items: center; max-width: 280px; flex: 1;">
-              <span class="material-symbols-outlined" style="position: absolute; left: 8px; font-size: 0.95rem; color: var(--text-muted);">search</span>
-              <input type="text" [ngModel]="handheldSearchQuery()" (ngModelChange)="handheldSearchQuery.set($event)" placeholder="Search operator, device, audit..."
+              <span class="material-symbols-outlined"
+                style="position: absolute; left: 8px; font-size: 0.95rem; color: var(--text-muted);">search</span>
+              <input type="text" [ngModel]="handheldSearchQuery()" (ngModelChange)="handheldSearchQuery.set($event)"
+                placeholder="Search operator, device, audit..."
                 style="padding: 6px 8px 6px 26px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.78rem; outline: none; width: 100%;" />
             </div>
 
@@ -3323,11 +3550,13 @@ esar+  @if (isLoggedIn()) {
         </div>
 
         <!-- Handheld Table -->
-        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; box-shadow: var(--shadow-sm);">
+        <div
+          style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; box-shadow: var(--shadow-sm);">
           <div class="table-responsive">
             <table class="table-modern" style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
               <thead>
-                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-weight: 600; text-align: left;">
+                <tr
+                  style="border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-weight: 600; text-align: left;">
                   <th style="padding: 8px;">Session ID</th>
                   <th style="padding: 8px;">Operator / Auditor</th>
                   <th style="padding: 8px;">Device Model</th>
@@ -3341,50 +3570,53 @@ esar+  @if (isLoggedIn()) {
               </thead>
               <tbody>
                 @for (sess of filteredHandheldSessionsList(); track sess.id) {
-                  <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s;">
-                    <td style="padding: 8px; font-family: monospace; font-weight: 600;">{{ sess.id }}</td>
-                    <td style="padding: 8px;">
-                      <div style="font-weight: 600; color: var(--text-main);">{{ sess.operator }}</div>
-                    </td>
-                    <td style="padding: 8px;">{{ sess.model }}</td>
-                    <td style="padding: 8px; font-weight: 500;">{{ sess.type }}</td>
-                    <td style="padding: 8px;">
-                      <div>{{ sess.startTime }}</div>
-                      <div style="font-size: 0.72rem; color: var(--text-muted);">Duration: {{ sess.duration }}</div>
-                    </td>
-                    <td style="padding: 8px; text-align: center; font-weight: 700; font-family: monospace; color: var(--color-primary);">
-                      {{ sess.scannedTags | number }}
-                    </td>
-                    <td style="padding: 8px; text-align: center;">
-                      <span style="font-weight: 700; color: {{ sess.discrepancies > 0 ? '#ef4444' : 'var(--text-secondary)' }}">
-                        {{ sess.discrepancies }}
-                      </span>
-                    </td>
-                    <td style="padding: 8px;">
-                      <span class="status-pill"
-                        [class.active]="sess.status === 'In Progress'"
-                        [class.available]="sess.status === 'Synced' || sess.status === 'Completed'"
-                        [class.danger]="sess.status === 'Failed'"
-                        style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
-                        {{ sess.status }}
-                      </span>
-                    </td>
-                    <td style="padding: 8px; text-align: right;">
-                      @if (sess.status === 'In Progress') {
-                        <button (click)="stopHandheldSession(sess.id)" class="action-btn-outline sm-btn text-danger" style="padding: 3px 6px; border-color: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: 600; border-radius: 4px;">
-                          End Session
-                        </button>
-                      } @else {
-                        <span style="color: var(--text-muted); font-size: 0.75rem;">Locked &amp; Synced</span>
-                      }
-                    </td>
-                  </tr>
+                <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s;">
+                  <td style="padding: 8px; font-family: monospace; font-weight: 600;">{{ sess.id }}</td>
+                  <td style="padding: 8px;">
+                    <div style="font-weight: 600; color: var(--text-main);">{{ sess.operator }}</div>
+                  </td>
+                  <td style="padding: 8px;">{{ sess.model }}</td>
+                  <td style="padding: 8px; font-weight: 500;">{{ sess.type }}</td>
+                  <td style="padding: 8px;">
+                    <div>{{ sess.startTime }}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted);">Duration: {{ sess.duration }}</div>
+                  </td>
+                  <td
+                    style="padding: 8px; text-align: center; font-weight: 700; font-family: monospace; color: var(--color-primary);">
+                    {{ sess.scannedTags | number }}
+                  </td>
+                  <td style="padding: 8px; text-align: center;">
+                    <span
+                      style="font-weight: 700; color: {{ sess.discrepancies > 0 ? '#ef4444' : 'var(--text-secondary)' }}">
+                      {{ sess.discrepancies }}
+                    </span>
+                  </td>
+                  <td style="padding: 8px;">
+                    <span class="status-pill" [class.active]="sess.status === 'In Progress'"
+                      [class.available]="sess.status === 'Synced' || sess.status === 'Completed'"
+                      [class.danger]="sess.status === 'Failed'"
+                      style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
+                      {{ sess.status }}
+                    </span>
+                  </td>
+                  <td style="padding: 8px; text-align: right;">
+                    @if (sess.status === 'In Progress') {
+                    <button (click)="stopHandheldSession(sess.id)" class="action-btn-outline sm-btn text-danger"
+                      style="padding: 3px 6px; border-color: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: 600; border-radius: 4px;">
+                      End Session
+                    </button>
+                    } @else {
+                    <span style="color: var(--text-muted); font-size: 0.75rem;">Locked &amp; Synced</span>
+                    }
+                  </td>
+                </tr>
                 } @empty {
-                  <tr>
-                    <td colspan="9" style="padding: 24px; text-align: center; color: var(--text-muted); font-style: italic;">
-                      No handheld sessions matched your filters.
-                    </td>
-                  </tr>
+                <tr>
+                  <td colspan="9"
+                    style="padding: 24px; text-align: center; color: var(--text-muted); font-style: italic;">
+                    No handheld sessions matched your filters.
+                  </td>
+                </tr>
                 }
               </tbody>
             </table>
@@ -3392,14 +3624,18 @@ esar+  @if (isLoggedIn()) {
         </div>
       </div>
       } @else if (activeSubNav() === 'RFID Events') {
-      <div class="rfid-events-view animate-fade-in" style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
-        
+      <div class="rfid-events-view animate-fade-in"
+        style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+
         <!-- Toolbar -->
-        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: var(--shadow-sm);">
+        <div
+          style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: var(--shadow-sm);">
           <div style="display: flex; align-items: center; gap: 8px; flex: 1; flex-wrap: wrap;">
             <div style="position: relative; display: flex; align-items: center; max-width: 280px; flex: 1;">
-              <span class="material-symbols-outlined" style="position: absolute; left: 8px; font-size: 0.95rem; color: var(--text-muted);">search</span>
-              <input type="text" [ngModel]="rfidEventsSearchQuery()" (ngModelChange)="rfidEventsSearchQuery.set($event)" placeholder="Search event log messages..."
+              <span class="material-symbols-outlined"
+                style="position: absolute; left: 8px; font-size: 0.95rem; color: var(--text-muted);">search</span>
+              <input type="text" [ngModel]="rfidEventsSearchQuery()" (ngModelChange)="rfidEventsSearchQuery.set($event)"
+                placeholder="Search event log messages..."
                 style="padding: 6px 8px 6px 26px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main); font-size: 0.78rem; outline: none; width: 100%;" />
             </div>
 
@@ -3416,58 +3652,71 @@ esar+  @if (isLoggedIn()) {
             </select>
           </div>
 
-          <button (click)="clearRfidEvents()" class="action-btn-outline" style="padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; color: #ef4444; border-color: rgba(239, 68, 68, 0.2); cursor: pointer;">
+          <button (click)="clearRfidEvents()" class="action-btn-outline"
+            style="padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; color: #ef4444; border-color: rgba(239, 68, 68, 0.2); cursor: pointer;">
             Clear Events Log
           </button>
         </div>
 
         <!-- Log List -->
-        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 8px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 4px;">
-            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Real-Time Activity Logs</span>
-            <span style="font-size: 0.72rem; color: #10b981; font-weight: 600; display: flex; align-items: center; gap: 4px;">
-              <span style="width: 6px; height: 6px; background: #10b981; border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite;"></span>
+        <div
+          style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 8px;">
+          <div
+            style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 4px;">
+            <span
+              style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Real-Time
+              Activity Logs</span>
+            <span
+              style="font-size: 0.72rem; color: #10b981; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+              <span
+                style="width: 6px; height: 6px; background: #10b981; border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite;"></span>
               Listening to Telemetry Stream
             </span>
           </div>
 
-          <div style="display: flex; flex-direction: column; gap: 6px; max-height: 500px; overflow-y: auto; padding-right: 4px;">
+          <div
+            style="display: flex; flex-direction: column; gap: 6px; max-height: 500px; overflow-y: auto; padding-right: 4px;">
             @for (evt of filteredRfidEventsList(); track evt.id) {
-              <div style="display: flex; gap: 12px; padding: 10px; border-radius: 6px; background: var(--bg-body); border-left: 3px solid {{ evt.severity === 'Error' ? '#ef4444' : (evt.severity === 'Warning' ? '#f59e0b' : '#3b82f6') }}; font-size: 0.82rem; align-items: center;">
-                
-                <!-- Severity Icon -->
-                <span class="material-symbols-outlined" style="font-size: 1.2rem;
+            <div
+              style="display: flex; gap: 12px; padding: 10px; border-radius: 6px; background: var(--bg-body); border-left: 3px solid {{ evt.severity === 'Error' ? '#ef4444' : (evt.severity === 'Warning' ? '#f59e0b' : '#3b82f6') }}; font-size: 0.82rem; align-items: center;">
+
+              <!-- Severity Icon -->
+              <span class="material-symbols-outlined"
+                style="font-size: 1.2rem;
                   color: {{ evt.severity === 'Error' ? '#ef4444' : (evt.severity === 'Warning' ? '#f59e0b' : '#3b82f6') }};">
-                  {{ evt.severity === 'Error' ? 'error_med' : (evt.severity === 'Warning' ? 'warning' : 'info') }}
+                {{ evt.severity === 'Error' ? 'error_med' : (evt.severity === 'Warning' ? 'warning' : 'info') }}
+              </span>
+
+              <!-- Time -->
+              <div style="font-family: monospace; color: var(--text-muted); font-size: 0.75rem; white-space: nowrap;">
+                {{ evt.time }}
+              </div>
+
+              <!-- Event Details -->
+              <div style="flex: 1;">
+                <span style="font-weight: 700; color: var(--text-primary); margin-right: 8px;">[{{ evt.eventType
+                  }}]</span>
+                <span style="color: var(--text-main);">{{ evt.message }}</span>
+              </div>
+
+              <!-- Metadata badges -->
+              <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                <span
+                  style="font-size: 0.7rem; background: var(--border-color); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; font-family: monospace;">
+                  {{ evt.reader }} ({{ evt.antenna }})
                 </span>
-
-                <!-- Time -->
-                <div style="font-family: monospace; color: var(--text-muted); font-size: 0.75rem; white-space: nowrap;">
-                  {{ evt.time }}
-                </div>
-
-                <!-- Event Details -->
-                <div style="flex: 1;">
-                  <span style="font-weight: 700; color: var(--text-primary); margin-right: 8px;">[{{ evt.eventType }}]</span>
-                  <span style="color: var(--text-main);">{{ evt.message }}</span>
-                </div>
-
-                <!-- Metadata badges -->
-                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                  <span style="font-size: 0.7rem; background: var(--border-color); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; font-family: monospace;">
-                    {{ evt.reader }} ({{ evt.antenna }})
-                  </span>
-                  @if (evt.rssi !== '-') {
-                    <span style="font-size: 0.7rem; background: rgba(59, 130, 246, 0.08); color: var(--color-primary); padding: 2px 6px; border-radius: 4px; font-family: monospace;">
-                      {{ evt.rssi }}
-                    </span>
-                  }
-                </div>
+                @if (evt.rssi !== '-') {
+                <span
+                  style="font-size: 0.7rem; background: rgba(59, 130, 246, 0.08); color: var(--color-primary); padding: 2px 6px; border-radius: 4px; font-family: monospace;">
+                  {{ evt.rssi }}
+                </span>
+                }
               </div>
+            </div>
             } @empty {
-              <div style="padding: 40px; text-align: center; color: var(--text-muted); font-style: italic;">
-                No real-time events match the current filter criteria.
-              </div>
+            <div style="padding: 40px; text-align: center; color: var(--text-muted); font-style: italic;">
+              No real-time events match the current filter criteria.
+            </div>
             }
           </div>
         </div>
@@ -5432,11 +5681,9 @@ esar+  @if (isLoggedIn()) {
                   style="flex: 1; border: 1.5px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); padding: 6px; border-radius: 6px; font-weight: 700; cursor: pointer; transition: all 0.15s;">Cancel</button>
                 <button (click)="saveMaintenanceAlert(selected)"
                   style="flex: 1; border: 1px solid var(--border-color); background: var(--border-light); color: var(--text-primary); padding: 6px; border-radius: 6px; font-weight: 700; cursor: pointer; transition: all 0.15s;">Save</button>
-                <button
-                  (click)="saveMaintenanceAlert(selected, 'In Progress')"
+                <button (click)="saveMaintenanceAlert(selected, 'In Progress')"
                   style="flex: 2; border: none; background: #3b82f6; color: white; padding: 6px; border-radius: 6px; font-weight: 700; cursor: pointer; transition: all 0.15s;">Assign</button>
-                <button
-                  (click)="saveMaintenanceAlert(selected, 'Resolved')"
+                <button (click)="saveMaintenanceAlert(selected, 'Resolved')"
                   style="flex: 2; border: none; background: #10b981; color: white; padding: 6px; border-radius: 6px; font-weight: 700; cursor: pointer; transition: all 0.15s;">Resolve</button>
               </div>
 
@@ -5680,7 +5927,8 @@ esar+  @if (isLoggedIn()) {
                 <canvas #reportsAssetsByCategoryCanvas></canvas>
                 <div
                   style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; width: 70%;">
-                  <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary); line-height: 1;">{{ totalInventoryCount() | number }}
+                  <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary); line-height: 1;">{{
+                    totalInventoryCount() | number }}
                   </div>
                   <div
                     style="font-size: 0.58rem; color: var(--text-secondary); text-transform: uppercase; margin-top: 2px;">
@@ -6720,7 +6968,8 @@ esar+  @if (isLoggedIn()) {
             <table class="table-modern"
               style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.72rem;">
               <thead>
-                <tr style="background: var(--border-light); color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">
+                <tr
+                  style="background: var(--border-light); color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">
                   <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">
                     User Profile</th>
                   <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">
@@ -6751,7 +7000,8 @@ esar+  @if (isLoggedIn()) {
                   </td>
                   <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary); font-weight: 600;">
                     <span style="display: inline-flex; align-items: center; gap: 4px;">
-                      <span class="material-symbols-outlined" style="font-size: 0.85rem; color: var(--text-secondary);">storefront</span>
+                      <span class="material-symbols-outlined"
+                        style="font-size: 0.85rem; color: var(--text-secondary);">storefront</span>
                       {{ user.siteName }}
                     </span>
                   </td>
@@ -6970,7 +7220,8 @@ esar+  @if (isLoggedIn()) {
           style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-sm);">
           <div
             style="padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.015); display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-weight: 700; color: var(--text-primary); font-size: 0.78rem;">Registered Handheld RFID Scanners</span>
+            <span style="font-weight: 700; color: var(--text-primary); font-size: 0.78rem;">Registered Handheld RFID
+              Scanners</span>
             <button (click)="openAddHandheldModal()"
               style="padding: 4px 10px; border: none; border-radius: 4px; background: #2563eb; color: white; font-weight: 700; font-size: 0.68rem; cursor: pointer; display: flex; align-items: center; gap: 2px;">
               <span class="material-symbols-outlined" style="font-size: 0.85rem;">phone_android</span> Register Scanner
@@ -7000,17 +7251,21 @@ esar+  @if (isLoggedIn()) {
                 <tr style="border-bottom: 1px solid var(--border-light);">
                   <td style="padding: 0.55rem 0.75rem; font-weight: 700; color: var(--text-primary);">
                     <div style="display: flex; align-items: center; gap: 8px;">
-                      <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #3b82f6;">phone_android</span>
+                      <span class="material-symbols-outlined"
+                        style="font-size: 1.1rem; color: #3b82f6;">phone_android</span>
                       {{ device.name }}
                     </div>
                   </td>
-                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary); font-family: monospace;">{{ device.deviceSerial }}</td>
-                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary);">{{ device.model || 'Zebra TC20' }}</td>
+                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary); font-family: monospace;">{{
+                    device.deviceSerial }}</td>
+                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary);">{{ device.model || 'Zebra TC20' }}
+                  </td>
                   <td style="padding: 0.55rem 0.75rem;">
                     <span class="status-pill" [class.available]="device.status === 'Online' || device.status === 0"
                       [class.checked-out]="device.status === 'Offline' || device.status === 2"
                       style="font-size: 0.6rem; padding: 2px 6px; font-weight: 700; border-radius: 4px; display: inline-block;">
-                      {{ device.status === 0 ? 'Online' : device.status === 2 ? 'Offline' : device.status || 'Registered' }}
+                      {{ device.status === 0 ? 'Online' : device.status === 2 ? 'Offline' : device.status ||
+                      'Registered' }}
                     </span>
                   </td>
                   <td style="padding: 0.55rem 0.75rem; text-align: center;">
@@ -7028,7 +7283,8 @@ esar+  @if (isLoggedIn()) {
                 </tr>
                 } @empty {
                 <tr>
-                  <td colspan="5" style="padding: 2rem; text-align: center; color: var(--text-muted); font-style: italic;">
+                  <td colspan="5"
+                    style="padding: 2rem; text-align: center; color: var(--text-muted); font-style: italic;">
                     No handheld scanners registered yet. Click "Register Scanner" to add one.
                   </td>
                 </tr>
@@ -7127,11 +7383,13 @@ esar+  @if (isLoggedIn()) {
   style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease-out;">
   <div class="modal-card"
     style="background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 16px; width: 100%; max-width: 460px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
       <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin: 0;">
         {{ userModalMode() === 'add' ? '➕ Add New User' : '✏️ Edit User' }}
       </h3>
-      <button (click)="isUserModalOpen.set(false)" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 50%;">
+      <button (click)="isUserModalOpen.set(false)"
+        style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 50%;">
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
@@ -7143,7 +7401,8 @@ esar+  @if (isLoggedIn()) {
       </div>
       <div style="display: flex; flex-direction: column; gap: 5px;">
         <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Email Address</label>
-        <input type="email" [(ngModel)]="formUserEmail" name="formUserEmail" required placeholder="e.g. john@company.com"
+        <input type="email" [(ngModel)]="formUserEmail" name="formUserEmail" required
+          placeholder="e.g. john@company.com"
           style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;" />
       </div>
       @if (userModalMode() === 'add') {
@@ -7177,11 +7436,14 @@ esar+  @if (isLoggedIn()) {
       </div>
       @if (userModalMode() === 'edit') {
       <div style="display: flex; align-items: center; gap: 10px;">
-        <input type="checkbox" [(ngModel)]="formUserIsActive" name="formUserIsActive" id="userIsActiveChk" style="accent-color: #2563eb; width: 16px; height: 16px;" />
-        <label for="userIsActiveChk" style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); cursor: pointer;">Account Active</label>
+        <input type="checkbox" [(ngModel)]="formUserIsActive" name="formUserIsActive" id="userIsActiveChk"
+          style="accent-color: #2563eb; width: 16px; height: 16px;" />
+        <label for="userIsActiveChk"
+          style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); cursor: pointer;">Account Active</label>
       </div>
       }
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+      <div
+        style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; border-top: 1px solid var(--border-color); padding-top: 14px;">
         <button type="button" (click)="isUserModalOpen.set(false)"
           style="background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;">
           Cancel
@@ -7202,11 +7464,13 @@ esar+  @if (isLoggedIn()) {
   style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease-out;">
   <div class="modal-card"
     style="background: var(--card-bg, #ffffff); border: 1px solid var(--border-color); border-radius: 16px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
       <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin: 0;">
         {{ readerModalMode() === 'add' ? '📡 Register Reader Profile' : '✏️ Edit Reader Profile' }}
       </h3>
-      <button (click)="isReaderModalOpen.set(false)" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 50%;">
+      <button (click)="isReaderModalOpen.set(false)"
+        style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 50%;">
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
@@ -7230,7 +7494,8 @@ esar+  @if (isLoggedIn()) {
         </div>
         <div style="display: flex; flex-direction: column; gap: 5px;">
           <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">IP Address</label>
-          <input type="text" [(ngModel)]="formReaderIpAddress" name="formReaderIpAddress" required placeholder="e.g. 192.168.1.100"
+          <input type="text" [(ngModel)]="formReaderIpAddress" name="formReaderIpAddress" required
+            placeholder="e.g. 192.168.1.100"
             style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;" />
         </div>
         <div style="display: flex; flex-direction: column; gap: 5px;">
@@ -7263,7 +7528,8 @@ esar+  @if (isLoggedIn()) {
           <option value="Degraded">Degraded</option>
         </select>
       </div>
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+      <div
+        style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; border-top: 1px solid var(--border-color); padding-top: 14px;">
         <button type="button" (click)="isReaderModalOpen.set(false)"
           style="background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;">
           Cancel
@@ -7284,23 +7550,27 @@ esar+  @if (isLoggedIn()) {
   style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease-out;">
   <div class="modal-card"
     style="background: var(--card-bg, #ffffff); border: 1px solid var(--border-color); border-radius: 16px; width: 100%; max-width: 460px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
       <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin: 0;">
         {{ handheldModalMode() === 'add' ? '📱 Register Handheld Scanner' : '✏️ Edit Scanner Details' }}
       </h3>
-      <button (click)="isHandheldModalOpen.set(false)" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 50%;">
+      <button (click)="isHandheldModalOpen.set(false)"
+        style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 50%;">
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
     <form (submit)="$event.preventDefault(); saveHandheld();" style="display: flex; flex-direction: column; gap: 14px;">
       <div style="display: flex; flex-direction: column; gap: 5px;">
         <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Device Name</label>
-        <input type="text" [(ngModel)]="formHandheldName" name="formHandheldName" required placeholder="e.g. HH-Warehouse-01"
+        <input type="text" [(ngModel)]="formHandheldName" name="formHandheldName" required
+          placeholder="e.g. HH-Warehouse-01"
           style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;" />
       </div>
       <div style="display: flex; flex-direction: column; gap: 5px;">
         <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Device Serial Number</label>
-        <input type="text" [(ngModel)]="formHandheldSerial" name="formHandheldSerial" required placeholder="e.g. SN2025001234"
+        <input type="text" [(ngModel)]="formHandheldSerial" name="formHandheldSerial" required
+          placeholder="e.g. SN2025001234"
           style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;" />
       </div>
       <div style="display: flex; flex-direction: column; gap: 5px;">
@@ -7314,7 +7584,8 @@ esar+  @if (isLoggedIn()) {
           <option value="Honeywell Dolphin CT45">Honeywell Dolphin CT45</option>
         </select>
       </div>
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+      <div
+        style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; border-top: 1px solid var(--border-color); padding-top: 14px;">
         <button type="button" (click)="isHandheldModalOpen.set(false)"
           style="background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;">
           Cancel
@@ -7348,30 +7619,37 @@ esar+  @if (isLoggedIn()) {
     </div>
 
     <form (submit)="$event.preventDefault(); saveAsset();" style="display: flex; flex-direction: column; gap: 16px;">
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-height: 60vh; overflow-y: auto; padding-right: 8px;">
-        
+      <div
+        style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-height: 60vh; overflow-y: auto; padding-right: 8px;">
+
         <!-- Column 1: Core Identifiers & Categorization -->
         <div style="display: flex; flex-direction: column; gap: 12px;">
-          <h4 style="margin: 0; font-size: 0.95rem; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: #3b82f6; border-left: 3px solid #3b82f6; padding-left: 8px;">Asset Information</h4>
-          
+          <h4
+            style="margin: 0; font-size: 0.95rem; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: #3b82f6; border-left: 3px solid #3b82f6; padding-left: 8px;">
+            Asset Information</h4>
+
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset ID / Number *</label>
-            <input type="text" [ngModel]="formAssetNumber()" (ngModelChange)="formAssetNumber.set($event)" name="formAssetNumber" required placeholder="e.g. AST-00124"
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset ID / Number
+              *</label>
+            <input type="text" [ngModel]="formAssetNumber()" (ngModelChange)="formAssetNumber.set($event)"
+              name="formAssetNumber" required placeholder="e.g. AST-00124"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset Name *</label>
-            <input type="text" [ngModel]="formName()" (ngModelChange)="formName.set($event)" name="formName" required placeholder="e.g. ThinkPad Workstation"
+            <input type="text" [ngModel]="formName()" (ngModelChange)="formName.set($event)" name="formName" required
+              placeholder="e.g. ThinkPad Workstation"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset Category *</label>
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset Category
+              *</label>
             <select [ngModel]="formCategory()" (ngModelChange)="formCategory.set($event)" name="formCategory"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               @for (cat of apiCategories(); track cat.id) {
-                <option [value]="cat.id">{{ cat.name }}</option>
+              <option [value]="cat.id">{{ cat.name }}</option>
               }
             </select>
           </div>
@@ -7382,7 +7660,7 @@ esar+  @if (isLoggedIn()) {
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— No Group —</option>
               @for (grp of availableGroupsForSelectedCategory(); track grp.name) {
-                <option [value]="grp.name">{{ grp.name }}</option>
+              <option [value]="grp.name">{{ grp.name }}</option>
               }
             </select>
           </div>
@@ -7402,62 +7680,71 @@ esar+  @if (isLoggedIn()) {
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Serial Number</label>
-            <input type="text" [ngModel]="formSerialNumber()" (ngModelChange)="formSerialNumber.set($event)" name="formSerialNumber" placeholder="e.g. SN-8924017A"
+            <input type="text" [ngModel]="formSerialNumber()" (ngModelChange)="formSerialNumber.set($event)"
+              name="formSerialNumber" placeholder="e.g. SN-8924017A"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">RFID EPC Code (Optional)</label>
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">RFID EPC Code
+              (Optional)</label>
             <select [ngModel]="formRfid()" (ngModelChange)="formRfid.set($event)" name="formRfid"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Unassigned / None —</option>
               @for (tag of unassignedRfidTags(); track tag.id) {
-                <option [value]="tag.epcCode">{{ tag.epcCode }}</option>
+              <option [value]="tag.epcCode">{{ tag.epcCode }}</option>
               }
             </select>
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">QR Code / Barcode (Optional)</label>
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">QR Code / Barcode
+              (Optional)</label>
             <select [ngModel]="formQrCode()" (ngModelChange)="formQrCode.set($event)" name="formQrCode"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Unassigned / None —</option>
               @for (bc of unassignedBarcodes(); track bc.id) {
-                <option [value]="bc.barcodeValue">{{ bc.barcodeValue }}</option>
+              <option [value]="bc.barcodeValue">{{ bc.barcodeValue }}</option>
               }
             </select>
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">GPS Device Code (Optional)</label>
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">GPS Device Code
+              (Optional)</label>
             <select [ngModel]="formGps()" (ngModelChange)="formGps.set($event)" name="formGps"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Unassigned / None —</option>
               @for (gps of unassignedGpsDevices(); track gps.id) {
-                <option [value]="gps.imei">{{ gps.imei }}</option>
+              <option [value]="gps.imei">{{ gps.imei }}</option>
               }
             </select>
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Manufacturer</label>
-            <input type="text" [ngModel]="formManufacturer()" (ngModelChange)="formManufacturer.set($event)" name="formManufacturer" placeholder="e.g. Lenovo / Dell"
+            <input type="text" [ngModel]="formManufacturer()" (ngModelChange)="formManufacturer.set($event)"
+              name="formManufacturer" placeholder="e.g. Lenovo / Dell"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Model</label>
-            <input type="text" [ngModel]="formModel()" (ngModelChange)="formModel.set($event)" name="formModel" placeholder="e.g. ThinkPad L14 Gen 4"
+            <input type="text" [ngModel]="formModel()" (ngModelChange)="formModel.set($event)" name="formModel"
+              placeholder="e.g. ThinkPad L14 Gen 4"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
         </div>
 
         <!-- Column 2: Logistics, Business & Warranty -->
         <div style="display: flex; flex-direction: column; gap: 12px;">
-          <h4 style="margin: 0; font-size: 0.95rem; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: #10b981; border-left: 3px solid #10b981; padding-left: 8px;">Usage & Deployment</h4>
+          <h4
+            style="margin: 0; font-size: 0.95rem; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: #10b981; border-left: 3px solid #10b981; padding-left: 8px;">
+            Usage & Deployment</h4>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset Lifecycle Status</label>
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Asset Lifecycle
+              Status</label>
             <select [ngModel]="formStatus()" (ngModelChange)="formStatus.set($event)" name="formStatus"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="Available">Procured / Available</option>
@@ -7470,49 +7757,61 @@ esar+  @if (isLoggedIn()) {
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Purchase Date</label>
-            <input type="date" [ngModel]="formPurchaseDate()" (ngModelChange)="formPurchaseDate.set($event)" name="formPurchaseDate"
+            <input type="date" [ngModel]="formPurchaseDate()" (ngModelChange)="formPurchaseDate.set($event)"
+              name="formPurchaseDate"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Warranty Expiry Date</label>
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Warranty Expiry
+              Date</label>
             <input type="date" [ngModel]="formWarranty()" (ngModelChange)="formWarranty.set($event)" name="formWarranty"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Warranty Provider</label>
-            <input type="text" [ngModel]="formWarrantyProvider()" (ngModelChange)="formWarrantyProvider.set($event)" name="formWarrantyProvider" placeholder="e.g. Dell Technologies, HP Care"
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Warranty
+              Provider</label>
+            <input type="text" [ngModel]="formWarrantyProvider()" (ngModelChange)="formWarrantyProvider.set($event)"
+              name="formWarrantyProvider" placeholder="e.g. Dell Technologies, HP Care"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Current Custodian</label>
-            <input type="text" [ngModel]="formCustodian()" (ngModelChange)="formCustodian.set($event)" name="formCustodian" placeholder="e.g. Ramesh Kumar"
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Current
+              Custodian</label>
+            <input type="text" [ngModel]="formCustodian()" (ngModelChange)="formCustodian.set($event)"
+              name="formCustodian" placeholder="e.g. Ramesh Kumar"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Custodian Email</label>
-            <input type="email" [ngModel]="formCustodianEmail()" (ngModelChange)="formCustodianEmail.set($event)" name="formCustodianEmail" placeholder="e.g. ramesh@trackit.in"
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Custodian
+              Email</label>
+            <input type="email" [ngModel]="formCustodianEmail()" (ngModelChange)="formCustodianEmail.set($event)"
+              name="formCustodianEmail" placeholder="e.g. ramesh@trackit.in"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Owner Department</label>
-            <input type="text" [ngModel]="formDepartment()" (ngModelChange)="formDepartment.set($event)" name="formDepartment" placeholder="e.g. Logistics / IT Operations"
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Owner
+              Department</label>
+            <input type="text" [ngModel]="formDepartment()" (ngModelChange)="formDepartment.set($event)"
+              name="formDepartment" placeholder="e.g. Logistics / IT Operations"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Industry</label>
-            <input type="text" [ngModel]="formIndustry()" (ngModelChange)="formIndustry.set($event)" name="formIndustry" placeholder="e.g. Automotive / E-commerce"
+            <input type="text" [ngModel]="formIndustry()" (ngModelChange)="formIndustry.set($event)" name="formIndustry"
+              placeholder="e.g. Automotive / E-commerce"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Business Unit</label>
-            <input type="text" [ngModel]="formBusinessUnit()" (ngModelChange)="formBusinessUnit.set($event)" name="formBusinessUnit" placeholder="e.g. Supply Chain / Tech Services"
+            <input type="text" [ngModel]="formBusinessUnit()" (ngModelChange)="formBusinessUnit.set($event)"
+              name="formBusinessUnit" placeholder="e.g. Supply Chain / Tech Services"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;" />
           </div>
 
@@ -7522,29 +7821,31 @@ esar+  @if (isLoggedIn()) {
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Select Site —</option>
               @for (site of apiSites(); track site.id) {
-                <option [value]="site.id">{{ site.name }}</option>
+              <option [value]="site.id">{{ site.name }}</option>
               }
             </select>
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Warehouse <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Warehouse <span
+                style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
             <select [ngModel]="formWarehouseId()" (ngModelChange)="formWarehouseId.set($event)" name="formWarehouseId"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Select Warehouse —</option>
               @for (wh of filteredWarehouses(); track wh.id) {
-                <option [value]="wh.id">{{ wh.name }}</option>
+              <option [value]="wh.id">{{ wh.name }}</option>
               }
             </select>
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Zone <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Zone <span
+                style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
             <select [ngModel]="formZoneId()" (ngModelChange)="formZoneId.set($event)" name="formZoneId"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Select Zone —</option>
               @for (zone of filteredZones(); track zone.id) {
-                <option [value]="zone.id">{{ zone.name }}</option>
+              <option [value]="zone.id">{{ zone.name }}</option>
               }
             </select>
           </div>
@@ -7576,7 +7877,8 @@ esar+  @if (isLoggedIn()) {
     style="background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 16px; width: 100%; max-width: 450px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
     <div class="modal-header"
       style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); padding-bottom: 12px;">
-      <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 700; color: var(--text-main, #0f172a); margin: 0;">
+      <h3
+        style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 700; color: var(--text-main, #0f172a); margin: 0;">
         Create New Asset Category
       </h3>
       <button (click)="isCategoryModalOpen.set(false)"
@@ -7588,13 +7890,15 @@ esar+  @if (isLoggedIn()) {
     <form (submit)="$event.preventDefault(); saveCategory();" style="display: flex; flex-direction: column; gap: 14px;">
       <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
         <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-main, #0f172a);">Category Name *</label>
-        <input type="text" [ngModel]="formCategoryName()" (ngModelChange)="formCategoryName.set($event)" name="formCategoryName" required placeholder="e.g. Returnable containers"
+        <input type="text" [ngModel]="formCategoryName()" (ngModelChange)="formCategoryName.set($event)"
+          name="formCategoryName" required placeholder="e.g. Returnable containers"
           style="padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.85rem; width: 100%; box-sizing: border-box;" />
       </div>
 
       <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
         <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-main, #0f172a);">Description</label>
-        <textarea [ngModel]="formCategoryDescription()" (ngModelChange)="formCategoryDescription.set($event)" name="formCategoryDescription" placeholder="Provide category purpose / scope" rows="3"
+        <textarea [ngModel]="formCategoryDescription()" (ngModelChange)="formCategoryDescription.set($event)"
+          name="formCategoryDescription" placeholder="Provide category purpose / scope" rows="3"
           style="padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.85rem; width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
       </div>
 
@@ -7622,7 +7926,8 @@ esar+  @if (isLoggedIn()) {
     style="background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 16px; width: 100%; max-width: 450px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
     <div class="modal-header"
       style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color, #e2e8f0); padding-bottom: 12px;">
-      <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 700; color: var(--text-main, #0f172a); margin: 0;">
+      <h3
+        style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 700; color: var(--text-main, #0f172a); margin: 0;">
         Create New Asset Group
       </h3>
       <button (click)="isGroupModalOpen.set(false)"
@@ -7634,16 +7939,18 @@ esar+  @if (isLoggedIn()) {
     <form (submit)="$event.preventDefault(); saveGroup();" style="display: flex; flex-direction: column; gap: 14px;">
       <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
         <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-main, #0f172a);">Group Name *</label>
-        <input type="text" [ngModel]="formGroupName()" (ngModelChange)="formGroupName.set($event)" name="formGroupName" required placeholder="e.g. Laptop / Excavator"
+        <input type="text" [ngModel]="formGroupName()" (ngModelChange)="formGroupName.set($event)" name="formGroupName"
+          required placeholder="e.g. Laptop / Excavator"
           style="padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.85rem; width: 100%; box-sizing: border-box;" />
       </div>
 
       <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
         <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-main, #0f172a);">Parent Category *</label>
-        <select [ngModel]="formGroupCategory()" (ngModelChange)="formGroupCategory.set($event)" name="formGroupCategory" required
+        <select [ngModel]="formGroupCategory()" (ngModelChange)="formGroupCategory.set($event)" name="formGroupCategory"
+          required
           style="padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.85rem; width: 100%; box-sizing: border-box;">
           @for (cat of apiCategories(); track cat.id) {
-            <option [value]="cat.id">{{ cat.name }}</option>
+          <option [value]="cat.id">{{ cat.name }}</option>
           }
         </select>
       </div>
@@ -7666,256 +7973,274 @@ esar+  @if (isLoggedIn()) {
 } @else {
 <div class="login-page-container">
   <div class="login-outer-card">
-  <!-- Left Hero Panel -->
-  <div class="login-left-panel">
-    <!-- Header with brand logo -->
-    <div class="login-left-header">
-      <div class="login-brand-text">
-        <span class="login-brand-name">TrackIt</span>
-        <span class="login-brand-sub">RFID & GPS Solution</span>
+    <!-- Left Hero Panel -->
+    <div class="login-left-panel">
+      <!-- Header with brand logo -->
+      <div class="login-left-header">
+        <div class="login-brand-text">
+          <span class="login-brand-name">TrackIt</span>
+          <span class="login-brand-sub">RFID & GPS Solution</span>
+        </div>
       </div>
-    </div>
 
-    <!-- Hero Section -->
-    <div class="login-hero-section">
-      <h2 class="login-hero-title">Track. Monitor. Optimize.</h2>
-      <p class="login-hero-desc">Real-time visibility of your assets anywhere, anytime.</p>
-    </div>
+      <!-- Hero Section -->
+      <div class="login-hero-section">
+        <h2 class="login-hero-title">Track. Monitor. Optimize.</h2>
+        <p class="login-hero-desc">Real-time visibility of your assets anywhere, anytime.</p>
+      </div>
 
-    <!-- Vector Illustration (Animated SVG) -->
-    <div class="login-illustration-container">
-      <svg width="100%" height="100%" viewBox="0 0 500 350" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- Dotted World Map Grid Background -->
-        <g opacity="0.15">
-          <circle cx="50" cy="80" r="2" fill="#cbd5e1" />
-          <circle cx="100" cy="60" r="2" fill="#cbd5e1" />
-          <circle cx="150" cy="70" r="2" fill="#cbd5e1" />
-          <circle cx="200" cy="90" r="2" fill="#cbd5e1" />
-          <circle cx="250" cy="80" r="2" fill="#cbd5e1" />
-          <circle cx="300" cy="60" r="2" fill="#cbd5e1" />
-          <circle cx="350" cy="110" r="2" fill="#cbd5e1" />
-          <circle cx="400" cy="80" r="2" fill="#cbd5e1" />
-          <circle cx="450" cy="90" r="2" fill="#cbd5e1" />
-          
-          <circle cx="70" cy="130" r="2" fill="#cbd5e1" />
-          <circle cx="120" cy="120" r="2" fill="#cbd5e1" />
-          <circle cx="170" cy="140" r="2" fill="#cbd5e1" />
-          <circle cx="220" cy="130" r="2" fill="#cbd5e1" />
-          <circle cx="270" cy="150" r="2" fill="#cbd5e1" />
-          <circle cx="320" cy="110" r="2" fill="#cbd5e1" />
-          <circle cx="370" cy="140" r="2" fill="#cbd5e1" />
-          <circle cx="420" cy="120" r="2" fill="#cbd5e1" />
-          
-          <circle cx="90" cy="190" r="2" fill="#cbd5e1" />
-          <circle cx="140" cy="170" r="2" fill="#cbd5e1" />
-          <circle cx="190" cy="200" r="2" fill="#cbd5e1" />
-          <circle cx="240" cy="180" r="2" fill="#cbd5e1" />
-          <circle cx="290" cy="190" r="2" fill="#cbd5e1" />
-          <circle cx="340" cy="180" r="2" fill="#cbd5e1" />
-          <circle cx="390" cy="210" r="2" fill="#cbd5e1" />
-          
-          <!-- Connection lines -->
-          <path d="M120 120 Q 220 70 270 150" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 4" />
-          <path d="M270 150 Q 320 80 420 120" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 4" />
-          <path d="M140 170 Q 220 180 270 150" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 4" />
-        </g>
+      <!-- Vector Illustration (Animated SVG) -->
+      <div class="login-illustration-container">
+        <svg width="100%" height="100%" viewBox="0 0 500 350" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Dotted World Map Grid Background -->
+          <g opacity="0.15">
+            <circle cx="50" cy="80" r="2" fill="#cbd5e1" />
+            <circle cx="100" cy="60" r="2" fill="#cbd5e1" />
+            <circle cx="150" cy="70" r="2" fill="#cbd5e1" />
+            <circle cx="200" cy="90" r="2" fill="#cbd5e1" />
+            <circle cx="250" cy="80" r="2" fill="#cbd5e1" />
+            <circle cx="300" cy="60" r="2" fill="#cbd5e1" />
+            <circle cx="350" cy="110" r="2" fill="#cbd5e1" />
+            <circle cx="400" cy="80" r="2" fill="#cbd5e1" />
+            <circle cx="450" cy="90" r="2" fill="#cbd5e1" />
 
-        <!-- Ground Line -->
-        <path d="M 20 280 L 480 280" stroke="rgba(255,255,255,0.1)" stroke-width="2" />
-        <path d="M 50 280 L 0 350" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
-        <path d="M 150 280 L 80 350" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
-        <path d="M 250 280 L 250 350" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
-        <path d="M 350 280 L 420 350" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
-        <path d="M 450 280 L 500 350" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
+            <circle cx="70" cy="130" r="2" fill="#cbd5e1" />
+            <circle cx="120" cy="120" r="2" fill="#cbd5e1" />
+            <circle cx="170" cy="140" r="2" fill="#cbd5e1" />
+            <circle cx="220" cy="130" r="2" fill="#cbd5e1" />
+            <circle cx="270" cy="150" r="2" fill="#cbd5e1" />
+            <circle cx="320" cy="110" r="2" fill="#cbd5e1" />
+            <circle cx="370" cy="140" r="2" fill="#cbd5e1" />
+            <circle cx="420" cy="120" r="2" fill="#cbd5e1" />
 
-        <!-- Warehouse illustration -->
-        <g transform="translate(10, 160)" class="ill-warehouse-g">
-          <rect x="10" y="50" width="130" height="70" fill="#1e293b" rx="4" stroke="rgba(255,255,255,0.1)" stroke-width="1.5" />
-          <path d="M 5 50 L 75 20 L 145 50 Z" fill="#0f172a" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" />
-          <rect x="40" y="80" width="70" height="40" fill="#020617" rx="2" />
-          <line x1="40" y1="88" x2="110" y2="88" stroke="#334155" stroke-width="1.5" />
-          <line x1="40" y1="96" x2="110" y2="96" stroke="#334155" stroke-width="1.5" />
-          <line x1="40" y1="104" x2="110" y2="104" stroke="#334155" stroke-width="1.5" />
-          <line x1="40" y1="112" x2="110" y2="112" stroke="#334155" stroke-width="1.5" />
-          <rect x="50" y="72" width="50" height="4" fill="#fbbf24" opacity="0.8" />
-        </g>
+            <circle cx="90" cy="190" r="2" fill="#cbd5e1" />
+            <circle cx="140" cy="170" r="2" fill="#cbd5e1" />
+            <circle cx="190" cy="200" r="2" fill="#cbd5e1" />
+            <circle cx="240" cy="180" r="2" fill="#cbd5e1" />
+            <circle cx="290" cy="190" r="2" fill="#cbd5e1" />
+            <circle cx="340" cy="180" r="2" fill="#cbd5e1" />
+            <circle cx="390" cy="210" r="2" fill="#cbd5e1" />
 
-        <!-- Shipping Truck -->
-        <g transform="translate(260, 185)" class="ill-truck-g">
-          <path d="M 130 60 L 170 60 L 195 90 L 195 110 L 130 110 Z" fill="#0f172a" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" />
-          <path d="M 165 65 L 180 65 L 190 85 L 165 85 Z" fill="#38bdf8" opacity="0.6" />
-          <path d="M 135 110 A 15 15 0 0 1 165 110" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" />
-          <path d="M 30 110 A 15 15 0 0 1 60 110" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" />
-          <path d="M 75 110 A 15 15 0 0 1 105 110" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" />
-          <circle cx="150" cy="110" r="10" fill="#020617" stroke="#475569" stroke-width="2" />
-          <circle cx="150" cy="110" r="4" fill="#cbd5e1" />
-          <circle cx="45" cy="110" r="10" fill="#020617" stroke="#475569" stroke-width="2" />
-          <circle cx="45" cy="110" r="4" fill="#cbd5e1" />
-          <circle cx="90" cy="110" r="10" fill="#020617" stroke="#475569" stroke-width="2" />
-          <circle cx="90" cy="110" r="4" fill="#cbd5e1" />
-          <rect x="10" y="40" width="120" height="70" fill="#0284c7" rx="3" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" />
-          <line x1="25" y1="40" x2="25" y2="110" stroke="#0369a1" stroke-width="2" />
-          <line x1="40" y1="40" x2="40" y2="110" stroke="#0369a1" stroke-width="2" />
-          <line x1="55" y1="40" x2="55" y2="110" stroke="#0369a1" stroke-width="2" />
-          <line x1="70" y1="40" x2="70" y2="110" stroke="#0369a1" stroke-width="2" />
-          <line x1="85" y1="40" x2="85" y2="110" stroke="#0369a1" stroke-width="2" />
-          <line x1="100" y1="40" x2="100" y2="110" stroke="#0369a1" stroke-width="2" />
-          <line x1="115" y1="40" x2="115" y2="110" stroke="#0369a1" stroke-width="2" />
-        </g>
-
-        <!-- Big Asset Box (floating) -->
-        <g class="ill-box">
-          <path d="M 10 30 L 70 5 L 130 30 L 130 90 L 70 120 L 10 90 Z" fill="#d97706" stroke="#b45309" stroke-width="2" />
-          <path d="M 10 30 L 70 55 L 130 30" fill="none" stroke="#b45309" stroke-width="2" />
-          <path d="M 70 55 L 70 120" fill="none" stroke="#b45309" stroke-width="2" />
-          <path d="M 10 30 Q 70 15 130 30" fill="none" stroke="#f59e0b" opacity="0.3" stroke-width="1.5" />
-          <path d="M 80 65 L 115 50 L 115 80 L 80 95 Z" fill="#ffffff" />
-          <line x1="86" y1="68" x2="86" y2="82" stroke="#000000" stroke-width="2" />
-          <line x1="90" y1="66" x2="90" y2="80" stroke="#000000" stroke-width="1" />
-          <line x1="94" y1="64" x2="94" y2="78" stroke="#000000" stroke-width="3" />
-          <line x1="100" y1="62" x2="100" y2="76" stroke="#000000" stroke-width="1.5" />
-          <line x1="104" y1="60" x2="104" y2="74" stroke="#000000" stroke-width="2" />
-          <line x1="108" y1="58" x2="108" y2="72" stroke="#000000" stroke-width="1" />
-        </g>
-
-        <!-- RFID Signals -->
-        <g class="ill-signal">
-          <path d="M 230 180 A 25 25 0 0 1 270 180" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" />
-          <path d="M 215 170 A 45 45 0 0 1 285 170" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" opacity="0.7" />
-          <path d="M 200 160 A 65 65 0 0 1 300 160" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" opacity="0.4" />
-        </g>
-
-        <!-- Map Pins -->
-        <g class="ill-pin ill-pin-1">
-          <path d="M 120 75 Q 120 75 120 75" /> <!-- bounce anchor -->
-          <g transform="translate(110, 35)">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 9 12 20 12 20s12-11 12-20c0-6.63-5.37-12-12-12zm0 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z" fill="#3b82f6" />
-            <circle cx="12" cy="12" r="4" fill="#ffffff" />
+            <!-- Connection lines -->
+            <path d="M120 120 Q 220 70 270 150" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 4" />
+            <path d="M270 150 Q 320 80 420 120" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 4" />
+            <path d="M140 170 Q 220 180 270 150" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 4" />
           </g>
-        </g>
-        <g class="ill-pin ill-pin-2">
-          <g transform="translate(230, 65)">
-            <path d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 16.7 10 16.7s10-9.2 10-16.7c0-5.52-4.48-10-10-10zm0 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z" fill="#00b4d8" />
-            <circle cx="10" cy="10" r="3.5" fill="#ffffff" />
+
+          <!-- Ground Line -->
+          <path d="M 20 280 L 480 280" stroke="rgba(255,255,255,0.1)" stroke-width="2" />
+          <path d="M 50 280 L 0 350" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
+          <path d="M 150 280 L 80 350" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
+          <path d="M 250 280 L 250 350" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
+          <path d="M 350 280 L 420 350" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
+          <path d="M 450 280 L 500 350" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
+
+          <!-- Warehouse illustration -->
+          <g transform="translate(10, 160)" class="ill-warehouse-g">
+            <rect x="10" y="50" width="130" height="70" fill="#1e293b" rx="4" stroke="rgba(255,255,255,0.1)"
+              stroke-width="1.5" />
+            <path d="M 5 50 L 75 20 L 145 50 Z" fill="#0f172a" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" />
+            <rect x="40" y="80" width="70" height="40" fill="#020617" rx="2" />
+            <line x1="40" y1="88" x2="110" y2="88" stroke="#334155" stroke-width="1.5" />
+            <line x1="40" y1="96" x2="110" y2="96" stroke="#334155" stroke-width="1.5" />
+            <line x1="40" y1="104" x2="110" y2="104" stroke="#334155" stroke-width="1.5" />
+            <line x1="40" y1="112" x2="110" y2="112" stroke="#334155" stroke-width="1.5" />
+            <rect x="50" y="72" width="50" height="4" fill="#fbbf24" opacity="0.8" />
           </g>
-        </g>
-        <g class="ill-pin ill-pin-3">
-          <g transform="translate(360, 15)">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 9 12 20 12 20s12-11 12-20c0-6.63-5.37-12-12-12zm0 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z" fill="#10b981" />
-            <circle cx="12" cy="12" r="4" fill="#ffffff" />
+
+          <!-- Shipping Truck -->
+          <g transform="translate(260, 185)" class="ill-truck-g">
+            <path d="M 130 60 L 170 60 L 195 90 L 195 110 L 130 110 Z" fill="#0f172a" stroke="rgba(255,255,255,0.15)"
+              stroke-width="1.5" />
+            <path d="M 165 65 L 180 65 L 190 85 L 165 85 Z" fill="#38bdf8" opacity="0.6" />
+            <path d="M 135 110 A 15 15 0 0 1 165 110" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" />
+            <path d="M 30 110 A 15 15 0 0 1 60 110" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" />
+            <path d="M 75 110 A 15 15 0 0 1 105 110" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" />
+            <circle cx="150" cy="110" r="10" fill="#020617" stroke="#475569" stroke-width="2" />
+            <circle cx="150" cy="110" r="4" fill="#cbd5e1" />
+            <circle cx="45" cy="110" r="10" fill="#020617" stroke="#475569" stroke-width="2" />
+            <circle cx="45" cy="110" r="4" fill="#cbd5e1" />
+            <circle cx="90" cy="110" r="10" fill="#020617" stroke="#475569" stroke-width="2" />
+            <circle cx="90" cy="110" r="4" fill="#cbd5e1" />
+            <rect x="10" y="40" width="120" height="70" fill="#0284c7" rx="3" stroke="rgba(255,255,255,0.15)"
+              stroke-width="1.5" />
+            <line x1="25" y1="40" x2="25" y2="110" stroke="#0369a1" stroke-width="2" />
+            <line x1="40" y1="40" x2="40" y2="110" stroke="#0369a1" stroke-width="2" />
+            <line x1="55" y1="40" x2="55" y2="110" stroke="#0369a1" stroke-width="2" />
+            <line x1="70" y1="40" x2="70" y2="110" stroke="#0369a1" stroke-width="2" />
+            <line x1="85" y1="40" x2="85" y2="110" stroke="#0369a1" stroke-width="2" />
+            <line x1="100" y1="40" x2="100" y2="110" stroke="#0369a1" stroke-width="2" />
+            <line x1="115" y1="40" x2="115" y2="110" stroke="#0369a1" stroke-width="2" />
           </g>
-        </g>
-      </svg>
-    </div>
 
-    <!-- Feature Icons Footer -->
-    <div class="login-left-footer">
-      <div class="login-feature-item">
-        <div class="login-feature-icon-wrapper">
-          <span class="material-symbols-outlined">contactless</span>
-        </div>
-        <span class="login-feature-label">RFID Tracking</span>
-      </div>
-      <div class="login-feature-item">
-        <div class="login-feature-icon-wrapper">
-          <span class="material-symbols-outlined">location_on</span>
-        </div>
-        <span class="login-feature-label">GPS Tracking</span>
-      </div>
-      <div class="login-feature-item">
-        <div class="login-feature-icon-wrapper">
-          <span class="material-symbols-outlined">bar_chart</span>
-        </div>
-        <span class="login-feature-label">Real-time Analytics</span>
-      </div>
-      <div class="login-feature-item">
-        <div class="login-feature-icon-wrapper">
-          <span class="material-symbols-outlined">notifications</span>
-        </div>
-        <span class="login-feature-label">Alerts & Info</span>
-      </div>
-      <div class="login-feature-item">
-        <div class="login-feature-icon-wrapper">
-          <span class="material-symbols-outlined">shield</span>
-        </div>
-        <span class="login-feature-label">Secure & Reliable</span>
-      </div>
-    </div>
-  </div>
+          <!-- Big Asset Box (floating) -->
+          <g class="ill-box">
+            <path d="M 10 30 L 70 5 L 130 30 L 130 90 L 70 120 L 10 90 Z" fill="#d97706" stroke="#b45309"
+              stroke-width="2" />
+            <path d="M 10 30 L 70 55 L 130 30" fill="none" stroke="#b45309" stroke-width="2" />
+            <path d="M 70 55 L 70 120" fill="none" stroke="#b45309" stroke-width="2" />
+            <path d="M 10 30 Q 70 15 130 30" fill="none" stroke="#f59e0b" opacity="0.3" stroke-width="1.5" />
+            <path d="M 80 65 L 115 50 L 115 80 L 80 95 Z" fill="#ffffff" />
+            <line x1="86" y1="68" x2="86" y2="82" stroke="#000000" stroke-width="2" />
+            <line x1="90" y1="66" x2="90" y2="80" stroke="#000000" stroke-width="1" />
+            <line x1="94" y1="64" x2="94" y2="78" stroke="#000000" stroke-width="3" />
+            <line x1="100" y1="62" x2="100" y2="76" stroke="#000000" stroke-width="1.5" />
+            <line x1="104" y1="60" x2="104" y2="74" stroke="#000000" stroke-width="2" />
+            <line x1="108" y1="58" x2="108" y2="72" stroke="#000000" stroke-width="1" />
+          </g>
 
-  <!-- Right Form Panel -->
-  <div class="login-right-panel">
-    <div class="login-card">
-      <div class="login-card-header">
-        <img class="login-card-logo-img" src="logo.jpg" alt="TrackIt Logo" />
-        <h3 class="login-card-title">Welcome Back!</h3>
-        <p class="login-card-subtitle">Sign in to access your account</p>
+          <!-- RFID Signals -->
+          <g class="ill-signal">
+            <path d="M 230 180 A 25 25 0 0 1 270 180" fill="none" stroke="#38bdf8" stroke-width="3"
+              stroke-linecap="round" />
+            <path d="M 215 170 A 45 45 0 0 1 285 170" fill="none" stroke="#38bdf8" stroke-width="2.5"
+              stroke-linecap="round" opacity="0.7" />
+            <path d="M 200 160 A 65 65 0 0 1 300 160" fill="none" stroke="#38bdf8" stroke-width="2"
+              stroke-linecap="round" opacity="0.4" />
+          </g>
+
+          <!-- Map Pins -->
+          <g class="ill-pin ill-pin-1">
+            <path d="M 120 75 Q 120 75 120 75" /> <!-- bounce anchor -->
+            <g transform="translate(110, 35)">
+              <path
+                d="M12 0C5.37 0 0 5.37 0 12c0 9 12 20 12 20s12-11 12-20c0-6.63-5.37-12-12-12zm0 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"
+                fill="#3b82f6" />
+              <circle cx="12" cy="12" r="4" fill="#ffffff" />
+            </g>
+          </g>
+          <g class="ill-pin ill-pin-2">
+            <g transform="translate(230, 65)">
+              <path
+                d="M10 0C4.48 0 0 4.48 0 10c0 7.5 10 16.7 10 16.7s10-9.2 10-16.7c0-5.52-4.48-10-10-10zm0 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"
+                fill="#00b4d8" />
+              <circle cx="10" cy="10" r="3.5" fill="#ffffff" />
+            </g>
+          </g>
+          <g class="ill-pin ill-pin-3">
+            <g transform="translate(360, 15)">
+              <path
+                d="M12 0C5.37 0 0 5.37 0 12c0 9 12 20 12 20s12-11 12-20c0-6.63-5.37-12-12-12zm0 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"
+                fill="#10b981" />
+              <circle cx="12" cy="12" r="4" fill="#ffffff" />
+            </g>
+          </g>
+        </svg>
       </div>
 
-      <!-- Error Message -->
-      @if (loginErrorMessage()) {
-      <div class="login-error-msg">
-        <span class="material-symbols-outlined" style="font-size: 1.2rem;">error</span>
-        <span>{{ loginErrorMessage() }}</span>
-      </div>
-      }
-
-      <form class="login-form" (submit)="onSignIn($event)">
-        <!-- Username Input -->
-        <div class="login-input-group">
-          <label class="login-input-label">Username / Email</label>
-          <div class="login-input-wrapper">
-            <span class="material-symbols-outlined login-input-icon-left">person</span>
-            <input type="text" [(ngModel)]="loginUsername" name="username" class="login-input" [class.has-error]="loginErrorMessage() && !loginUsername()" placeholder="Enter username or email" required />
+      <!-- Feature Icons Footer -->
+      <div class="login-left-footer">
+        <div class="login-feature-item">
+          <div class="login-feature-icon-wrapper">
+            <span class="material-symbols-outlined">contactless</span>
           </div>
+          <span class="login-feature-label">RFID Tracking</span>
         </div>
-
-        <!-- Password Input -->
-        <div class="login-input-group">
-          <label class="login-input-label">Password</label>
-          <div class="login-input-wrapper">
-            <span class="material-symbols-outlined login-input-icon-left">lock</span>
-            <input [type]="showPassword() ? 'text' : 'password'" [(ngModel)]="loginPassword" name="password" class="login-input" [class.has-error]="loginErrorMessage() && !loginPassword()" placeholder="Enter password" required />
-            <span class="material-symbols-outlined login-input-icon-right" (click)="showPassword.set(!showPassword())">
-              {{ showPassword() ? 'visibility_off' : 'visibility' }}
-            </span>
+        <div class="login-feature-item">
+          <div class="login-feature-icon-wrapper">
+            <span class="material-symbols-outlined">location_on</span>
           </div>
+          <span class="login-feature-label">GPS Tracking</span>
+        </div>
+        <div class="login-feature-item">
+          <div class="login-feature-icon-wrapper">
+            <span class="material-symbols-outlined">bar_chart</span>
+          </div>
+          <span class="login-feature-label">Real-time Analytics</span>
+        </div>
+        <div class="login-feature-item">
+          <div class="login-feature-icon-wrapper">
+            <span class="material-symbols-outlined">notifications</span>
+          </div>
+          <span class="login-feature-label">Alerts & Info</span>
+        </div>
+        <div class="login-feature-item">
+          <div class="login-feature-icon-wrapper">
+            <span class="material-symbols-outlined">shield</span>
+          </div>
+          <span class="login-feature-label">Secure & Reliable</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Form Panel -->
+    <div class="login-right-panel">
+      <div class="login-card">
+        <div class="login-card-header">
+          <img class="login-card-logo-img" src="logo.jpg" alt="TrackIt Logo" />
+          <h3 class="login-card-title">Welcome Back!</h3>
+          <p class="login-card-subtitle">Sign in to access your account</p>
         </div>
 
-        <!-- Options -->
-        <div class="login-form-options">
-          <label class="login-checkbox-label">
-            <input type="checkbox" [(ngModel)]="loginRememberMe" name="remember" class="login-checkbox" />
-            <span>Remember me</span>
-          </label>
-          <a href="#" class="login-forgot-link" (click)="$event.preventDefault()">Forgot Password?</a>
+        <!-- Error Message -->
+        @if (loginErrorMessage()) {
+        <div class="login-error-msg">
+          <span class="material-symbols-outlined" style="font-size: 1.2rem;">error</span>
+          <span>{{ loginErrorMessage() }}</span>
+        </div>
+        }
+
+        <form class="login-form" (submit)="onSignIn($event)">
+          <!-- Username Input -->
+          <div class="login-input-group">
+            <label class="login-input-label">Username / Email</label>
+            <div class="login-input-wrapper">
+              <span class="material-symbols-outlined login-input-icon-left">person</span>
+              <input type="text" [(ngModel)]="loginUsername" name="username" class="login-input"
+                [class.has-error]="loginErrorMessage() && !loginUsername()" placeholder="Enter username or email"
+                required />
+            </div>
+          </div>
+
+          <!-- Password Input -->
+          <div class="login-input-group">
+            <label class="login-input-label">Password</label>
+            <div class="login-input-wrapper">
+              <span class="material-symbols-outlined login-input-icon-left">lock</span>
+              <input [type]="showPassword() ? 'text' : 'password'" [(ngModel)]="loginPassword" name="password"
+                class="login-input" [class.has-error]="loginErrorMessage() && !loginPassword()"
+                placeholder="Enter password" required />
+              <span class="material-symbols-outlined login-input-icon-right"
+                (click)="showPassword.set(!showPassword())">
+                {{ showPassword() ? 'visibility_off' : 'visibility' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Options -->
+          <div class="login-form-options">
+            <label class="login-checkbox-label">
+              <input type="checkbox" [(ngModel)]="loginRememberMe" name="remember" class="login-checkbox" />
+              <span>Remember me</span>
+            </label>
+            <a href="#" class="login-forgot-link" (click)="$event.preventDefault()">Forgot Password?</a>
+          </div>
+
+          <!-- Sign In Button -->
+          <button type="submit" class="login-submit-btn">
+            <span>Sign In</span>
+            <span class="material-symbols-outlined" style="font-size: 1.25rem;">login</span>
+          </button>
+        </form>
+
+        <div class="login-divider-row">
+          <div class="login-divider-line"></div>
+          <span>or</span>
+          <div class="login-divider-line"></div>
         </div>
 
-        <!-- Sign In Button -->
-        <button type="submit" class="login-submit-btn">
-          <span>Sign In</span>
-          <span class="material-symbols-outlined" style="font-size: 1.25rem;">login</span>
+        <!-- Device Login Button -->
+        <button class="login-device-btn" (click)="onLoginWithDevice()">
+          <span class="material-symbols-outlined" style="font-size: 1.25rem;">devices</span>
+          <span>Login with Device (Scanner)</span>
         </button>
-      </form>
 
-      <div class="login-divider-row">
-        <div class="login-divider-line"></div>
-        <span>or</span>
-        <div class="login-divider-line"></div>
-      </div>
-
-      <!-- Device Login Button -->
-      <button class="login-device-btn" (click)="onLoginWithDevice()">
-        <span class="material-symbols-outlined" style="font-size: 1.25rem;">devices</span>
-        <span>Login with Device (Scanner)</span>
-      </button>
-
-      <div class="login-footer-text">
-        © 2025 Asset Tracking System. All rights reserved.<br />
-        v1.0.0
+        <div class="login-footer-text">
+          © 2025 Asset Tracking System. All rights reserved.<br />
+          v1.0.0
+        </div>
       </div>
     </div>
-  </div>
   </div>
 </div>
 }
