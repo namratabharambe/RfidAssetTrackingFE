@@ -1933,13 +1933,13 @@ esar+ @if (isLoggedIn()) {
         <div class="upload-container-card">
           @if (!isBulkFileUploaded()) {
           <!-- State: Dropzone -->
-          <div class="dropzone-area clickable" (click)="simulateFileUpload()">
+          <div class="dropzone-area clickable" (click)="bulkFileInput.click()" (dragover)="$event.preventDefault()" (drop)="onFileDropped($event)">
+            <input type="file" #bulkFileInput (change)="onFileUploaded($event)" accept=".csv,.xlsx,.xls" style="display: none;" />
             <span class="material-symbols-outlined cloud-icon">cloud_upload</span>
             <h3>Drag and drop your spreadsheet here</h3>
             <p class="formats">CSV, XLS, or XLSX up to 10MB</p>
             <button class="action-btn-primary" style="margin-top: 10px;">Browse Files</button>
-            <p class="click-note" style="margin-top: 10px;">Clicking anywhere inside this box will simulate choosing a
-              file</p>
+            <p class="click-note" style="margin-top: 10px;">Click or drag file here to upload</p>
           </div>
           } @else {
           <!-- State: Uploaded & Parsing Preview -->
@@ -1948,8 +1948,8 @@ esar+ @if (isLoggedIn()) {
               <div class="file-info-block">
                 <span class="material-symbols-outlined file-icon">description</span>
                 <div class="file-text">
-                  <h4>enterprise_assets_import_q2.csv</h4>
-                  <p class="file-size">148.5 KB — 25 rows parsed</p>
+                  <h4>{{ uploadedFileName() }}</h4>
+                  <p class="file-size">{{ uploadedFileSize() }} — {{ parsedAssetsCount() }} rows parsed</p>
                 </div>
               </div>
               <button class="action-btn-outline" (click)="cancelUpload()">
@@ -1967,12 +1967,14 @@ esar+ @if (isLoggedIn()) {
               <div class="step-card active">
                 <span class="step-num">2</span>
                 <span class="step-lbl">Column Mapping</span>
-                <span class="step-status green">8/8 Matched</span>
+                <span class="step-status green">All Matched</span>
               </div>
               <div class="step-card active">
                 <span class="step-num">3</span>
                 <span class="step-lbl">Validation</span>
-                <span class="step-status yellow">24 Valid, 1 Warning</span>
+                <span class="step-status" [class.green]="warningAssetsCount() === 0" [class.yellow]="warningAssetsCount() > 0">
+                  {{ validAssetsCount() }} Valid, {{ warningAssetsCount() }} Warnings
+                </span>
               </div>
             </div>
 
@@ -1994,66 +1996,43 @@ esar+ @if (isLoggedIn()) {
                   </tr>
                 </thead>
                 <tbody>
+                  @for (asset of parsedAssets(); track asset.assetNumber; let idx = $index) {
                   <tr>
-                    <td>1</td>
-                    <td class="text-semibold">AST-TRC-005121</td>
-                    <td>Plastic Bin - Large C1</td>
-                    <td>Returnable Container</td>
-                    <td>E280689400107B2A00002A11</td>
-                    <td>—</td>
-                    <td>Pune DC / Zone B</td>
-                    <td><span class="status-pill available">Available</span></td>
-                    <td><span class="badge-success-glow"><span class="material-symbols-outlined">check_circle</span>
-                        Valid</span></td>
+                    <td>{{ idx + 1 }}</td>
+                    <td class="text-semibold">{{ asset.assetNumber }}</td>
+                    <td>{{ asset.name }}</td>
+                    <td>{{ asset.category }}</td>
+                    <td [class.text-danger]="!asset.isRfidValid">{{ asset.rfidTag || '—' }}</td>
+                    <td>{{ asset.gpsId || '—' }}</td>
+                    <td>{{ asset.site || 'Pune DC' }} / {{ asset.zone || 'Zone A' }}</td>
+                    <td>
+                      <span class="status-pill" 
+                        [class.available]="asset.status === 'Available'" 
+                        [class.assigned]="asset.status === 'In Use' || asset.status === 'Assigned'"
+                        [class.in-transit]="asset.status === 'Checked Out' || asset.status === 'InTransit'"
+                        [class.maintenance]="asset.status === 'Under Maintenance' || asset.status === 'UnderMaintenance'">
+                        {{ asset.status }}
+                      </span>
+                    </td>
+                    <td>
+                      @if (asset.isRfidValid) {
+                      <span class="badge-success-glow">
+                        <span class="material-symbols-outlined">check_circle</span> Valid
+                      </span>
+                      } @else {
+                      <span class="badge-warning-glow">
+                        <span class="material-symbols-outlined">warning</span> Check EPC
+                      </span>
+                      }
+                    </td>
                   </tr>
+                  } @empty {
                   <tr>
-                    <td>2</td>
-                    <td class="text-semibold">AST-IT-008912</td>
-                    <td>Developer Workstation - LT-8912</td>
-                    <td>IT Assets</td>
-                    <td>E280689400107B2A00002A12</td>
-                    <td>—</td>
-                    <td>Pune DC / IT Zone</td>
-                    <td><span class="status-pill assigned">In Use</span></td>
-                    <td><span class="badge-success-glow"><span class="material-symbols-outlined">check_circle</span>
-                        Valid</span></td>
+                    <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                      No rows parsed. Please select a valid template file.
+                    </td>
                   </tr>
-                  <tr>
-                    <td>3</td>
-                    <td class="text-semibold">VEH-MH-00998</td>
-                    <td>Electric Pallet Jack - PJ09</td>
-                    <td>Material Handling Equipment</td>
-                    <td>E280689400107B2A00002A13</td>
-                    <td>GPS-MH-00998</td>
-                    <td>Mumbai Warehouse / Zone A</td>
-                    <td><span class="status-pill assigned">In Use</span></td>
-                    <td><span class="badge-success-glow"><span class="material-symbols-outlined">check_circle</span>
-                        Valid</span></td>
-                  </tr>
-                  <tr>
-                    <td>4</td>
-                    <td class="text-semibold">VEH-DL-00887</td>
-                    <td>Medium Courier Truck - V887</td>
-                    <td>Vehicles</td>
-                    <td>E280689400107B2A00002A14</td>
-                    <td>GPS-VEH-00887</td>
-                    <td>Chennai Plant / Yard 1</td>
-                    <td><span class="status-pill in-transit">Checked Out</span></td>
-                    <td><span class="badge-success-glow"><span class="material-symbols-outlined">check_circle</span>
-                        Valid</span></td>
-                  </tr>
-                  <tr>
-                    <td>5</td>
-                    <td class="text-semibold">AST-IT-001222</td>
-                    <td>Office Workstation - DT-1222</td>
-                    <td>IT Assets</td>
-                    <td class="text-danger">INVALID_FORMAT_EPC</td>
-                    <td>—</td>
-                    <td>Bengaluru Hub / IT Zone</td>
-                    <td><span class="status-pill available">Available</span></td>
-                    <td><span class="badge-warning-glow"><span class="material-symbols-outlined">warning</span> Check
-                        EPC Format</span></td>
-                  </tr>
+                  }
                 </tbody>
               </table>
             </div>
@@ -2061,8 +2040,8 @@ esar+ @if (isLoggedIn()) {
             <!-- Actions -->
             <div class="import-footer-actions">
               <button class="action-btn-outline" (click)="cancelUpload()">Cancel Import</button>
-              <button class="action-btn-primary" (click)="cancelUpload()">
-                <span class="material-symbols-outlined">check</span> Proceed Import (24 Assets)
+              <button class="action-btn-primary" [disabled]="parsedAssets().length === 0" (click)="proceedBulkImport()">
+                <span class="material-symbols-outlined">check</span> Proceed Import ({{ parsedAssets().length }} Assets)
               </button>
             </div>
           </div>
