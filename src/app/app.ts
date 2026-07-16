@@ -855,7 +855,8 @@ export class App implements AfterViewInit, OnDestroy {
       },
       error: (err) => {
         console.error('Failed to register tag', err);
-        alert('Failed to register tag');
+        const detail = err.error?.message || err.error || err.message || 'Unknown error';
+        alert('Failed to register tag: ' + detail);
       }
     });
   }
@@ -2479,7 +2480,6 @@ export class App implements AfterViewInit, OnDestroy {
         });
 
         this.assets.set(mapped);
-
         // Populate inventoryItems dynamically from the loaded assets
         this.inventoryItems.set(mapped.map(asset => {
           const isAvailableOrInUse = asset.status === 'Available' || asset.status === 'In Use';
@@ -2500,6 +2500,7 @@ export class App implements AfterViewInit, OnDestroy {
           };
         }));
 
+        this.fetchTags();
         const allAssets = mapped;
         const statusCategory = [
           allAssets.filter(a => a.status === 'In Use').length,
@@ -3346,6 +3347,7 @@ export class App implements AfterViewInit, OnDestroy {
     this.fetchAssignments();
     this.fetchAlerts();
     this.fetchSitesZonesWarehouses();
+    this.fetchScanEvents();
     // Categories must load first, which then triggers fetchAssets
     this.fetchCategories(() => {
       // After categories are loaded, load tags then assets (so tag pools are ready for asset mapping)
@@ -3682,6 +3684,9 @@ export class App implements AfterViewInit, OnDestroy {
       this.fetchAssets();
     } else if (parentName === 'RFID Operations') {
       this.fetchTagsThenAssets();
+      if (sub === 'Tag Management') {
+        this.fetchTags();
+      }
       if (sub === 'Scan Session Monitor') {
         this.startScanSession();
       } else {
