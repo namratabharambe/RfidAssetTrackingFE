@@ -1,4 +1,4 @@
-esar+ @if (isLoggedIn()) {
+@if (isLoggedIn()) {
 <div class="app-container" [class.loading]="isLoading()">
 
   <!-- Sidebar Navigation -->
@@ -123,45 +123,90 @@ esar+ @if (isLoggedIn()) {
             </p>
           </div>
 
-          @if (activeNav() === 'Dashboard') {
-          <!-- Site Dropdown Selector right next to title -->
-          <div class="dropdown-wrapper">
-            <button class="dropdown-btn site-dropdown-btn-custom" (click)="toggleSiteDropdown()"
-              id="site-selector-dropdown-btn"
-              style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 6px 14px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; box-shadow: var(--shadow-sm); font-size: 0.82rem;">
-              <span class="material-symbols-outlined"
-                style="font-size: 1.15rem; color: var(--text-secondary);">location_on</span>
-              <span class="dropdown-label">{{ selectedSite() }}</span>
-              <span class="material-symbols-outlined arrow"
-                style="font-size: 1.1rem; color: var(--text-muted);">expand_more</span>
-            </button>
+          <!-- Site Dropdown Selector & Operations Segments -->
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <!-- Site Dropdown Selector -->
+            <div class="dropdown-wrapper">
+              <button class="dropdown-btn site-dropdown-btn-custom" (click)="toggleSiteDropdown()"
+                id="site-selector-dropdown-btn"
+                style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 14px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; box-shadow: var(--shadow-sm); font-size: 0.82rem; height: 36px; cursor: pointer;">
+                @if (selectedSite() !== 'All Sites') {
+                  <span class="flag-icon" style="font-size: 1.1rem; line-height: 1;">🇮🇳</span>
+                } @else {
+                  <span class="material-symbols-outlined" style="font-size: 1.15rem; color: var(--text-secondary);">public</span>
+                }
+                <span class="dropdown-label">{{ selectedSite() }}</span>
+                <span class="material-symbols-outlined arrow"
+                  style="font-size: 1.1rem; color: var(--text-muted);">expand_more</span>
+              </button>
 
-            @if (isSiteDropdownOpen()) {
-            <ul class="dropdown-menu" id="site-selector-menu"
-              style="border-radius: 12px; box-shadow: var(--shadow-lg);">
-              <li (click)="selectSite('All Sites')" [class.selected]="selectedSite() === 'All Sites'">
-                <span class="material-symbols-outlined">public</span> All Sites
-                @if (selectedSite() === 'All Sites') {
-                <span class="material-symbols-outlined check">check</span>
+              @if (isSiteDropdownOpen()) {
+              <ul class="dropdown-menu" id="site-selector-menu"
+                style="border-radius: 12px; box-shadow: var(--shadow-lg);">
+                <li (click)="selectSite('All Sites')" [class.selected]="selectedSite() === 'All Sites'">
+                  <span class="material-symbols-outlined">public</span> All Sites
+                  @if (selectedSite() === 'All Sites') {
+                  <span class="material-symbols-outlined check">check</span>
+                  }
+                </li>
+                @for (site of apiSites(); track site.id) {
+                <li (click)="selectSite(site.name)" [class.selected]="selectedSite() === site.name">
+                  <span style="font-size: 1.1rem; margin-right: 6px; line-height: 1;">🇮🇳</span>
+                  {{ site.name }}
+                  @if (selectedSite() === site.name) {
+                  <span class="material-symbols-outlined check">check</span>
+                  }
+                </li>
                 }
-              </li>
-              @for (site of apiSites(); track site.id) {
-              <li (click)="selectSite(site.name)" [class.selected]="selectedSite() === site.name">
-                <span class="material-symbols-outlined">
-                  {{ site.name.toLowerCase().includes('warehouse') || site.name.toLowerCase().includes('dc') ?
-                  'warehouse' : site.name.toLowerCase().includes('plant') || site.name.toLowerCase().includes('factory')
-                  ? 'factory' : 'domain' }}
-                </span>
-                {{ site.name }}
-                @if (selectedSite() === site.name) {
-                <span class="material-symbols-outlined check">check</span>
-                }
-              </li>
+              </ul>
               }
-            </ul>
+            </div>
+
+            @if (activeNav() !== 'Dashboard') {
+            <!-- Operations Segment Filters -->
+            <div class="operation-segments" style="display: flex; align-items: center; gap: 6px;">
+              <!-- All Operations -->
+              <button (click)="selectOperation('All Operations')"
+                [style.background]="activeOperation() === 'All Operations' ? '#eff6ff' : 'var(--bg-card)'"
+                [style.color]="activeOperation() === 'All Operations' ? '#2563eb' : 'var(--text-secondary)'"
+                [style.border-color]="activeOperation() === 'All Operations' ? '#2563eb' : 'var(--border-color)'"
+                style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid; border-radius: 8px; height: 36px; cursor: pointer; transition: all 0.2s;">
+                <span class="material-symbols-outlined" style="font-size: 1.15rem;">corporate_fare</span>
+                <span>All Operations</span>
+              </button>
+
+              <!-- Warehouse -->
+              <button (click)="selectOperation('Warehouse')"
+                [style.background]="activeOperation() === 'Warehouse' ? '#eff6ff' : 'var(--bg-card)'"
+                [style.color]="activeOperation() === 'Warehouse' ? '#2563eb' : 'var(--text-secondary)'"
+                [style.border-color]="activeOperation() === 'Warehouse' ? '#2563eb' : 'var(--border-color)'"
+                style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid; border-radius: 8px; height: 36px; cursor: pointer; transition: all 0.2s;">
+                <span class="material-symbols-outlined" style="font-size: 1.15rem;">warehouse</span>
+                <span>Warehouse</span>
+              </button>
+
+              <!-- Manufacturing -->
+              <button (click)="selectOperation('Manufacturing')"
+                [style.background]="activeOperation() === 'Manufacturing' ? '#eff6ff' : 'var(--bg-card)'"
+                [style.color]="activeOperation() === 'Manufacturing' ? '#2563eb' : 'var(--text-secondary)'"
+                [style.border-color]="activeOperation() === 'Manufacturing' ? '#2563eb' : 'var(--border-color)'"
+                style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid; border-radius: 8px; height: 36px; cursor: pointer; transition: all 0.2s;">
+                <span class="material-symbols-outlined" style="font-size: 1.15rem;">factory</span>
+                <span>Manufacturing</span>
+              </button>
+
+              <!-- Distribution -->
+              <button (click)="selectOperation('Distribution')"
+                [style.background]="activeOperation() === 'Distribution' ? '#eff6ff' : 'var(--bg-card)'"
+                [style.color]="activeOperation() === 'Distribution' ? '#2563eb' : 'var(--text-secondary)'"
+                [style.border-color]="activeOperation() === 'Distribution' ? '#2563eb' : 'var(--border-color)'"
+                style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid; border-radius: 8px; height: 36px; cursor: pointer; transition: all 0.2s;">
+                <span class="material-symbols-outlined" style="font-size: 1.15rem;">local_shipping</span>
+                <span>Distribution</span>
+              </button>
+            </div>
             }
           </div>
-          }
         </div>
       </div>
 
@@ -287,32 +332,6 @@ esar+ @if (isLoggedIn()) {
           <span>Logout</span>
         </button>
         } @else {
-        <!-- Country Dropdown Selector -->
-        <div class="dropdown-wrapper">
-          <button class="dropdown-btn" id="country-dropdown-btn">
-            <span class="flag-icon">🇮🇳</span>
-            <span class="dropdown-label">India</span>
-            <span class="material-symbols-outlined arrow">expand_more</span>
-          </button>
-        </div>
-
-        <!-- Site Segment Filters for Assets -->
-        <div class="segment-control">
-          <button [class.active]="activeAssetSite() === 'All Assets'" (click)="selectAssetSite('All Assets')">
-            <span class="material-symbols-outlined segment-icon">public</span>All Sites
-          </button>
-          <button [class.active]="activeAssetSite() === 'Warehouse'" (click)="selectAssetSite('Warehouse')">
-            <span class="material-symbols-outlined segment-icon">warehouse</span>Warehouse
-          </button>
-          <button [class.active]="activeAssetSite() === 'Manufacturing'" (click)="selectAssetSite('Manufacturing')">
-            <span class="material-symbols-outlined segment-icon">factory</span>Manufacturing
-          </button>
-          <button [class.active]="activeAssetSite() === 'Distribution Center'"
-            (click)="selectAssetSite('Distribution Center')">
-            <span class="material-symbols-outlined segment-icon">local_shipping</span>Distribution Center
-          </button>
-        </div>
-
         <!-- Notification Bell -->
         <div class="notification-wrapper">
           <button class="icon-btn" id="asset-notif-bell-btn">
@@ -1924,7 +1943,8 @@ esar+ @if (isLoggedIn()) {
       <div class="bulk-upload-view animate-fade-in">
         <!-- Header -->
         <div class="subpage-header" style="justify-content: flex-end; margin-bottom: 0.5rem; padding: 0;">
-          <button class="action-btn-outline" (click)="downloadBulkUploadTemplate()" style="display: flex; align-items: center; gap: 6px;">
+          <button class="action-btn-outline" (click)="downloadBulkUploadTemplate()"
+            style="display: flex; align-items: center; gap: 6px;">
             <span class="material-symbols-outlined">download</span> Download Template
           </button>
         </div>
@@ -1933,8 +1953,10 @@ esar+ @if (isLoggedIn()) {
         <div class="upload-container-card">
           @if (!isBulkFileUploaded()) {
           <!-- State: Dropzone -->
-          <div class="dropzone-area clickable" (click)="bulkFileInput.click()" (dragover)="$event.preventDefault()" (drop)="onFileDropped($event)">
-            <input type="file" #bulkFileInput (change)="onFileUploaded($event)" accept=".csv,.xlsx,.xls" style="display: none;" />
+          <div class="dropzone-area clickable" (click)="bulkFileInput.click()" (dragover)="$event.preventDefault()"
+            (drop)="onFileDropped($event)">
+            <input type="file" #bulkFileInput (change)="onFileUploaded($event)" accept=".csv,.xlsx,.xls"
+              style="display: none;" />
             <span class="material-symbols-outlined cloud-icon">cloud_upload</span>
             <h3>Drag and drop your spreadsheet here</h3>
             <p class="formats">CSV, XLS, or XLSX up to 10MB</p>
@@ -1972,7 +1994,8 @@ esar+ @if (isLoggedIn()) {
               <div class="step-card active">
                 <span class="step-num">3</span>
                 <span class="step-lbl">Validation</span>
-                <span class="step-status" [class.green]="warningAssetsCount() === 0" [class.yellow]="warningAssetsCount() > 0">
+                <span class="step-status" [class.green]="warningAssetsCount() === 0"
+                  [class.yellow]="warningAssetsCount() > 0">
                   {{ validAssetsCount() }} Valid, {{ warningAssetsCount() }} Warnings
                 </span>
               </div>
@@ -2006,8 +2029,7 @@ esar+ @if (isLoggedIn()) {
                     <td>{{ asset.gpsId || '—' }}</td>
                     <td>{{ asset.site || 'Pune DC' }} / {{ asset.zone || 'Zone A' }}</td>
                     <td>
-                      <span class="status-pill" 
-                        [class.available]="asset.status === 'Available'" 
+                      <span class="status-pill" [class.available]="asset.status === 'Available'"
                         [class.assigned]="asset.status === 'In Use' || asset.status === 'Assigned'"
                         [class.in-transit]="asset.status === 'Checked Out' || asset.status === 'InTransit'"
                         [class.maintenance]="asset.status === 'Under Maintenance' || asset.status === 'UnderMaintenance'">
@@ -2147,7 +2169,8 @@ esar+ @if (isLoggedIn()) {
           <div class="audit-table-card">
             <div class="table-header-row">
               <h3>Session Reconciled Assets</h3>
-              <button class="action-btn-outline sm-btn" (click)="exportAuditReportToExcel()" style="display: flex; align-items: center; gap: 6px;">
+              <button class="action-btn-outline sm-btn" (click)="exportAuditReportToExcel()"
+                style="display: flex; align-items: center; gap: 6px;">
                 <span class="material-symbols-outlined">summarize</span> Export Audit Report
               </button>
             </div>
@@ -2515,7 +2538,7 @@ esar+ @if (isLoggedIn()) {
               <div>
                 <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--text-main, #0f172a); margin: 0;">Handheld
                   Reader</h4>
-                <span style="font-size: 0.72rem; color: var(--text-muted, #64748b);">HH-01 (RFD40)</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted, #64748b);">HH-01 (Chainway C72)</span>
               </div>
             </div>
             <div style="display: flex; gap: 20px; text-align: right;">
@@ -3741,14 +3764,15 @@ esar+ @if (isLoggedIn()) {
           </div>
 
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <!-- Timestamp with clock and arrow -->
+            <!-- Interactive Date Picker Calendar -->
             <div
-              style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-card); border-radius: 6px; font-size: 0.75rem; color: var(--text-primary); font-weight: 500; border: 1px solid var(--border-color); cursor: pointer;">
+              style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-card); border-radius: 6px; font-size: 0.75rem; color: var(--text-primary); font-weight: 500; border: 1px solid var(--border-color); position: relative; cursor: pointer; transition: all 0.15s ease;">
               <span class="material-symbols-outlined"
-                style="font-size: 0.95rem; color: var(--text-secondary);">schedule</span>
-              <span>20 May 2025, 10:24 AM IST</span>
-              <span class="material-symbols-outlined"
-                style="font-size: 0.95rem; color: var(--text-secondary);">expand_more</span>
+                style="font-size: 0.95rem; color: var(--text-secondary);">calendar_month</span>
+              <input type="date" class="gps-date-input-hidden"
+                [ngModel]="gpsSelectedDate()"
+                (ngModelChange)="onGpsDateChange($event)"
+                style="border: none; background: transparent; color: var(--text-primary); font-family: inherit; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer; padding: 0; margin: 0; width: 110px;" />
             </div>
 
             <!-- Refresh button -->
@@ -3865,7 +3889,7 @@ esar+ @if (isLoggedIn()) {
                         style="font-size: 0.95rem; color: var(--text-secondary);">local_shipping</span>
                       <span>Vehicle</span>
                     </div>
-                    <span style="font-weight: 700; opacity: 0.85;">24</span>
+                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsVehicleCount() }}</span>
                   </li>
                   <li (click)="gpsTypeFilter.set(gpsTypeFilter() === 'Forklift' ? 'All' : 'Forklift')"
                     [class.active]="gpsTypeFilter() === 'Forklift'" class="legend-filter-item"
@@ -3875,7 +3899,7 @@ esar+ @if (isLoggedIn()) {
                         style="font-size: 0.95rem; color: var(--text-secondary);">precision_manufacturing</span>
                       <span>Forklift</span>
                     </div>
-                    <span style="font-weight: 700; opacity: 0.85;">18</span>
+                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsForkliftCount() }}</span>
                   </li>
                   <li (click)="gpsTypeFilter.set(gpsTypeFilter() === 'Pallet/Bin' ? 'All' : 'Pallet/Bin')"
                     [class.active]="gpsTypeFilter() === 'Pallet/Bin'" class="legend-filter-item"
@@ -3885,7 +3909,7 @@ esar+ @if (isLoggedIn()) {
                         style="font-size: 0.95rem; color: var(--text-secondary);">inventory_2</span>
                       <span>Pallet / Bin</span>
                     </div>
-                    <span style="font-weight: 700; opacity: 0.85;">45</span>
+                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsPalletBinCount() }}</span>
                   </li>
                   <li (click)="gpsTypeFilter.set(gpsTypeFilter() === 'Container' ? 'All' : 'Container')"
                     [class.active]="gpsTypeFilter() === 'Container'" class="legend-filter-item"
@@ -3895,7 +3919,7 @@ esar+ @if (isLoggedIn()) {
                         style="font-size: 0.95rem; color: var(--text-secondary);">widgets</span>
                       <span>Container</span>
                     </div>
-                    <span style="font-weight: 700; opacity: 0.85;">22</span>
+                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsContainerCount() }}</span>
                   </li>
                   <li (click)="gpsTypeFilter.set(gpsTypeFilter() === 'Tool/Equipment' ? 'All' : 'Tool/Equipment')"
                     [class.active]="gpsTypeFilter() === 'Tool/Equipment'" class="legend-filter-item"
@@ -3905,7 +3929,7 @@ esar+ @if (isLoggedIn()) {
                         style="font-size: 0.95rem; color: var(--text-secondary);">build</span>
                       <span>Tool / Equip</span>
                     </div>
-                    <span style="font-weight: 700; opacity: 0.85;">11</span>
+                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsToolEquipCount() }}</span>
                   </li>
                   <li (click)="gpsTypeFilter.set(gpsTypeFilter() === 'Mobile Equipment' ? 'All' : 'Mobile Equipment')"
                     [class.active]="gpsTypeFilter() === 'Mobile Equipment'" class="legend-filter-item"
@@ -3915,7 +3939,7 @@ esar+ @if (isLoggedIn()) {
                         style="font-size: 0.95rem; color: var(--text-secondary);">devices</span>
                       <span>Mobile Equip</span>
                     </div>
-                    <span style="font-weight: 700; opacity: 0.85;">8</span>
+                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsMobileEquipCount() }}</span>
                   </li>
                 </ul>
               </div>
@@ -3936,8 +3960,11 @@ esar+ @if (isLoggedIn()) {
           <div style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%;">
 
             <!-- Interactive Map Card -->
-            <div
-              style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; position: relative; overflow: hidden; height: 380px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column;">
+            <div [style.position]="gpsMapFullscreen() ? 'fixed' : 'relative'"
+              [style.top]="gpsMapFullscreen() ? '0' : 'auto'" [style.left]="gpsMapFullscreen() ? '0' : 'auto'"
+              [style.width]="gpsMapFullscreen() ? '100vw' : '100%'"
+              [style.height]="gpsMapFullscreen() ? '100vh' : '380px'" [style.zIndex]="gpsMapFullscreen() ? '9999' : '1'"
+              style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column;">
 
               <!-- Map Header Overlay -->
               <div
@@ -3951,232 +3978,227 @@ esar+ @if (isLoggedIn()) {
               <!-- Map Controls Overlay -->
               <div
                 style="position: absolute; top: 12px; right: 12px; z-index: 10; display: flex; flex-direction: column; gap: 4px;">
-                <button class="map-ctrl-btn"
-                  style="width: 28px; height: 28px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
+                <button class="map-ctrl-btn" (click)="zoomMapIn()" [disabled]="gpsMapZoom() >= 3"
+                  [style.opacity]="gpsMapZoom() >= 3 ? '0.5' : '1'"
+                  [style.cursor]="gpsMapZoom() >= 3 ? 'not-allowed' : 'pointer'"
+                  style="width: 28px; height: 28px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
                     class="material-symbols-outlined" style="font-size: 1.05rem;">add</span></button>
-                <button class="map-ctrl-btn"
-                  style="width: 28px; height: 28px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
+                <button class="map-ctrl-btn" (click)="zoomMapOut()" [disabled]="gpsMapZoom() <= 1"
+                  [style.opacity]="gpsMapZoom() <= 1 ? '0.5' : '1'"
+                  [style.cursor]="gpsMapZoom() <= 1 ? 'not-allowed' : 'pointer'"
+                  style="width: 28px; height: 28px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
                     class="material-symbols-outlined" style="font-size: 1.05rem;">remove</span></button>
-                <button class="map-ctrl-btn"
-                  style="width: 28px; height: 28px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
+                <button class="map-ctrl-btn" (click)="toggleMapMode()"
+                  [style.background]="gpsMapMode() === 'satellite' ? 'rgba(37, 99, 235, 0.18)' : 'var(--bg-card)'"
+                  [style.color]="gpsMapMode() === 'satellite' ? '#2563eb' : 'var(--text-primary)'"
+                  [style.border]="gpsMapMode() === 'satellite' ? '1.5px solid #3b82f6' : '1px solid var(--border-color)'"
+                  title="Toggle Satellite / Blueprint view"
+                  style="width: 28px; height: 28px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
+                    class="material-symbols-outlined" style="font-size: 1.05rem;">{{ gpsMapMode() === 'satellite' ? 'satellite_alt' : 'satellite' }}</span></button>
+                <button class="map-ctrl-btn" (click)="toggleMapLayers()"
+                  [style.background]="gpsMapTheme() === 'dark' ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-card)'"
+                  [style.color]="gpsMapTheme() === 'dark' ? '#2563eb' : 'var(--text-primary)'"
+                  style="width: 28px; height: 28px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
                     class="material-symbols-outlined" style="font-size: 1.05rem;">layers</span></button>
-                <button class="map-ctrl-btn"
-                  style="width: 28px; height: 28px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
-                    class="material-symbols-outlined" style="font-size: 1.05rem;">fullscreen</span></button>
+                <button class="map-ctrl-btn" (click)="toggleMapFullscreen()"
+                  [style.color]="gpsMapFullscreen() ? '#2563eb' : 'var(--text-primary)'"
+                  style="width: 28px; height: 28px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
+                    class="material-symbols-outlined" style="font-size: 1.05rem;">{{ gpsMapFullscreen() ?
+                    'fullscreen_exit' : 'fullscreen' }}</span></button>
               </div>
 
               <!-- Map Area Container -->
               <div class="map-canvas-container"
-                style="flex: 1; position: relative; background: #eef2f6; overflow: hidden; border-radius: 0 0 8px 8px;">
+                [style.background]="gpsMapTheme() === 'dark' ? '#0b0f19' : '#eef2f6'"
+                style="flex: 1; position: relative; overflow: hidden; border-radius: 0 0 8px 8px; user-select: none;">
 
-                <!-- Vector Map Background SVG -->
-                <svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"
-                  viewBox="0 0 800 380" preserveAspectRatio="none">
-                  <!-- Road outlines (styled road paths) -->
-                  <!-- Pune-Nashik Hwy (Main bottom road) -->
-                  <path d="M -50,290 Q 200,320 400,280 T 850,250" fill="none" stroke="#cbd5e1" stroke-width="26"
-                    opacity="0.8" />
-                  <path d="M -50,290 Q 200,320 400,280 T 850,250" fill="none" stroke="#ffffff" stroke-width="22"
-                    opacity="0.95" />
-                  <path d="M -50,290 Q 200,320 400,280 T 850,250" fill="none" stroke="#e2e8f0" stroke-width="2"
-                    stroke-dasharray="10, 8" />
-
-                  <!-- Talegaon Chakan Rd (Top road) -->
-                  <path d="M 200,-20 Q 400,50 650,40 T 850,10" fill="none" stroke="#cbd5e1" stroke-width="20"
-                    opacity="0.8" />
-                  <path d="M 200,-20 Q 400,50 650,40 T 850,10" fill="none" stroke="#ffffff" stroke-width="16"
-                    opacity="0.95" />
-
-                  <!-- Mumbai-Pune Expressway (Left road) -->
-                  <path d="M 80,420 L 100,-20" fill="none" stroke="#cbd5e1" stroke-width="22" opacity="0.8" />
-                  <path d="M 80,420 L 100,-20" fill="none" stroke="#ffffff" stroke-width="18" opacity="0.95" />
-                </svg>
-
-                <!-- Grid Pattern Background overlay -->
-                <div
-                  style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.15; background-image: radial-gradient(#64748b 1px, transparent 0); background-size: 16px 16px;">
-                </div>
-
-                <!-- Road labels -->
-                <div
-                  style="position: absolute; top: 12%; left: 45%; color: #64748b; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; pointer-events: none; transform: rotate(5deg);">
-                  Talegaon Chakan Rd</div>
-                <div
-                  style="position: absolute; top: 78%; left: 32%; color: #64748b; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; pointer-events: none; transform: rotate(-5deg);">
-                  Pune-Nashik Hwy</div>
-                <div
-                  style="position: absolute; top: 40%; left: 5%; color: #64748b; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; pointer-events: none; transform: rotate(-80deg);">
-                  Mumbai-Pune Expressway</div>
-
-                <!-- NH-48 shields -->
-                <div
-                  style="position: absolute; top: 14%; left: 9%; background: #fbbf24; color: #000; font-size: 0.52rem; font-weight: 800; padding: 1px 3px; border-radius: 3px; border: 1px solid #d97706; pointer-events: none;">
-                  NH-48</div>
-                <div
-                  style="position: absolute; top: 82%; left: 48%; background: #fbbf24; color: #000; font-size: 0.52rem; font-weight: 800; padding: 1px 3px; border-radius: 3px; border: 1px solid #d97706; pointer-events: none;">
-                  NH-48</div>
-
-                <!-- Facility Outline (Geofence Boundary) -->
-                @if (gpsShowGeofences()) {
-                <!-- Dotted Colored Zones representing Geofences -->
-
-                <!-- 1. Receiving (Purple) -->
-                <div
-                  style="position: absolute; left: 14%; top: 12%; width: 8%; height: 15%; border: 1.5px dashed #a855f7; background: rgba(168, 85, 247, 0.04); border-radius: 4px; display: flex; align-items: center; justify-content: center; pointer-events: none;">
-                  <span
-                    style="background: rgba(168, 85, 247, 0.12); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.2); font-size: 0.58rem; font-weight: 700; padding: 2px 4px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">
-                    <span class="material-symbols-outlined" style="font-size: 0.75rem;">download</span>Receiving
-                  </span>
-                </div>
-
-                <!-- 2. Raw Material Store (Blue) -->
-                <div
-                  style="position: absolute; left: 24%; top: 12%; width: 12%; height: 26%; border: 1.5px dashed #3b82f6; background: rgba(59, 130, 246, 0.04); border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 4px; pointer-events: none;">
-                  <span
-                    style="align-self: flex-start; background: rgba(59, 130, 246, 0.12); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.2); font-size: 0.58rem; font-weight: 700; padding: 2px 4px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">
-                    <span class="material-symbols-outlined" style="font-size: 0.75rem;">inventory</span>Raw Material
-                    Store
-                  </span>
-                  <div style="display: flex; gap: 4px; opacity: 0.5; justify-content: flex-end; align-items: center;">
-                    <span class="material-symbols-outlined"
-                      style="font-size: 0.95rem; color: #2563eb;">precision_manufacturing</span>
-                    <span class="material-symbols-outlined"
-                      style="font-size: 0.95rem; color: #2563eb;">inventory_2</span>
+                <!-- Satellite Map Container -->
+                @if (gpsMapMode() === 'satellite') {
+                  <!-- Layer switcher & auto-track bar -->
+                  <div style="position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 4px; background: rgba(10,14,28,0.82); backdrop-filter: blur(10px); border-radius: 20px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 4px 14px rgba(0,0,0,0.4);">
+                    <button (click)="switchMapLayer('satellite')"
+                      [style.background]="gpsMapLayer() === 'satellite' ? '#2563eb' : 'transparent'"
+                      [style.color]="gpsMapLayer() === 'satellite' ? 'white' : 'rgba(255,255,255,0.7)'"
+                      style="border: none; border-radius: 14px; padding: 4px 12px; font-size: 0.7rem; font-weight: 700; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s ease; display: flex; align-items: center; gap: 4px;">
+                      <span class="material-symbols-outlined" style="font-size: 0.85rem; font-variation-settings: 'FILL' 1;">satellite_alt</span>
+                      Satellite
+                    </button>
+                    <button (click)="switchMapLayer('hybrid')"
+                      [style.background]="gpsMapLayer() === 'hybrid' ? '#2563eb' : 'transparent'"
+                      [style.color]="gpsMapLayer() === 'hybrid' ? 'white' : 'rgba(255,255,255,0.7)'"
+                      style="border: none; border-radius: 14px; padding: 4px 12px; font-size: 0.7rem; font-weight: 700; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s ease; display: flex; align-items: center; gap: 4px;">
+                      <span class="material-symbols-outlined" style="font-size: 0.85rem; font-variation-settings: 'FILL' 1;">layers</span>
+                      Hybrid
+                    </button>
+                    <button (click)="switchMapLayer('street')"
+                      [style.background]="gpsMapLayer() === 'street' ? '#2563eb' : 'transparent'"
+                      [style.color]="gpsMapLayer() === 'street' ? 'white' : 'rgba(255,255,255,0.7)'"
+                      style="border: none; border-radius: 14px; padding: 4px 12px; font-size: 0.7rem; font-weight: 700; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s ease; display: flex; align-items: center; gap: 4px;">
+                      <span class="material-symbols-outlined" style="font-size: 0.85rem; font-variation-settings: 'FILL' 1;">map</span>
+                      Street
+                    </button>
                   </div>
-                </div>
 
-                <!-- 3. WIP Zone (Yellow/Orange) -->
-                <div
-                  style="position: absolute; left: 38%; top: 13%; width: 10%; height: 20%; border: 1.5px dashed #f59e0b; background: rgba(245, 158, 11, 0.04); border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 4px; pointer-events: none;">
-                  <span
-                    style="align-self: flex-start; background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.2); font-size: 0.58rem; font-weight: 700; padding: 2px 4px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">
-                    <span class="material-symbols-outlined" style="font-size: 0.75rem;">settings</span>WIP Zone
-                  </span>
-                  <div style="display: flex; gap: 4px; opacity: 0.5; justify-content: flex-end;">
-                    <span class="material-symbols-outlined" style="font-size: 0.95rem; color: #d97706;">widgets</span>
+                  <!-- Auto-track & Center buttons overlay -->
+                  <div style="position: absolute; top: 12px; left: 12px; z-index: 10; display: flex; flex-direction: column; gap: 4px;">
+                    <button (click)="gpsAutoTrack.set(!gpsAutoTrack())"
+                      [style.background]="gpsAutoTrack() ? 'rgba(37,99,235,0.92)' : 'rgba(10,14,28,0.82)'"
+                      [style.border]="gpsAutoTrack() ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)'"
+                      [style.color]="gpsAutoTrack() ? 'white' : 'rgba(255,255,255,0.75)'"
+                      style="backdrop-filter: blur(8px); padding: 5px 10px; border-radius: 8px; font-size: 0.68rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"
+                      title="Auto-track: automatically follows the selected asset">
+                      <span class="material-symbols-outlined" style="font-size: 0.9rem; font-variation-settings: 'FILL' 1;">my_location</span>
+                      {{ gpsAutoTrack() ? 'Tracking' : 'Auto-Track' }}
+                    </button>
+                    @if (gpsSelectedAsset()) {
+                    <button (click)="centerOnSelectedAsset()"
+                      style="background: rgba(10,14,28,0.82); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.85); padding: 5px 10px; border-radius: 8px; font-size: 0.68rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                      <span class="material-symbols-outlined" style="font-size: 0.9rem;">center_focus_strong</span>
+                      Center
+                    </button>
+                    }
                   </div>
-                </div>
 
-                <!-- 4. Finished Goods (Green) -->
-                <div
-                  style="position: absolute; left: 50%; top: 14%; width: 10%; height: 22%; border: 1.5px dashed #10b981; background: rgba(16, 185, 129, 0.04); border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 4px; pointer-events: none;">
-                  <span
-                    style="align-self: flex-start; background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.2); font-size: 0.58rem; font-weight: 700; padding: 2px 4px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">
-                    <span class="material-symbols-outlined" style="font-size: 0.75rem;">check_circle</span>Finished
-                    Goods
-                  </span>
-                  <div style="display: flex; gap: 4px; opacity: 0.5; justify-content: flex-end;">
-                    <span class="material-symbols-outlined"
-                      style="font-size: 0.95rem; color: #059669;">inventory_2</span>
-                  </div>
-                </div>
+                  <!-- Live Coordinates overlay for selected asset -->
+                  @if (gpsSelectedAsset(); as selectedAsset) {
+                    @if (selectedAsset.latitude && selectedAsset.longitude) {
+                    <div style="position: absolute; bottom: 36px; right: 12px; z-index: 10; background: rgba(10,14,28,0.85); backdrop-filter: blur(8px); border: 1px solid rgba(59,130,246,0.35); border-radius: 8px; padding: 6px 10px; display: flex; flex-direction: column; gap: 3px; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+                      <div style="font-size: 0.6rem; color: #3b82f6; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
+                        <span style="width: 5px; height: 5px; border-radius: 50%; background: #10b981; display: inline-block; animation: pulse 1.5s infinite;"></span>
+                        Live Location
+                      </div>
+                      <div style="font-family: monospace; font-size: 0.72rem; color: rgba(255,255,255,0.9); font-weight: 600;">
+                        {{ selectedAsset.latitude | number:'1.5-5' }}° N
+                      </div>
+                      <div style="font-family: monospace; font-size: 0.72rem; color: rgba(255,255,255,0.9); font-weight: 600;">
+                        {{ selectedAsset.longitude | number:'1.5-5' }}° E
+                      </div>
+                      <div style="font-size: 0.6rem; color: rgba(255,255,255,0.5);">
+                        ± ~30m accuracy
+                      </div>
+                    </div>
+                    }
+                  }
 
-                <!-- 5. Yard (Cyan/Teal) -->
-                <div
-                  style="position: absolute; left: 62%; top: 16%; width: 15%; height: 28%; border: 1.5px dashed #06b6d4; background: rgba(6, 182, 212, 0.04); border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 4px; pointer-events: none;">
-                  <span
-                    style="align-self: flex-start; background: rgba(6, 182, 212, 0.12); color: #0891b2; border: 1px solid rgba(6, 182, 212, 0.2); font-size: 0.58rem; font-weight: 700; padding: 2px 4px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">
-                    <span class="material-symbols-outlined" style="font-size: 0.75rem;">local_shipping</span>Yard
-                  </span>
-                  <div style="display: flex; gap: 4px; opacity: 0.5; justify-content: flex-end; align-items: center;">
-                    <span class="material-symbols-outlined"
-                      style="font-size: 0.95rem; color: #0891b2;">local_shipping</span>
-                    <span class="material-symbols-outlined"
-                      style="font-size: 0.95rem; color: #0891b2;">precision_manufacturing</span>
-                  </div>
-                </div>
-
-                <!-- 6. Dock Doors (Blue/Indigo) -->
-                <div
-                  style="position: absolute; left: 39%; top: 38%; width: 10%; height: 15%; border: 1.5px dashed #2563eb; background: rgba(37, 99, 235, 0.04); border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 4px; pointer-events: none;">
-                  <span
-                    style="align-self: flex-start; background: rgba(37, 99, 235, 0.12); color: #1d4ed8; border: 1px solid rgba(37, 99, 235, 0.2); font-size: 0.58rem; font-weight: 700; padding: 2px 4px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">
-                    <span class="material-symbols-outlined" style="font-size: 0.75rem;">warehouse</span>Dock Doors
-                  </span>
-                  <div style="display: flex; gap: 4px; opacity: 0.5; justify-content: flex-end;">
-                    <span class="material-symbols-outlined"
-                      style="font-size: 0.95rem; color: #1d4ed8;">precision_manufacturing</span>
-                  </div>
-                </div>
-
-                <!-- 7. Vendor Return Area (Red) -->
-                <div
-                  style="position: absolute; left: 69%; top: 48%; width: 11%; height: 15%; border: 1.5px dashed #ef4444; background: rgba(239, 68, 68, 0.04); border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 4px; pointer-events: none;">
-                  <span
-                    style="align-self: flex-start; background: rgba(239, 68, 68, 0.12); color: #b91c1c; border: 1px solid rgba(239, 68, 68, 0.2); font-size: 0.58rem; font-weight: 700; padding: 2px 4px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">
-                    <span class="material-symbols-outlined" style="font-size: 0.75rem;">assignment_return</span>Vendor
-                    Return Area
-                  </span>
-                  <div style="display: flex; gap: 4px; opacity: 0.5; justify-content: flex-end;">
-                    <span class="material-symbols-outlined" style="font-size: 0.95rem; color: #b91c1c;">widgets</span>
-                  </div>
-                </div>
-
-                <!-- 8. Dispatch Gate (Purple/Indigo) -->
-                <div
-                  style="position: absolute; left: 32%; top: 60%; width: 10%; height: 8%; border: 1.5px dashed #8b5cf6; background: rgba(139, 92, 246, 0.04); border-radius: 4px; display: flex; align-items: center; justify-content: center; pointer-events: none;">
-                  <span
-                    style="background: rgba(139, 92, 246, 0.12); color: #6d28d9; border: 1px solid rgba(139, 92, 246, 0.2); font-size: 0.58rem; font-weight: 700; padding: 2px 4px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">
-                    <span class="material-symbols-outlined" style="font-size: 0.75rem;">logout</span>Dispatch Gate
-                  </span>
-                </div>
-
-                <!-- Global boundary dashed line -->
-                <div
-                  style="position: absolute; top: 6%; left: 4%; width: 88%; height: 68%; border: 2px dashed rgba(100, 116, 139, 0.2); border-radius: 8px; pointer-events: none;">
-                </div>
+                  <div id="leaflet-satellite-map" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 2;"></div>
                 }
 
-                <!-- Selected Asset Route Trail (rendered as SVG overlay) -->
-                @if (gpsSelectedAsset(); as selected) {
-                <svg
-                  style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;"
-                  viewBox="0 0 100 100" preserveAspectRatio="none">
-                  @if (selected.trail.length > 1) {
-                  <!-- Trail path line -->
-                  <polyline [attr.points]="selected.trail.map(p => p.x + ',' + p.y).join(' ')" fill="none"
-                    stroke="#2563eb" stroke-width="1.2" />
-                  <!-- Trail connection dots -->
-                  @for (p of selected.trail; track $index) {
-                  <circle [attr.cx]="p.x" [attr.cy]="p.y" r="0.75" fill="#2563eb" />
-                  }
-                  }
-                </svg>
-                }
+                @if (gpsMapMode() === 'blueprint') {
+                <!-- Zoom and Pan inner wrapper -->
+                <div (mousedown)="onMapMouseDown($event)"
+                  (mousemove)="onMapMouseMove($event)" (mouseup)="onMapMouseUp()" (mouseleave)="onMapMouseUp()"
+                  (touchstart)="onMapTouchStart($event)" (touchmove)="onMapTouchMove($event)" (touchend)="onMapMouseUp()"
+                  [style.cursor]="gpsMapZoom() > 1 ? (isMapDragging() ? 'grabbing' : 'grab') : 'default'"
+                  [style.transform]="'translate(' + gpsMapPanX() + 'px, ' + gpsMapPanY() + 'px) scale(' + gpsMapZoom() + ')'"
+                  style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; transform-origin: center center; transition: transform 0.1s ease-out;">
 
-                <!-- Asset Markers Overlay -->
-                @for (asset of filteredGpsAssets(); track asset.id) {
-                <div (click)="selectGpsAsset(asset)" [style.left.%]="asset.x" [style.top.%]="asset.y"
-                  class="map-asset-marker" [class.selected]="gpsSelectedAsset()?.id === asset.id"
-                  style="position: absolute; transform: translate(-50%, -50%); z-index: 10; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                  <!-- Vector Map Background SVG -->
+                  <svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"
+                    viewBox="0 0 800 380" preserveAspectRatio="none">
+                    <!-- Pune-Nashik Hwy (Main bottom road) -->
+                    <path d="M -50,290 Q 200,320 400,280 T 850,250" fill="none"
+                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#1e293b' : '#cbd5e1'" stroke-width="26"
+                      opacity="0.8" />
+                    <path d="M -50,290 Q 200,320 400,280 T 850,250" fill="none"
+                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#0f172a' : '#ffffff'" stroke-width="22"
+                      opacity="0.95" />
+                    <path d="M -50,290 Q 200,320 400,280 T 850,250" fill="none"
+                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#334155' : '#e2e8f0'" stroke-width="2"
+                      stroke-dasharray="10, 8" />
 
-                  <!-- Pulsing Live status ring (active selection only) -->
-                  @if (gpsSelectedAsset()?.id === asset.id) {
-                  <div class="marker-pulse-ring"
-                    style="position: absolute; width: 34px; height: 34px; border-radius: 50%; border: 2px solid #2563eb; animation: pulse-ring 1.5s infinite; pointer-events: none;">
+                    <!-- Talegaon Chakan Rd (Top road) -->
+                    <path d="M 200,-20 Q 400,50 650,40 T 850,10" fill="none"
+                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#1e293b' : '#cbd5e1'" stroke-width="20"
+                      opacity="0.8" />
+                    <path d="M 200,-20 Q 400,50 650,40 T 850,10" fill="none"
+                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#0f172a' : '#ffffff'" stroke-width="16"
+                      opacity="0.95" />
+
+                    <!-- Mumbai-Pune Expressway (Left road) -->
+                    <path d="M 80,420 L 100,-20" fill="none"
+                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#1e293b' : '#cbd5e1'" stroke-width="22"
+                      opacity="0.8" />
+                    <path d="M 80,420 L 100,-20" fill="none"
+                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#0f172a' : '#ffffff'" stroke-width="18"
+                      opacity="0.95" />ill="none" stroke="#ffffff" stroke-width="18" opacity="0.95" />
+                  </svg>
+
+                  <!-- Grid Pattern Background overlay -->
+                  <div
+                    [style.backgroundImage]="gpsMapTheme() === 'dark' ? 'radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 0)' : 'radial-gradient(#64748b 1px, transparent 0)'"
+                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.15; background-size: 16px 16px;">
                   </div>
+
+                  <!-- Road labels -->
+                  <div [style.color]="gpsMapTheme() === 'dark' ? '#94a3b8' : '#64748b'"
+                    style="position: absolute; top: 78%; left: 32%; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; pointer-events: none; transform: rotate(-5deg);">
+                    Pune-Nashik Hwy</div>
+                  <div [style.color]="gpsMapTheme() === 'dark' ? '#94a3b8' : '#64748b'"
+                    style="style=position: absolute; top: 40%; left: 5%; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; pointer-events: none; transform: rotate(-80deg);">
+                    Mumbai-Pune Expressway</div>
+
+                  <!-- NH-48 shields -->
+                  <div
+                    style="position: absolute; top: 14%; left: 9%; background: #fbbf24; color: #000; font-size: 0.52rem; font-weight: 800; padding: 1px 3px; border-radius: 3px; border: 1px solid #d97706; pointer-events: none;">
+                    NH-48</div>
+                  <div
+                    style="position: absolute; top: 82%; left: 48%; background: #fbbf24; color: #000; font-size: 0.52rem; font-weight: 800; padding: 1px 3px; border-radius: 3px; border: 1px solid #d97706; pointer-events: none;">
+                    NH-48</div>
+
+
+
+                  <!-- Selected Asset Route Trail (rendered as SVG overlay) -->
+                  @if (gpsSelectedAsset(); as selected) {
+                  <svg
+                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;"
+                    viewBox="0 0 100 100" preserveAspectRatio="none">
+                    @if (gpsSelectedTrail().length > 1) {
+                    <!-- Trail path line -->
+                    <polyline [attr.points]="gpsSelectedTrail().map(p => p.x + ',' + p.y).join(' ')" fill="none"
+                      stroke="#2563eb" stroke-width="1.2" />
+                    <!-- Trail connection dots -->
+                    @for (p of gpsSelectedTrail(); track $index) {
+                    <circle [attr.cx]="p.x" [attr.cy]="p.y" r="0.75" fill="#2563eb" />
+                    }
+                    }
+                  </svg>
                   }
 
-                  <!-- Inner marker circle -->
-                  <div class="marker-circle"
-                    [style.background]="asset.speed > 0 ? 'var(--color-success)' : (asset.timeline[0]?.type === 'idle' ? 'var(--color-primary)' : 'var(--text-secondary)')"
-                    style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md); color: white;">
-                    <span class="material-symbols-outlined"
-                      style="font-size: 0.75rem; font-weight: bold; color: white;">
-                      {{ asset.type === 'Vehicle' ? 'local_shipping' : (asset.type === 'Forklift' ?
-                      'precision_manufacturing' : 'inventory_2') }}
-                    </span>
-                  </div>
+                  <!-- Asset Markers Overlay -->
+                  @for (asset of filteredGpsAssets(); track asset.id) {
+                  <div (click)="selectGpsAsset(asset)" [style.left.%]="asset.x" [style.top.%]="asset.y"
+                    class="map-asset-marker" [class.selected]="gpsSelectedAsset()?.id === asset.id"
+                    style="position: absolute; transform: translate(-50%, -50%); z-index: 10; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px;">
 
-                  <!-- Active selection card banner style label -->
-                  @if (gpsSelectedAsset()?.id === asset.id) {
-                  <span class="marker-label"
-                    style="background: #0f172a; color: white; font-size: 0.58rem; padding: 2px 5px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.12); font-weight: 700; white-space: nowrap; font-family: 'Plus Jakarta Sans', sans-serif;">{{
-                    asset.id }}</span>
-                  } @else {
-                  <span class="marker-label"
-                    style="background: rgba(15, 23, 42, 0.75); color: white; font-size: 0.52rem; padding: 1px 3px; border-radius: 3px; font-weight: 600; white-space: nowrap; font-family: monospace;">{{
-                    asset.id }}</span>
+                    <!-- Pulsing Live status ring (active selection only) -->
+                    @if (gpsSelectedAsset()?.id === asset.id) {
+                    <div class="marker-pulse-ring"
+                      style="position: absolute; width: 34px; height: 34px; border-radius: 50%; border: 2px solid #2563eb; animation: pulse-ring 1.5s infinite; pointer-events: none;">
+                    </div>
+                    }
+
+                    <!-- Inner marker circle -->
+                    <div class="marker-circle"
+                      [style.background]="asset.speed > 0 ? 'var(--color-success)' : (asset.timeline[0]?.type === 'idle' ? 'var(--color-primary)' : 'var(--text-secondary)')"
+                      style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md); color: white;">
+                      <span class="material-symbols-outlined"
+                        style="font-size: 0.75rem; font-weight: bold; color: white;">
+                        {{ asset.type === 'Vehicle' ? 'local_shipping' : (asset.type === 'Forklift' ?
+                        'precision_manufacturing' : 'inventory_2') }}
+                      </span>
+                    </div>
+
+                    <!-- Active selection card banner style label -->
+                    @if (gpsSelectedAsset()?.id === asset.id) {
+                    <span class="marker-label"
+                      style="background: #0f172a; color: white; font-size: 0.58rem; padding: 2px 5px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.12); font-weight: 700; white-space: nowrap; font-family: 'Plus Jakarta Sans', sans-serif;">{{
+                      asset.id }}</span>
+                    } @else {
+                    <span class="marker-label"
+                      style="background: rgba(15, 23, 42, 0.75); color: white; font-size: 0.52rem; padding: 1px 3px; border-radius: 3px; font-weight: 600; white-space: nowrap; font-family: monospace;">{{
+                      asset.id }}</span>
+                    }
+                  </div>
                   }
                 </div>
                 }
@@ -4323,27 +4345,7 @@ esar+ @if (isLoggedIn()) {
                   style="padding: 0.45rem 0.85rem; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-color); background: rgba(0,0,0,0.015);">
                   <div
                     style="font-size: 0.68rem; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
-                    <span>Showing 1-7 of 128 assets</span>
-                    <div style="display: flex; gap: 2px; align-items: center; margin-left: 8px;">
-                      <button
-                        style="border: 1px solid var(--border-color); background: var(--bg-card); padding: 1px 4px; font-size: 0.65rem; cursor: pointer; border-radius: 3px; font-weight: 700;">
-                        &lt;&lt;</button>
-                      <button
-                        style="border: 1px solid #3b82f6; background: rgba(59, 130, 246, 0.1); color: #2563eb; padding: 1px 5px; font-size: 0.65rem; cursor: pointer; border-radius: 3px; font-weight: 800;">1</button>
-                      <button
-                        style="border: 1px solid var(--border-color); background: var(--bg-card); padding: 1px 5px; font-size: 0.65rem; cursor: pointer; border-radius: 3px; font-weight: 700;">2</button>
-                      <button
-                        style="border: 1px solid var(--border-color); background: var(--bg-card); padding: 1px 5px; font-size: 0.65rem; cursor: pointer; border-radius: 3px; font-weight: 700;">3</button>
-                      <button
-                        style="border: 1px solid var(--border-color); background: var(--bg-card); padding: 1px 5px; font-size: 0.65rem; cursor: pointer; border-radius: 3px; font-weight: 700;">4</button>
-                      <button
-                        style="border: 1px solid var(--border-color); background: var(--bg-card); padding: 1px 5px; font-size: 0.65rem; cursor: pointer; border-radius: 3px; font-weight: 700;">5</button>
-                      <span style="font-size: 0.65rem; padding: 0 2px;">...</span>
-                      <button
-                        style="border: 1px solid var(--border-color); background: var(--bg-card); padding: 1px 5px; font-size: 0.65rem; cursor: pointer; border-radius: 3px; font-weight: 700;">19</button>
-                      <button
-                        style="border: 1px solid var(--border-color); background: var(--bg-card); padding: 1px 4px; font-size: 0.65rem; cursor: pointer; border-radius: 3px; font-weight: 700;">></button>
-                    </div>
+                    <span>Showing {{ filteredGpsAssets().length }} of {{ filteredGpsAssets().length }} assets</span>
                   </div>
                 </div>
               </div>
@@ -4458,139 +4460,258 @@ esar+ @if (isLoggedIn()) {
 
             <!-- Tabs -->
             <div
-              style="display: flex; border-bottom: 1px solid var(--border-color); font-size: 0.75rem; font-weight: 600; background: var(--bg-card);">
-              <button
-                style="flex: 1; padding: 8px 2px; background: none; border: none; border-bottom: 2.5px solid #2563eb; color: #2563eb; font-weight: 700; cursor: pointer;">Overview</button>
-              <button
-                style="flex: 1; padding: 8px 2px; background: none; border: none; border-bottom: 2.5px solid transparent; color: var(--text-secondary); cursor: pointer;">Route</button>
-              <button
-                style="flex: 1; padding: 8px 2px; background: none; border: none; border-bottom: 2.5px solid transparent; color: var(--text-secondary); cursor: pointer;">RFID
+              style="display: flex; border-bottom: 1px solid var(--border-color); font-size: 0.75rem; font-weight: 600; background: var(--bg-card); z-index: 5;">
+              <button type="button" (click)="gpsDetailTab.set('overview')"
+                [style.border-bottom]="gpsDetailTab() === 'overview' ? '2.5px solid #2563eb' : '2.5px solid transparent'"
+                [style.color]="gpsDetailTab() === 'overview' ? '#2563eb' : 'var(--text-secondary)'"
+                style="flex: 1; padding: 8px 2px; background: none; border: none; font-weight: 700; cursor: pointer; outline: none; transition: all 0.15s ease;">Overview</button>
+              <button type="button" (click)="gpsDetailTab.set('route')"
+                [style.border-bottom]="gpsDetailTab() === 'route' ? '2.5px solid #2563eb' : '2.5px solid transparent'"
+                [style.color]="gpsDetailTab() === 'route' ? '#2563eb' : 'var(--text-secondary)'"
+                style="flex: 1; padding: 8px 2px; background: none; border: none; font-weight: 700; cursor: pointer; outline: none; transition: all 0.15s ease;">Route</button>
+              <button type="button" (click)="gpsDetailTab.set('rfid')"
+                [style.border-bottom]="gpsDetailTab() === 'rfid' ? '2.5px solid #2563eb' : '2.5px solid transparent'"
+                [style.color]="gpsDetailTab() === 'rfid' ? '#2563eb' : 'var(--text-secondary)'"
+                style="flex: 1; padding: 8px 2px; background: none; border: none; font-weight: 700; cursor: pointer; outline: none; transition: all 0.15s ease;">RFID
                 Reads</button>
-              <button
-                style="flex: 1; padding: 8px 2px; background: none; border: none; border-bottom: 2.5px solid transparent; color: var(--text-secondary); cursor: pointer;">Trips</button>
+              <button type="button" (click)="gpsDetailTab.set('trips')"
+                [style.border-bottom]="gpsDetailTab() === 'trips' ? '2.5px solid #2563eb' : '2.5px solid transparent'"
+                [style.color]="gpsDetailTab() === 'trips' ? '#2563eb' : 'var(--text-secondary)'"
+                style="flex: 1; padding: 8px 2px; background: none; border: none; font-weight: 700; cursor: pointer; outline: none; transition: all 0.15s ease;">Trips</button>
             </div>
 
-            <!-- Overview Details Content -->
             <div
               style="flex: 1; padding: 0.75rem; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; font-size: 0.72rem;">
 
-              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
-                <div
-                  style="background: var(--border-light); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 2px;">
-                  <span
-                    style="font-size: 0.58rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Current
-                    Zone</span>
-                  <span
-                    style="font-weight: 700; color: #0891b2; background: rgba(6, 182, 212, 0.08); border-radius: 4px; padding: 2px 4px; align-self: flex-start;">{{
-                    selected.currentZone }}</span>
-                </div>
-                <div
-                  style="background: var(--border-light); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 2px;">
-                  <span
-                    style="font-size: 0.58rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Speed</span>
-                  <span style="font-weight: 800; color: var(--text-primary);">{{ selected.speed }} km/h</span>
-                </div>
-              </div>
-
-              <div
-                style="border-top: 1px solid var(--border-color); padding-top: 8px; display: flex; flex-direction: column; gap: 6px;">
-                <div
-                  style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                  <span style="color: var(--text-secondary); font-weight: 500;">Direction</span>
-                  <span style="font-weight: 700; color: var(--text-primary);">{{ selected.direction }} (45°)</span>
-                </div>
-                <div
-                  style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                  <span style="color: var(--text-secondary); font-weight: 500;">Last GPS Ping</span>
-                  <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">
-                    {{ selected.lastGpsPing.split(',')[1]?.trim() || selected.lastGpsPing }}
+              <!-- Overview Tab Content -->
+              @if (gpsDetailTab() === 'overview') {
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
+                  <div
+                    style="background: var(--border-light); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 2px;">
                     <span
-                      style="color: var(--color-success); font-weight: 600; font-size: 0.65rem; margin-left: 2px;">(10
-                      secs ago)</span>
-                  </span>
-                </div>
-                <div
-                  style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                  <span style="color: var(--text-secondary); font-weight: 500;">Last RFID Read</span>
-                  <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
-                    selected.lastRfidRead.replace('(', '').replace(')', '') }}</span>
-                </div>
-                <div
-                  style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                  <span style="color: var(--text-secondary); font-weight: 500;">Battery</span>
-                  <div style="display: flex; align-items: center; gap: 4px;">
-                    <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
-                      selected.battery }}%</span>
-                    <div
-                      style="width: 32px; height: 10px; border: 1.5px solid var(--color-success); border-radius: 3px; padding: 1px; display: flex; align-items: center; background: var(--bg-card);">
-                      <div [style.width.%]="selected.battery"
-                        style="background: var(--color-success); height: 100%; border-radius: 1px;"></div>
-                    </div>
-                    <span style="font-weight: 700; color: var(--color-success); font-size: 0.62rem;">Good</span>
+                      style="font-size: 0.58rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Current
+                      Zone</span>
+                    <span
+                      style="font-weight: 700; color: #0891b2; background: rgba(6, 182, 212, 0.08); border-radius: 4px; padding: 2px 4px; align-self: flex-start;">{{
+                      selected.currentZone }}</span>
+                  </div>
+                  <div
+                    style="background: var(--border-light); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 2px;">
+                    <span
+                      style="font-size: 0.58rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Speed</span>
+                    <span style="font-weight: 800; color: var(--text-primary);">{{ selected.speed }} km/h</span>
                   </div>
                 </div>
+
                 <div
-                  style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                  <span style="color: var(--text-secondary); font-weight: 500;">Operator</span>
-                  <span style="font-weight: 700; color: var(--text-primary);">{{ selected.operator }}</span>
-                </div>
-                <div
-                  style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                  <span style="color: var(--text-secondary); font-weight: 500;">Shift</span>
-                  <span style="font-weight: 700; color: var(--text-primary);">{{ selected.shift }} (06:00 AM - 02:00
-                    PM)</span>
-                </div>
-                <div
-                  style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                  <span style="color: var(--text-secondary); font-weight: 500;">Odometer</span>
-                  <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
-                    selected.odometer ? (selected.odometer | number:'1.1-1') + ' km' : '—' }}</span>
-                </div>
-                <div
-                  style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                  <span style="color: var(--text-secondary); font-weight: 500;">Device</span>
-                  <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
-                    selected.deviceId }}</span>
-                </div>
-                <div
-                  style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                  <span style="color: var(--text-secondary); font-weight: 500;">SIM</span>
-                  <div style="display: flex; align-items: center; gap: 4px;">
-                    <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{ selected.sim
-                      }}</span>
-                    <span
-                      style="color: var(--color-success); font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 2px;">
-                      Signal Strong <span class="material-symbols-outlined"
-                        style="font-size: 0.85rem;">signal_cellular_alt</span>
+                  style="border-top: 1px solid var(--border-color); padding-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+                  <div
+                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
+                    <span style="color: var(--text-secondary); font-weight: 500;">Direction</span>
+                    <span style="font-weight: 700; color: var(--text-primary);">{{ selected.direction }} (45°)</span>
+                  </div>
+                  <div
+                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
+                    <span style="color: var(--text-secondary); font-weight: 500;">Last GPS Ping</span>
+                    <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">
+                      {{ selected.lastGpsPing.split(',')[1]?.trim() || selected.lastGpsPing }}
+                      <span
+                        style="color: var(--color-success); font-weight: 600; font-size: 0.65rem; margin-left: 2px;">(10
+                        secs ago)</span>
                     </span>
                   </div>
-                </div>
-                <div
-                  style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                  <span style="color: var(--text-secondary); font-weight: 500;">Geo-fence Status</span>
-                  <div style="display: flex; align-items: center; gap: 4px;">
-                    <span style="width: 5px; height: 5px; border-radius: 50%; background: var(--color-success);"></span>
-                    <span style="font-weight: 700; color: var(--color-success);">Inside Geofence</span>
+                  <div
+                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
+                    <span style="color: var(--text-secondary); font-weight: 500;">Last RFID Read</span>
+                    <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
+                      selected.lastRfidRead.replace('(', '').replace(')', '') }}</span>
+                  </div>
+                  <div
+                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
+                    <span style="color: var(--text-secondary); font-weight: 500;">Battery</span>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                      <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
+                        selected.battery }}%</span>
+                      <div
+                        style="width: 32px; height: 10px; border: 1.5px solid var(--color-success); border-radius: 3px; padding: 1px; display: flex; align-items: center; background: var(--bg-card);">
+                        <div [style.width.%]="selected.battery"
+                          style="background: var(--color-success); height: 100%; border-radius: 1px;"></div>
+                      </div>
+                      <span style="font-weight: 700; color: var(--color-success); font-size: 0.62rem;">Good</span>
+                    </div>
+                  </div>
+                  <div
+                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
+                    <span style="color: var(--text-secondary); font-weight: 500;">Operator</span>
+                    <span style="font-weight: 700; color: var(--text-primary);">{{ selected.operator }}</span>
+                  </div>
+                  <div
+                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
+                    <span style="color: var(--text-secondary); font-weight: 500;">Shift</span>
+                    <span style="font-weight: 700; color: var(--text-primary);">{{ selected.shift }} (06:00 AM - 02:00
+                      PM)</span>
+                  </div>
+                  <div
+                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
+                    <span style="color: var(--text-secondary); font-weight: 500;">Odometer</span>
+                    <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
+                      selected.odometer ? (selected.odometer | number:'1.1-1') + ' km' : '—' }}</span>
+                  </div>
+                  <div
+                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
+                    <span style="color: var(--text-secondary); font-weight: 500;">Device</span>
+                    <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
+                      selected.deviceId }}</span>
+                  </div>
+                  <div
+                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
+                    <span style="color: var(--text-secondary); font-weight: 500;">SIM</span>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                      <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
+                        selected.sim
+                        }}</span>
+                      <span
+                        style="color: var(--color-success); font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 2px;">
+                        Signal Strong <span class="material-symbols-outlined"
+                          style="font-size: 0.85rem;">signal_cellular_alt</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
+                    <span style="color: var(--text-secondary); font-weight: 500;">Geo-fence Status</span>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                      <span
+                        style="width: 5px; height: 5px; border-radius: 50%; background: var(--color-success);"></span>
+                      <span style="font-weight: 700; color: var(--color-success);">Inside Geofence</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <!-- Coordinates Box -->
-              <div
-                style="border-top: 1px solid var(--border-color); padding-top: 8px; display: flex; flex-direction: column; gap: 4px;">
-                <span
-                  style="font-size: 0.58rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Current
-                  Location (WGS84)</span>
+                <!-- Coordinates Box -->
                 <div
-                  style="background: var(--border-light); border-radius: 6px; padding: 6px; display: flex; align-items: center; justify-content: space-between; font-family: monospace; font-size: 0.68rem; font-weight: 700; color: var(--text-primary);">
-                  <span>{{ selected.latitude }}, {{ selected.longitude }}</span>
-                  <button style="border: none; background: none; color: var(--text-secondary); cursor: pointer;"
-                    title="Copy coordinates"><span class="material-symbols-outlined"
-                      style="font-size: 0.9rem;">content_copy</span></button>
+                  style="border-top: 1px solid var(--border-color); padding-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+                  <span
+                    style="font-size: 0.58rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Current
+                    Location (WGS84)</span>
+                  <div
+                    style="background: var(--border-light); border-radius: 6px; padding: 6px; display: flex; align-items: center; justify-content: space-between; font-family: monospace; font-size: 0.68rem; font-weight: 700; color: var(--text-primary);">
+                    <span>{{ selected.latitude }}, {{ selected.longitude }}</span>
+                    <button style="border: none; background: none; color: var(--text-secondary); cursor: pointer;"
+                      title="Copy coordinates"><span class="material-symbols-outlined"
+                        style="font-size: 0.9rem;">content_copy</span></button>
+                  </div>
+                  <span
+                    style="font-size: 0.62rem; color: var(--text-secondary); font-weight: 500; line-height: 1.2;">Pune
+                    DC, Chakan, Pune, Maharashtra 410501, India</span>
                 </div>
-                <span style="font-size: 0.62rem; color: var(--text-secondary); font-weight: 500; line-height: 1.2;">Pune
-                  DC, Chakan, Pune, Maharashtra 410501, India</span>
               </div>
+              }
+
+              <!-- Route Tab Content -->
+              @if (gpsDetailTab() === 'route') {
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <h4 style="margin: 0; font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">Route Telemetry
+                  Log</h4>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  @for (pt of gpsSelectedRoute(); track pt.seq) {
+                  <div
+                    style="display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid var(--border-light); padding-bottom: 6px;">
+                    <div
+                      style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--border-light); border-radius: 50%; width: 18px; height: 18px; font-size: 0.6rem; font-weight: 700; color: var(--text-secondary);">
+                      {{ pt.seq }}
+                    </div>
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 700; color: var(--text-primary);">{{ pt.zone }}</span>
+                        <span style="font-family: monospace; font-size: 0.6rem; color: var(--text-secondary);">{{
+                          pt.time }}</span>
+                      </div>
+                      <span style="font-size: 0.65rem; color: var(--text-muted);">Lat/Lon: {{ pt.lat }}, {{ pt.lon
+                        }}</span>
+                      <span style="font-size: 0.65rem; color: var(--text-secondary);">Speed: {{ pt.speed }} km/h</span>
+                    </div>
+                  </div>
+                  }
+                </div>
+              </div>
+              }
+
+              <!-- RFID Reads Tab Content -->
+              @if (gpsDetailTab() === 'rfid') {
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <h4 style="margin: 0; font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">RFID Gate Read
+                  Events</h4>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  @for (read of gpsSelectedRfidReads(); track read.time) {
+                  <div
+                    style="display: flex; justify-content: space-between; align-items: center; background: var(--border-light); padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <div style="display: flex; flex-direction: column; gap: 1px;">
+                      <div style="display: flex; align-items: center; gap: 4px;">
+                        <span class="material-symbols-outlined"
+                          style="font-size: 0.85rem; color: #2563eb;">sensors</span>
+                        <span style="font-weight: 700; color: var(--text-primary);">{{ read.reader }}</span>
+                      </div>
+                      <span style="font-size: 0.6rem; font-family: monospace; color: var(--text-muted);">{{ read.epc
+                        }}</span>
+                    </div>
+                    <div style="text-align: right; display: flex; flex-direction: column; gap: 1px;">
+                      <span
+                        style="font-family: monospace; font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">{{
+                        read.time }}</span>
+                      <span style="font-size: 0.58rem; color: var(--text-secondary);">RSSI: {{ read.rssi }}</span>
+                    </div>
+                  </div>
+                  }
+                </div>
+              </div>
+              }
+
+              <!-- Trips Tab Content -->
+              @if (gpsDetailTab() === 'trips') {
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <h4 style="margin: 0; font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">Trip History
+                  (Today)</h4>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  @for (trip of gpsSelectedTrips(); track trip.tripId) {
+                  <div
+                    style="border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--bg-card);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-family: monospace; font-size: 0.65rem; font-weight: 700; color: #2563eb;">{{
+                        trip.tripId }}</span>
+                      <span
+                        [style.background]="trip.status === 'Active' ? 'var(--color-success-soft)' : 'var(--border-light)'"
+                        [style.color]="trip.status === 'Active' ? 'var(--color-success)' : 'var(--text-secondary)'"
+                        style="font-size: 0.58rem; font-weight: 700; padding: 1px 4px; border-radius: 4px; text-transform: uppercase;">{{
+                        trip.status }}</span>
+                    </div>
+                    <div
+                      style="display: flex; justify-content: space-between; align-items: center; font-size: 0.68rem;">
+                      <div style="display: flex; flex-direction: column;">
+                        <span style="font-weight: 600; color: var(--text-secondary);">From</span>
+                        <span style="font-weight: 700; color: var(--text-primary);">{{ trip.from }} ({{ trip.start
+                          }})</span>
+                      </div>
+                      <span class="material-symbols-outlined"
+                        style="font-size: 0.95rem; color: var(--text-secondary);">arrow_forward</span>
+                      <div style="display: flex; flex-direction: column; text-align: right;">
+                        <span style="font-weight: 600; color: var(--text-secondary);">To</span>
+                        <span style="font-weight: 700; color: var(--text-primary);">{{ trip.to }} ({{ trip.end
+                          }})</span>
+                      </div>
+                    </div>
+                    <div
+                      style="border-top: 1px dashed var(--border-color); padding-top: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 0.6rem; color: var(--text-secondary);">
+                      <span>Distance: <strong>{{ trip.distance }}</strong></span>
+                      <span>Duration: <strong>{{ trip.duration }}</strong></span>
+                      <span>Avg Speed: <strong>{{ trip.avgSpeed }}</strong></span>
+                    </div>
+                  </div>
+                  }
+                </div>
+              </div>
+              }
 
             </div>
             } @else {
@@ -4608,25 +4729,26 @@ esar+ @if (isLoggedIn()) {
         <div
           style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.45rem 0.85rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: var(--text-secondary); box-shadow: var(--shadow-sm);">
           <div style="font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 12px;">
-            <span>Total Assets: <strong style="font-size: 0.8rem;">128</strong></span>
+            <span>Total Assets: <strong style="font-size: 0.8rem;">{{ gpsTotalAssets() }}</strong></span>
             <span style="color: var(--border-color);">|</span>
             <span style="display: flex; align-items: center; gap: 3px;"><span
                 style="width: 5px; height: 5px; border-radius: 50%; background: var(--color-success);"></span> Moving:
-              46</span>
+              {{ gpsMovingCount() }}</span>
             <span style="display: flex; align-items: center; gap: 3px;"><span
                 style="width: 5px; height: 5px; border-radius: 50%; background: var(--color-primary);"></span> Idle:
-              32</span>
+              {{ gpsIdleCount() }}</span>
             <span style="display: flex; align-items: center; gap: 3px;"><span
                 style="width: 5px; height: 5px; border-radius: 50%; background: var(--text-muted);"></span> Stopped:
-              28</span>
+              {{ gpsStoppedCount() }}</span>
             <span style="display: flex; align-items: center; gap: 3px;"><span
                 style="width: 5px; height: 5px; border-radius: 50%; background: var(--color-warning);"></span> Low
-              Battery: 6</span>
+              Battery: {{ gpsLowBatteryCount() }}</span>
             <span style="display: flex; align-items: center; gap: 3px;"><span
                 style="width: 5px; height: 5px; border-radius: 50%; background: var(--color-danger);"></span> Exception:
-              4</span>
+              {{ gpsExceptionCount() }}</span>
             <span style="display: flex; align-items: center; gap: 3px;"><span
-                style="width: 5px; height: 5px; border-radius: 50%; background: #475569;"></span> Offline: 12</span>
+                style="width: 5px; height: 5px; border-radius: 50%; background: #475569;"></span> Offline: {{
+              gpsOfflineCount() }}</span>
           </div>
 
           <div style="display: flex; align-items: center; gap: 12px;">
@@ -5302,7 +5424,7 @@ esar+ @if (isLoggedIn()) {
                   style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.72rem; font-weight: bold; color: var(--text-primary);">
                   <button
                     style="background: none; border: none; color: var(--text-secondary); cursor: pointer;">&lt;</button>
-                  <span>May 2025</span>
+                  <span>{{ currentMonthAndYear() }}</span>
                   <button
                     style="background: none; border: none; color: var(--text-secondary); cursor: pointer;">&gt;</button>
                 </div>
@@ -5314,21 +5436,20 @@ esar+ @if (isLoggedIn()) {
                 </div>
                 <div
                   style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; font-size: 0.65rem; font-weight: 600; color: var(--text-primary); flex: 1;">
-                  <!-- Week 1 empty offset, then days 1-31 -->
-                  <span style="color: var(--text-muted); opacity: 0.4;">27</span>
-                  <span style="color: var(--text-muted); opacity: 0.4;">28</span>
-                  <span style="color: var(--text-muted); opacity: 0.4;">29</span>
-                  <span style="color: var(--text-muted); opacity: 0.4;">30</span>
-                  <span>1</span><span>2</span><span>3</span>
-                  <span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
-                  <span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span>
-                  <span>18</span><span>19</span>
-                  <span (click)="selectedCalendarDay.set(20)"
-                    style="cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; height: 16px; width: 16px; margin: 0 auto;"
-                    [style.background]="selectedCalendarDay() === 20 ? 'var(--color-primary, #00b4d8)' : 'transparent'"
-                    [style.color]="selectedCalendarDay() === 20 ? 'white' : 'var(--text-primary)'">20</span>
-                  <span>21</span><span>22</span><span>23</span><span>24</span>
-                  <span>25</span><span>26</span><span>27</span><span>28</span><span>29</span><span>30</span><span>31</span>
+                  @for (item of calendarGrid; track item) {
+                    @if (item.isCurrentMonth) {
+                      <span (click)="selectedCalendarDay.set(item.day)"
+                        style="cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; height: 16px; width: 16px; margin: 0 auto;"
+                        [style.background]="selectedCalendarDay() === item.day ? 'var(--color-primary, #00b4d8)' : 'transparent'"
+                        [style.color]="selectedCalendarDay() === item.day ? 'white' : 'var(--text-primary)'">
+                        {{ item.day }}
+                      </span>
+                    } @else {
+                      <span style="color: var(--text-muted); opacity: 0.4; display: flex; align-items: center; justify-content: center; height: 16px; width: 16px; margin: 0 auto;">
+                        {{ item.day }}
+                      </span>
+                    }
+                  }
                 </div>
 
                 <!-- Legend -->
@@ -5711,7 +5832,7 @@ esar+ @if (isLoggedIn()) {
                 style="position: absolute; left: 8px; font-size: 0.95rem; color: var(--text-muted);">calendar_month</span>
               <input type="text" [ngModel]="reportsDateRange()" (ngModelChange)="reportsDateRange.set($event)"
                 style="width: 100%; padding: 6px 8px 6px 28px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 0.7rem; font-weight: 600; outline: none;"
-                placeholder="01 May 2025 - 20 May 2025">
+                [placeholder]="reportsDateRange()">
             </div>
           </div>
 
@@ -6659,7 +6780,7 @@ esar+ @if (isLoggedIn()) {
                     LIC-FL-99081</td>
                   <td style="padding: 0.55rem 0.75rem; color: var(--text-primary);">Toyota 8FBN20 Forklifts, Reach
                     Trucks</td>
-                  <td style="padding: 0.55rem 0.75rem; text-align: center; color: var(--text-secondary);">12 May 2025
+                  <td style="padding: 0.55rem 0.75rem; text-align: center; color: var(--text-secondary);">{{ getRelativeDateStr(-8) }}
                   </td>
                   <td style="padding: 0.55rem 0.75rem;"><span class="status-pill available"
                       style="font-size: 0.6rem; padding: 2px 6px; font-weight: 700; border-radius: 4px; color: var(--color-success); background: var(--color-success-soft);">Active</span>
@@ -6671,7 +6792,7 @@ esar+ @if (isLoggedIn()) {
                     LIC-TR-44102</td>
                   <td style="padding: 0.55rem 0.75rem; color: var(--text-primary);">Heavy Freight Vehicles, Yard
                     Tractors</td>
-                  <td style="padding: 0.55rem 0.75rem; text-align: center; color: var(--text-secondary);">05 May 2025
+                  <td style="padding: 0.55rem 0.75rem; text-align: center; color: var(--text-secondary);">{{ getRelativeDateStr(-15) }}
                   </td>
                   <td style="padding: 0.55rem 0.75rem;"><span class="status-pill available"
                       style="font-size: 0.6rem; padding: 2px 6px; font-weight: 700; border-radius: 4px; color: var(--color-success); background: var(--color-success-soft);">Active</span>
@@ -6683,7 +6804,7 @@ esar+ @if (isLoggedIn()) {
                     LIC-CL-10029</td>
                   <td style="padding: 0.55rem 0.75rem; color: var(--text-primary);">Precision Metrology Tools, Handheld
                     RF Scan</td>
-                  <td style="padding: 0.55rem 0.75rem; text-align: center; color: var(--text-secondary);">18 Apr 2025
+                  <td style="padding: 0.55rem 0.75rem; text-align: center; color: var(--text-secondary);">{{ getRelativeDateStr(-32) }}
                   </td>
                   <td style="padding: 0.55rem 0.75rem;"><span class="status-pill under-maintenance"
                       style="font-size: 0.6rem; padding: 2px 6px; font-weight: 700; border-radius: 4px; color: var(--color-warning); background: var(--color-warning-soft);">Suspended</span>
@@ -6814,7 +6935,7 @@ esar+ @if (isLoggedIn()) {
               </thead>
               <tbody>
                 <tr style="border-bottom: 1px solid var(--border-light);">
-                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary);">20 May 2025, 10:24:02</td>
+                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary);">{{ getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:24:02') }}</td>
                   <td style="padding: 0.55rem 0.75rem; font-weight: 700; color: var(--text-primary);">sap_s4_hana</td>
                   <td style="padding: 0.55rem 0.75rem; color: var(--text-primary);">Sync Asset Book Value (AST-MHE-092)
                   </td>
@@ -6829,7 +6950,7 @@ esar+ @if (isLoggedIn()) {
                   </td>
                 </tr>
                 <tr style="border-bottom: 1px solid var(--border-light);">
-                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary);">20 May 2025, 10:23:45</td>
+                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary);">{{ getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:23:45') }}</td>
                   <td style="padding: 0.55rem 0.75rem; font-weight: 700; color: var(--text-primary);">azure_iot_hub</td>
                   <td style="padding: 0.55rem 0.75rem; color: var(--text-primary);">Publish GPS Coordinate Ping (FL-03)
                   </td>
@@ -6844,7 +6965,7 @@ esar+ @if (isLoggedIn()) {
                   </td>
                 </tr>
                 <tr style="border-bottom: 1px solid var(--border-light);">
-                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary);">20 May 2025, 10:18:12</td>
+                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary);">{{ getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:18:12') }}</td>
                   <td style="padding: 0.55rem 0.75rem; font-weight: 700; color: var(--text-primary);">slack_connector
                   </td>
                   <td style="padding: 0.55rem 0.75rem; color: var(--text-primary);">Post Geofence Violation Alert
@@ -6860,7 +6981,7 @@ esar+ @if (isLoggedIn()) {
                   </td>
                 </tr>
                 <tr style="border-bottom: 1px solid var(--border-light);">
-                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary);">20 May 2025, 09:42:01</td>
+                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary);">{{ getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '09:42:01') }}</td>
                   <td style="padding: 0.55rem 0.75rem; font-weight: 700; color: var(--text-primary);">aws_iot_edge</td>
                   <td style="padding: 0.55rem 0.75rem; color: var(--text-primary);">Ingest scan session queue payload
                   </td>
@@ -7549,7 +7670,7 @@ esar+ @if (isLoggedIn()) {
       <div style="display: flex; flex-direction: column; gap: 5px;">
         <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Device Serial Number</label>
         <input type="text" [(ngModel)]="formHandheldSerial" name="formHandheldSerial" required
-          placeholder="e.g. SN2025001234"
+          [placeholder]="'e.g. SN' + currentYear() + '001234'"
           style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;" />
       </div>
       <div style="display: flex; flex-direction: column; gap: 5px;">
@@ -8215,7 +8336,7 @@ esar+ @if (isLoggedIn()) {
         </button>
 
         <div class="login-footer-text">
-          © 2025 Asset Tracking System. All rights reserved.<br />
+          © {{ currentYear() }} Asset Tracking System. All rights reserved.<br />
           v1.0.0
         </div>
       </div>

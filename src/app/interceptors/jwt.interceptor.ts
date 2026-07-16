@@ -32,6 +32,7 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
           }),
           catchError((refreshErr) => {
             authService.clearStorage();
+            alert('Session expired');
             return throwError(() => refreshErr);
           })
         );

@@ -5064,3 +5064,21 @@ td {
   color: #64748b;
   margin: 0;
 }
+
+/* Custom date picker overlay styles to hide the native icon and stretch it */
+.gps-date-input-hidden {
+  position: relative;
+}
+
+.gps-date-input-hidden::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+}

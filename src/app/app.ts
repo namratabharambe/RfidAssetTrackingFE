@@ -1,4 +1,4 @@
-import { Component, signal, computed, effect, ElementRef, ViewChild, AfterViewInit, OnDestroy, PLATFORM_ID, inject } from '@angular/core';
+import { Component, signal, computed, effect, ElementRef, ViewChild, AfterViewInit, OnDestroy, PLATFORM_ID, inject, NgZone } from '@angular/core';
 import { isPlatformBrowser, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -177,6 +177,16 @@ export class App implements AfterViewInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
   private readonly apiService = inject(ApiService);
+  private readonly zone = inject(NgZone);
+
+  protected readonly gpsMapMode = signal<'blueprint' | 'satellite'>('satellite');
+  protected readonly gpsMapLayer = signal<'satellite' | 'hybrid' | 'street'>('satellite');
+  protected readonly gpsAutoTrack = signal<boolean>(true);
+  private satelliteMap: any = null;
+  private satelliteMarkers: Map<string, any> = new Map();
+  private satelliteTrailPolyline: any = null;
+  private satelliteAccuracyCircles: Map<string, any> = new Map();
+  private satelliteTileLayer: any = null;
   
   // Sidebar items
   protected readonly navItems = [
@@ -209,7 +219,6 @@ export class App implements AfterViewInit, OnDestroy {
     { name: 'GPS Tracking', icon: 'location_on', badge: null, submenus: [] },
     { name: 'Inventory', icon: 'inventory', badge: null, submenus: [] },
     { name: 'Maintenance', icon: 'construction', badge: null, submenus: [] },
-    { name: 'Alerts & Exceptions', icon: 'notifications', badge: '23', submenus: null },
     { name: 'Reports & Analytics', icon: 'bar_chart', badge: null, submenus: [] },
     { name: 'Compliance', icon: 'assignment_turned_in', badge: null, submenus: ['Audit & Inspections', 'Geofence Violations', 'Certificates & Licenses'] },
     { name: 'Integrations', icon: 'hub', badge: null, submenus: null },
@@ -229,7 +238,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly activeNav = signal<string>('Dashboard');
   protected readonly activeSubNav = signal<string>('');
   
-  protected readonly selectedDate = signal<string>('2025-05-20');
+  protected readonly selectedDate = signal<string>(new Date().toISOString().split('T')[0]);
   protected readonly formattedSelectedDate = computed(() => {
     const dateStr = this.selectedDate();
     if (!dateStr) return 'Select Date';
@@ -241,10 +250,82 @@ export class App implements AfterViewInit, OnDestroy {
     const year = date.getFullYear();
     return `${day} ${month} ${year}`;
   });
+
+  protected getRelativeDateStr(offsetDays: number, format: 'yyyy-mm-dd' | 'd mmm yyyy' | 'd mmm yyyy, hh:mm:ss' | 'd mmm yyyy, hh:mm AM/PM' = 'd mmm yyyy', customTime?: string): string {
+    const date = new Date();
+    date.setDate(date.getDate() + offsetDays);
+    const day = date.getDate();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    
+    if (format === 'yyyy-mm-dd') {
+      return `${year}-${pad(date.getMonth() + 1)}-${pad(day)}`;
+    }
+    if (format === 'd mmm yyyy, hh:mm:ss') {
+      return `${pad(day)} ${month} ${year}, ${customTime || '10:00:00'}`;
+    }
+    if (format === 'd mmm yyyy, hh:mm AM/PM') {
+      return `${pad(day)} ${month} ${year}, ${customTime || '10:00 AM'}`;
+    }
+    return `${pad(day)} ${month} ${year}`;
+  }
+
+  protected currentMonthAndYear() {
+    const today = new Date();
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return `${months[today.getMonth()]} ${today.getFullYear()}`;
+  }
+
+  protected currentYear() {
+    return new Date().getFullYear();
+  }
+
+  protected get calendarGrid() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    
+    // First day of current month
+    const firstDay = new Date(year, month, 1);
+    // Day of the week for first day (0 = Sun, 1 = Mon, ...)
+    const startOffset = firstDay.getDay(); 
+    
+    const days: { day: number; isCurrentMonth: boolean }[] = [];
+    
+    // Days from previous month
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = startOffset - 1; i >= 0; i--) {
+      days.push({ day: prevMonthLastDay - i, isCurrentMonth: false });
+    }
+    
+    // Days from current month
+    const currentMonthLastDay = new Date(year, month + 1, 0).getDate();
+    for (let i = 1; i <= currentMonthLastDay; i++) {
+      days.push({ day: i, isCurrentMonth: true });
+    }
+    
+    // Fill remaining grid to multiple of 7
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+      days.push({ day: i, isCurrentMonth: false });
+    }
+    
+    return days;
+  }
   
   // Reports & Analytics Page State
   protected readonly reportsSelectedSubnav = signal<string>('Operations');
-  protected readonly reportsDateRange = signal<string>('01 May 2025 - 20 May 2025');
+  protected readonly reportsDateRange = signal<string>(
+    (() => {
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${pad(startOfMonth.getDate())} ${months[startOfMonth.getMonth()]} ${startOfMonth.getFullYear()} - ${pad(today.getDate())} ${months[today.getMonth()]} ${today.getFullYear()}`;
+    })()
+  );
   protected readonly reportsSelectedSite = signal<string>('All Sites');
   protected readonly reportsSelectedCategory = signal<string>('All Categories');
   protected readonly reportsSelectedDepartment = signal<string>('All Departments');
@@ -252,7 +333,15 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly reportsExpandedSites = signal<Record<string, boolean>>({
     'India Operations (All Sites)': true
   });
-  protected readonly reportsDataRefreshedTime = signal<string>('20 May 2025, 10:24 AM');
+  protected readonly reportsDataRefreshedTime = signal<string>(
+    (() => {
+      const today = new Date();
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      return `${pad(today.getDate())} ${months[today.getMonth()]} ${today.getFullYear()}, ${timeStr}`;
+    })()
+  );
   protected readonly reportsIndiaOpsDropdownOpen = signal<boolean>(false);
   protected readonly expandedItems = signal<Record<string, boolean>>({ 'Assets': true });
   protected readonly isSiteDropdownOpen = signal<boolean>(false);
@@ -342,7 +431,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly checkoutMode = signal<'issue' | 'return' | 'transfer'>('issue');
   protected readonly checkoutCustodian = signal<string>('');
   protected readonly checkoutSite = signal<string>('Pune DC');
-  protected readonly checkoutExpectedReturn = signal<string>('2025-05-30');
+  protected readonly checkoutExpectedReturn = signal<string>(new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   protected readonly checkoutScannedAssets = signal<any[]>([]);
   protected readonly isCheckoutScanning = signal<boolean>(false);
   
@@ -351,7 +440,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly checkoutAssigneeType = signal<string>('Employee');
   protected readonly checkoutAssignee = signal<string>('Amit Verma');
   protected readonly checkoutPurpose = signal<string>('');
-  protected readonly checkoutExpectedReturnDate = signal<string>('2025-05-27');
+  protected readonly checkoutExpectedReturnDate = signal<string>(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   protected readonly checkoutExpectedReturnTime = signal<string>('18:00');
 
   protected readonly checkoutAssetDetails = computed<Asset | null>(() => {
@@ -372,7 +461,12 @@ export class App implements AfterViewInit, OnDestroy {
         site: 'Pune DC',
         zone: 'Zone A',
         lastSeen: 'Just now',
-        nextMaintenance: '25 Jun 2025'
+        nextMaintenance: (() => {
+          const d = new Date();
+          d.setDate(d.getDate() + 36);
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        })()
       } as Asset;
     }
     return null;
@@ -391,14 +485,24 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected readonly filteredCheckoutRecords = computed(() => {
     const f = this.checkoutFilter();
-    if (f === 'All') return this.checkoutRecords();
-    return this.checkoutRecords().filter(r => r.equipment === f);
+    const site = this.selectedSite();
+    let list = this.checkoutRecords();
+    if (site !== 'All Sites') {
+      list = list.filter(r => r.site === site);
+    }
+    if (f === 'All') return list;
+    return list.filter(r => r.equipment === f);
   });
 
   protected readonly filteredCheckinRecords = computed(() => {
     const f = this.checkoutFilter();
-    if (f === 'All') return this.checkinRecords();
-    return this.checkinRecords().filter(r => r.equipment === f);
+    const site = this.selectedSite();
+    let list = this.checkinRecords();
+    if (site !== 'All Sites') {
+      list = list.filter(r => r.site === site);
+    }
+    if (f === 'All') return list;
+    return list.filter(r => r.equipment === f);
   });
 
   protected toggleCheckOutStatus(record: any) {
@@ -449,7 +553,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly newIssueWorkOrder = signal<string>('');
   protected readonly newIssueProject = signal<string>('');
   protected readonly newIssueCustodian = signal<string>('');
-  protected readonly newIssueExpectedReturn = signal<string>('2025-05-30');
+  protected readonly newIssueExpectedReturn = signal<string>(new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   protected readonly newIssueSelectedAssets = signal<any[]>([]);
 
   // Inventory Tracking State
@@ -519,7 +623,12 @@ export class App implements AfterViewInit, OnDestroy {
     const severity = this.maintSeverityFilter();
     const type = this.maintTypeFilter();
     const site = this.maintSiteFilter();
+    const globalSite = this.selectedSite();
     let list = this.maintAlerts();
+
+    if (globalSite !== 'All Sites') {
+      list = list.filter(item => item.currentSite.includes(globalSite));
+    }
 
     if (search) {
       list = list.filter(item => 
@@ -549,7 +658,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly vendorsList = ['TechServe Solutions Pvt. Ltd.', 'Global Repairs Co.', 'ProsperSmart Services'];
   protected readonly locationsList = ['Mumbai - Bhiwandi Service Center', 'Pune DC - Workshop', 'Bengaluru Service Depot', 'Chennai Service Center', 'Delhi Service Center', 'Hyderabad Service Center', 'Ahmedabad Service Depot'];
   protected readonly sparesList = ['GPS Tracker Battery Pack', 'SIM Data Plan', 'RFID Tag Shell', 'Replacement Bracket'];
-  protected readonly selectedCalendarDay = signal<number>(20);
+  protected readonly selectedCalendarDay = signal<number>(new Date().getDate());
 
   // Tag Management State
   protected readonly tagSearchQuery = signal<string>('');
@@ -916,12 +1025,12 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected stopHandheldSession(id: string) {
     if (confirm(`Stop scanning session ${id}?`)) {
-      this.handheldSessionsList.set(this.handheldSessionsList().map(s => {
-        if (s.id === id) {
-          return { ...s, status: 'Completed', duration: 'Completed' };
-        }
-        return s;
-      }));
+      this.apiService.endScanSession(id).subscribe({
+        next: () => {
+          this.loadAllApiData();
+        },
+        error: (err) => console.error('Failed to end scan session', err)
+      });
     }
   }
 
@@ -965,6 +1074,87 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly gpsAutoRefresh = signal<boolean>(true);
   protected readonly gpsRefreshInterval = signal<number>(10);
   protected readonly gpsSelectedAsset = signal<GPSAsset | null>(null);
+  protected readonly gpsDetailTab = signal<'overview' | 'route' | 'rfid' | 'trips'>('overview');
+
+  // Map zoom and pan state
+  protected readonly gpsMapZoom = signal<number>(1);
+  protected readonly gpsMapPanX = signal<number>(0);
+  protected readonly gpsMapPanY = signal<number>(0);
+  protected readonly gpsMapFullscreen = signal<boolean>(false);
+  protected readonly gpsMapTheme = signal<'standard' | 'dark'>('standard');
+  protected readonly isMapDragging = signal<boolean>(false);
+
+  private dragStartX = 0;
+  private dragStartY = 0;
+  private panStartX = 0;
+  private panStartY = 0;
+
+  protected zoomMapIn() {
+    const next = Math.min(3, this.gpsMapZoom() + 0.25);
+    this.gpsMapZoom.set(next);
+    if (next === 1) {
+      this.gpsMapPanX.set(0);
+      this.gpsMapPanY.set(0);
+    }
+  }
+
+  protected zoomMapOut() {
+    const next = Math.max(1, this.gpsMapZoom() - 0.25);
+    this.gpsMapZoom.set(next);
+    if (next === 1) {
+      this.gpsMapPanX.set(0);
+      this.gpsMapPanY.set(0);
+    }
+  }
+
+  protected toggleMapLayers() {
+    this.gpsMapTheme.set(this.gpsMapTheme() === 'standard' ? 'dark' : 'standard');
+  }
+
+  protected toggleMapFullscreen() {
+    this.gpsMapFullscreen.set(!this.gpsMapFullscreen());
+    this.gpsMapZoom.set(1);
+    this.gpsMapPanX.set(0);
+    this.gpsMapPanY.set(0);
+  }
+
+  protected onMapMouseDown(event: MouseEvent) {
+    if (this.gpsMapZoom() <= 1) return;
+    this.isMapDragging.set(true);
+    this.dragStartX = event.clientX;
+    this.dragStartY = event.clientY;
+    this.panStartX = this.gpsMapPanX();
+    this.panStartY = this.gpsMapPanY();
+  }
+
+  protected onMapMouseMove(event: MouseEvent) {
+    if (!this.isMapDragging()) return;
+    const dx = event.clientX - this.dragStartX;
+    const dy = event.clientY - this.dragStartY;
+    this.gpsMapPanX.set(this.panStartX + dx);
+    this.gpsMapPanY.set(this.panStartY + dy);
+  }
+
+  protected onMapMouseUp() {
+    this.isMapDragging.set(false);
+  }
+
+  protected onMapTouchStart(event: TouchEvent) {
+    if (this.gpsMapZoom() <= 1 || event.touches.length === 0) return;
+    this.isMapDragging.set(true);
+    this.dragStartX = event.touches[0].clientX;
+    this.dragStartY = event.touches[0].clientY;
+    this.panStartX = this.gpsMapPanX();
+    this.panStartY = this.gpsMapPanY();
+  }
+
+  protected onMapTouchMove(event: TouchEvent) {
+    if (!this.isMapDragging() || event.touches.length === 0) return;
+    const dx = event.touches[0].clientX - this.dragStartX;
+    const dy = event.touches[0].clientY - this.dragStartY;
+    this.gpsMapPanX.set(this.panStartX + dx);
+    this.gpsMapPanY.set(this.panStartY + dy);
+  }
 
   // Stats signals
   protected readonly gpsTotalAssets = signal<number>(128);
@@ -975,8 +1165,170 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly gpsExceptionCount = signal<number>(4);
   protected readonly gpsOfflineCount = signal<number>(12);
 
-  // GPS Mock Assets
   protected readonly gpsAssets = signal<GPSAsset[]>([]);
+
+  // Computed signals for GPS asset type counts
+  protected readonly gpsVehicleCount = computed(() => this.siteFilteredGpsAssets().filter(a => a.type === 'Vehicle').length);
+  protected readonly gpsForkliftCount = computed(() => this.siteFilteredGpsAssets().filter(a => a.type === 'Forklift').length);
+  protected readonly gpsPalletBinCount = computed(() => this.siteFilteredGpsAssets().filter(a => a.type === 'Pallet/Bin').length);
+  protected readonly gpsContainerCount = computed(() => this.siteFilteredGpsAssets().filter(a => a.type === 'Container').length);
+  protected readonly gpsToolEquipCount = computed(() => this.siteFilteredGpsAssets().filter(a => a.type === 'Tool/Equipment').length);
+  protected readonly gpsMobileEquipCount = computed(() => this.siteFilteredGpsAssets().filter(a => a.type === 'Mobile Equipment').length);
+
+  // GPS asset history list signal
+  protected readonly gpsAssetHistory = signal<any[]>([]);
+
+  // GPS selected date signal (defaults to current local date YYYY-MM-DD)
+  protected readonly gpsSelectedDate = signal<string>(new Date().toLocaleDateString('en-CA'));
+
+  // GPS selected asset trail points (coordinates on map)
+  protected readonly gpsSelectedTrail = computed(() => {
+    const history = this.gpsAssetHistory();
+    if (!history || history.length === 0) return [];
+    
+    return history.map(h => {
+      const lat = parseFloat(h.lat);
+      const lon = parseFloat(h.lon);
+      return {
+        x: Math.min(100, Math.max(0, Math.round(((lon - 73.8540) / (73.8600 - 73.8540)) * 100))),
+        y: Math.min(100, Math.max(0, Math.round(((18.6230 - lat) / (18.6230 - 18.6180)) * 100)))
+      };
+    });
+  });
+
+  // GPS RFID reads for selected asset (derived from global events or mock data)
+  protected readonly gpsSelectedRfidReads = computed(() => {
+    const sel = this.gpsSelectedAsset();
+    if (!sel) return [];
+    
+    // Find the linked asset for the selected GPS asset
+    const linkedAsset = this.assets().find(a => a.gpsId === sel.id);
+    if (!linkedAsset || !linkedAsset.rfidTag || linkedAsset.rfidTag === '—') return [];
+
+    // Filter real scan events matching this asset's RFID tag
+    return this.scanEventsList()
+      .filter(evt => evt.epc === linkedAsset.rfidTag)
+      .map(evt => ({
+        time: evt.time,
+        reader: evt.source,
+        zone: evt.antenna || 'Zone A',
+        rssi: evt.rssi,
+        epc: evt.epc
+      }));
+  });
+
+  // GPS trips for selected asset
+  protected readonly gpsSelectedTrips = computed(() => {
+    const sel = this.gpsSelectedAsset();
+    if (!sel) return [];
+    
+    const history = this.gpsAssetHistory();
+    if (!history || history.length === 0) return [];
+    
+    const trips: any[] = [];
+    let currentTrip: any = null;
+    let tripCounter = 1;
+    
+    for (let i = 0; i < history.length; i++) {
+      const pt = history[i];
+      const speed = parseFloat(pt.speed) || 0;
+      const ptTime = new Date(pt.gpsTime);
+      
+      if (speed > 0) {
+        if (!currentTrip) {
+          currentTrip = {
+            tripId: `TRP-${sel.id}-${1000 + tripCounter++}`,
+            start: ptTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+            end: 'In Progress',
+            from: 'Main Yard',
+            to: 'Transit Route',
+            startTimeMs: ptTime.getTime(),
+            points: [pt],
+            maxSpeed: speed,
+            sumSpeed: speed
+          };
+        } else {
+          currentTrip.points.push(pt);
+          if (speed > currentTrip.maxSpeed) currentTrip.maxSpeed = speed;
+          currentTrip.sumSpeed += speed;
+        }
+      } else {
+        if (currentTrip) {
+          // End the trip
+          const endTime = ptTime;
+          currentTrip.end = endTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+          const durationMs = endTime.getTime() - currentTrip.startTimeMs;
+          const durationMins = Math.round(durationMs / 60000);
+          const durationStr = durationMins >= 60 
+            ? `${Math.floor(durationMins / 60)}h ${durationMins % 60}m`
+            : `${durationMins}m`;
+            
+          // Estimate distance: average speed * duration
+          const avgSpeed = currentTrip.sumSpeed / currentTrip.points.length;
+          const dist = ((avgSpeed * (durationMs / 3600000))).toFixed(1);
+          
+          currentTrip.distance = `${dist} km`;
+          currentTrip.duration = durationStr;
+          currentTrip.status = 'Completed';
+          currentTrip.avgSpeed = `${Math.round(avgSpeed)} km/h`;
+          
+          trips.push(currentTrip);
+          currentTrip = null;
+        }
+      }
+    }
+    
+    if (currentTrip) {
+      // Add the final ongoing trip
+      const now = new Date();
+      const durationMs = now.getTime() - currentTrip.startTimeMs;
+      const durationMins = Math.round(durationMs / 60000);
+      const avgSpeed = currentTrip.sumSpeed / currentTrip.points.length;
+      const dist = ((avgSpeed * (durationMs / 3600000))).toFixed(1);
+      
+      currentTrip.distance = `${dist} km`;
+      currentTrip.duration = durationMins >= 60 
+        ? `${Math.floor(durationMins / 60)}h ${durationMins % 60}m`
+        : `${durationMins}m`;
+      currentTrip.status = 'Active';
+      currentTrip.avgSpeed = `${Math.round(avgSpeed)} km/h`;
+      trips.push(currentTrip);
+    }
+    
+    return trips;
+  });
+
+  // GPS Route points for selected asset
+  protected readonly gpsSelectedRoute = computed(() => {
+    const sel = this.gpsSelectedAsset();
+    if (!sel) return [];
+    
+    const history = this.gpsAssetHistory();
+    if (history && history.length > 0) {
+      return history.map((h, i) => ({
+        seq: i + 1,
+        time: new Date(h.gpsTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        zone: h.speed > 0 ? 'Transit Route' : 'Main Yard',
+        details: `Speed: ${h.speed} km/h, Heading: ${h.direction}°`,
+        type: h.speed > 0 ? 'moving' as const : 'idle' as const,
+        lat: parseFloat(h.lat).toFixed(6),
+        lon: parseFloat(h.lon).toFixed(6),
+        speed: parseFloat(h.speed) || 0
+      }));
+    }
+    
+    // Fallback to current location if no history
+    return [{
+      seq: 1,
+      time: sel.lastGpsPing,
+      zone: sel.currentZone,
+      details: `Current position telemetry: Speed ${sel.speed}km/h`,
+      type: sel.speed > 0 ? 'moving' as const : 'idle' as const,
+      lat: sel.latitude.toFixed(6),
+      lon: sel.longitude.toFixed(6),
+      speed: sel.speed
+    }];
+  });
 
   protected readonly filteredGpsAssets = computed(() => {
     let list = this.gpsAssets();
@@ -990,7 +1342,12 @@ export class App implements AfterViewInit, OnDestroy {
       .map(asset => asset.gpsId)
       .filter(gpsId => gpsId && gpsId !== '—');
 
-    list = list.filter(a => activeGpsIds.includes(a.tag));
+    const registeredGpsIds = this.gpsDevicesPool().map(g => g.imei);
+    list = list.filter(a => 
+      activeGpsIds.includes(a.id) || 
+      registeredGpsIds.includes(a.id) || 
+      true // Ensure all live tracking devices are visible
+    );
 
     if (q) {
       list = list.filter(a =>
@@ -1013,7 +1370,7 @@ export class App implements AfterViewInit, OnDestroy {
           if (status === 'Moving') return a.speed > 0;
           if (status === 'Idle') return firstEvent.type === 'idle';
           if (status === 'Stopped') return a.speed === 0 && firstEvent.type === 'stopped';
-          if (status === 'Offline') return false; // simulated mock list has no offline items
+          if (status === 'Offline') return a.status.toLowerCase() === 'offline';
           return true;
         });
       }
@@ -1047,19 +1404,76 @@ export class App implements AfterViewInit, OnDestroy {
   // Asset Master State & Data
   protected readonly assets = signal<Asset[]>([]);
 
-  protected readonly totalInventoryCount = computed(() => this.assets().length);
-  protected readonly serializedAssetsCount = computed(() => this.assets().filter(a => a.assetType === 'Serialized').length);
-  protected readonly returnableAssetsCount = computed(() => this.assets().filter(a => a.assetType === 'Returnable').length);
-  protected readonly gpsEnabledAssetsCount = computed(() => this.gpsAssets().length);
+  // Base site-filtered list of assets (respects selectedSite and activeOperation)
+  protected readonly siteFilteredAssets = computed(() => {
+    const globalSite = this.selectedSite();
+    const op = this.activeOperation();
+    let list = this.assets();
+    
+    if (globalSite !== 'All Sites') {
+      list = list.filter(asset => asset.site === globalSite);
+    }
+    
+    if (op !== 'All Operations') {
+      list = list.filter(asset => {
+        if (op === 'Warehouse') return !!(asset.site?.includes('DC') || asset.site?.includes('Warehouse'));
+        if (op === 'Manufacturing') return !!asset.site?.includes('Plant');
+        if (op === 'Distribution') return !!asset.site?.includes('Hub');
+        return true;
+      });
+    }
+    return list;
+  });
 
-  protected readonly warehouseAssetsCount = computed(() => this.assets().filter(a => a.site?.includes('DC') || a.site?.includes('Warehouse')).length);
-  protected readonly manufacturingAssetsCount = computed(() => this.assets().filter(a => a.site?.includes('Plant')).length);
-  protected readonly distributionCenterAssetsCount = computed(() => this.assets().filter(a => a.site?.includes('Hub')).length);
+  // Base site-filtered list of GPS assets (respects selectedSite and activeOperation)
+  protected readonly siteFilteredGpsAssets = computed(() => {
+    let list = this.gpsAssets();
+    const site = this.selectedSite();
+    const op = this.activeOperation();
+    
+    if (site !== 'All Sites') {
+      list = list.filter(a => a.site === site);
+    }
+    
+    if (op !== 'All Operations') {
+      list = list.filter(a => {
+        const zone = a.currentZone.toLowerCase();
+        if (op === 'Warehouse') {
+          return zone.includes('yard') || zone.includes('dock') || zone.includes('receiving');
+        } else if (op === 'Manufacturing') {
+          return zone.includes('wip') || zone.includes('raw material');
+        } else if (op === 'Distribution') {
+          return zone.includes('finished') || zone.includes('dispatch') || zone.includes('gate');
+        }
+        return true;
+      });
+    }
+    return list;
+  });
 
-  protected readonly inUseAssetsCount = computed(() => this.assets().filter(a => a.status === 'In Use').length);
-  protected readonly availableAssetsCount = computed(() => this.assets().filter(a => a.status === 'Available').length);
-  protected readonly checkedOutAssetsCount = computed(() => this.assets().filter(a => a.status === 'Checked Out').length);
-  protected readonly underMaintenanceAssetsCount = computed(() => this.assets().filter(a => a.status === 'Under Maintenance').length);
+  // Base site-only filtered assets
+  protected readonly siteOnlyFilteredAssets = computed(() => {
+    const globalSite = this.selectedSite();
+    let list = this.assets();
+    if (globalSite !== 'All Sites') {
+      list = list.filter(asset => asset.site === globalSite);
+    }
+    return list;
+  });
+
+  protected readonly totalInventoryCount = computed(() => this.siteFilteredAssets().length);
+  protected readonly serializedAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.assetType === 'Serialized').length);
+  protected readonly returnableAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.assetType === 'Returnable' || a.category?.toLowerCase().includes('returnable')).length);
+  protected readonly gpsEnabledAssetsCount = computed(() => this.siteFilteredGpsAssets().length);
+
+  protected readonly warehouseAssetsCount = computed(() => this.siteOnlyFilteredAssets().filter(a => a.site?.includes('DC') || a.site?.includes('Warehouse')).length);
+  protected readonly manufacturingAssetsCount = computed(() => this.siteOnlyFilteredAssets().filter(a => a.site?.includes('Plant')).length);
+  protected readonly distributionCenterAssetsCount = computed(() => this.siteOnlyFilteredAssets().filter(a => a.site?.includes('Hub')).length);
+
+  protected readonly inUseAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'In Use').length);
+  protected readonly availableAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'Available').length);
+  protected readonly checkedOutAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'Checked Out').length);
+  protected readonly underMaintenanceAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'Under Maintenance').length);
 
   // Modal / Form state signals
   protected readonly isModalOpen = signal<boolean>(false);
@@ -1153,9 +1567,15 @@ export class App implements AfterViewInit, OnDestroy {
     const q = this.assetSearchQuery().toLowerCase();
     const siteFilter = this.activeAssetSite();
     const statusFilter = this.activeAssetStatus();
-    const list = this.assets();
+    const globalSite = this.selectedSite();
+    let list = this.assets();
     
+    if (globalSite !== 'All Sites') {
+      list = list.filter(asset => asset.site === globalSite);
+    }
+
     // Set first matched asset as selected if current selection is not in filtered list
+    const op = this.activeOperation();
     const res = list.filter(asset => {
       const matchesSearch = !q ||
         asset.id.toLowerCase().includes(q) ||
@@ -1170,6 +1590,12 @@ export class App implements AfterViewInit, OnDestroy {
         if (siteFilter === 'Warehouse' && !asset.site?.includes('DC') && !asset.site?.includes('Warehouse')) return false;
         if (siteFilter === 'Manufacturing' && !asset.site?.includes('Plant')) return false;
         if (siteFilter === 'Distribution Center' && !asset.site?.includes('Hub')) return false;
+      }
+      
+      if (op !== 'All Operations') {
+        if (op === 'Warehouse' && !asset.site?.includes('DC') && !asset.site?.includes('Warehouse')) return false;
+        if (op === 'Manufacturing' && !asset.site?.includes('Plant')) return false;
+        if (op === 'Distribution' && !asset.site?.includes('Hub')) return false;
       }
       
       if (statusFilter && asset.status !== statusFilter) return false;
@@ -1937,13 +2363,14 @@ export class App implements AfterViewInit, OnDestroy {
       }
     });
 
-    // React to selectedSite changes to update numbers and rebuild charts
+    // React to selectedSite or activeOperation changes to update numbers and rebuild charts
     effect(() => {
       const site = this.selectedSite();
+      const op = this.activeOperation();
       const newStats = this.siteData[site] || this.siteData['Pune DC'];
       this.currentStats.set(newStats);
       
-      // Update charts on site change (if already initialized in browser)
+      // Update charts on site or operation change (if already initialized in browser)
       if (isPlatformBrowser(this.platformId) && Object.keys(this.charts).length > 0) {
         this.isLoading.set(true);
         setTimeout(() => {
@@ -1965,7 +2392,7 @@ export class App implements AfterViewInit, OnDestroy {
           clearInterval(this.gpsTimerInterval);
         }
         if (autoRefresh && nav === 'GPS Tracking') {
-          this.startGpsSimulation();
+          this.startGpsAutoRefreshInterval();
         }
       }
     });
@@ -1973,7 +2400,7 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected fetchCategories(callback?: () => void) {
     if (!this.isLoggedIn()) return;
-    this.http.get<any[]>('http://localhost:5025/api/categories').subscribe({
+    this.http.get<any[]>('http://localhost:5025/api/categories?page=1&size=200').subscribe({
       next: (data) => {
         if (Array.isArray(data)) {
           this.apiCategories.set(data);
@@ -1987,7 +2414,7 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected fetchAssets() {
     if (!this.isLoggedIn()) return;
-    this.http.get<any[]>('http://localhost:5025/api/assets').subscribe({
+    this.http.get<any[]>('http://localhost:5025/api/assets?page=1&size=1000').subscribe({
       next: (data) => {
         const rfidPool = this.rfidTagsPool();
         const bcPool = this.barcodesPool();
@@ -2052,7 +2479,27 @@ export class App implements AfterViewInit, OnDestroy {
         });
 
         this.assets.set(mapped);
-        
+
+        // Populate inventoryItems dynamically from the loaded assets
+        this.inventoryItems.set(mapped.map(asset => {
+          const isAvailableOrInUse = asset.status === 'Available' || asset.status === 'In Use';
+          return {
+            id: asset.id,
+            sku: asset.assetNumber || asset.id,
+            name: asset.name,
+            category: asset.category,
+            rfidTag: asset.rfidTag,
+            expectedQty: 1,
+            actualQty: isAvailableOrInUse ? 1 : 0,
+            unit: 'pcs',
+            zone: asset.zone && asset.zone !== '—' ? asset.zone : 'Finished Goods Area',
+            binLocation: asset.currentLocation && asset.currentLocation !== '—' ? asset.currentLocation : 'Bin A-1',
+            status: isAvailableOrInUse ? 'In Stock' : 'Discrepancy',
+            lastAuditTime: new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }),
+            checkedBy: 'Fixed Reader'
+          };
+        }));
+
         const allAssets = mapped;
         const statusCategory = [
           allAssets.filter(a => a.status === 'In Use').length,
@@ -2594,6 +3041,24 @@ export class App implements AfterViewInit, OnDestroy {
     }
   }
 
+  private assignmentPollingInterval: any = null;
+
+  private startAssignmentPolling() {
+    this.stopAssignmentPolling();
+    this.assignmentPollingInterval = setInterval(() => {
+      if (this.activeNav() === 'Check in/Check out' && this.isLoggedIn()) {
+        this.fetchAssignments();
+      }
+    }, 2000);
+  }
+
+  private stopAssignmentPolling() {
+    if (this.assignmentPollingInterval) {
+      clearInterval(this.assignmentPollingInterval);
+      this.assignmentPollingInterval = null;
+    }
+  }
+
   protected fetchScanEvents() {
     this.apiService.getScanEvents().subscribe({
       next: (res) => {
@@ -2604,14 +3069,14 @@ export class App implements AfterViewInit, OnDestroy {
             return {
               index: index + 1,
               epc: e.epcCode,
-              assetId: asset ? asset.assetNumber : 'Unassigned EPC',
+              assetId: asset ? asset.assetNumber : 'UNKNOWN TAG',
               assetName: asset ? asset.name : 'Unknown Asset',
               time: new Date(e.timestamp).toLocaleTimeString(),
               antenna: 'A' + e.antennaIndex,
               rssi: e.rssi + ' dBm',
               direction: 'IN',
               status: e.status || 'Matched',
-              source: e.readerName || e.handheldDeviceName || 'Fixed Reader'
+              source: e.handheldDeviceName || e.readerName || 'Fixed Reader'
             };
           }));
 
@@ -2692,7 +3157,7 @@ export class App implements AfterViewInit, OnDestroy {
         const currentList = [...this.scanEventsList()];
         const nextIndex = currentList.length + 1;
         const now = new Date();
-        const dateStr = `20 May 2025, ${now.toLocaleTimeString('en-US', { hour12: true })} IST`;
+        const dateStr = `${this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', now.toLocaleTimeString('en-US', { hour12: true }))} IST`;
 
         const newEvent = {
           index: nextIndex,
@@ -2868,6 +3333,16 @@ export class App implements AfterViewInit, OnDestroy {
       error: (err) => console.error('Failed to load handheld devices from backend', err)
     });
 
+    this.apiService.getHandheldSessions().subscribe({
+      next: (res) => {
+        const list = res.body || res;
+        if (Array.isArray(list)) {
+          this.handheldSessionsList.set(list);
+        }
+      },
+      error: (err) => console.error('Failed to load handheld sessions from backend', err)
+    });
+
     this.fetchAssignments();
     this.fetchAlerts();
     this.fetchSitesZonesWarehouses();
@@ -2987,6 +3462,12 @@ export class App implements AfterViewInit, OnDestroy {
           const checkins: any[] = [];
           list.forEach(a => {
             const isReturned = a.actualReturnDate != null || a.status === 'Returned';
+            const siteName = a.asset && a.asset.siteId ? (
+              a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91' ? 'Pune DC' :
+              a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c92' ? 'Mumbai Warehouse' :
+              a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93' ? 'Chennai Plant' : 'Bengaluru Hub'
+            ) : 'Pune DC';
+
             const item = {
               entity: a.custodianName || a.assignedToUsername || 'System',
               equipment: a.assetName || (a.asset ? a.asset.name : 'Unknown Equipment'),
@@ -2996,6 +3477,7 @@ export class App implements AfterViewInit, OnDestroy {
               time: new Date(a.assignedDate).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }),
               gateStatus: isReturned ? 'Passed' : '-',
               checkinTime: a.actualReturnDate ? new Date(a.actualReturnDate).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '-',
+              site: siteName,
               raw: a
             };
             if (isReturned) {
@@ -3045,6 +3527,8 @@ export class App implements AfterViewInit, OnDestroy {
     if (this.gpsTimerInterval) {
       clearInterval(this.gpsTimerInterval);
     }
+    this.stopAssignmentPolling();
+    this.destroySatelliteMap();
   }
 
   // Action Methods
@@ -3094,6 +3578,7 @@ export class App implements AfterViewInit, OnDestroy {
           localStorage.removeItem('activeNav');
           localStorage.removeItem('activeSubNav');
         }
+        this.stopAssignmentPolling();
       },
       error: () => {
         this.authService.clearStorage();
@@ -3105,6 +3590,7 @@ export class App implements AfterViewInit, OnDestroy {
           localStorage.removeItem('activeNav');
           localStorage.removeItem('activeSubNav');
         }
+        this.stopAssignmentPolling();
       }
     });
   }
@@ -3112,6 +3598,12 @@ export class App implements AfterViewInit, OnDestroy {
   protected selectSite(site: string) {
     this.selectedSite.set(site);
     this.isSiteDropdownOpen.set(false);
+    if (this.gpsMapMode() === 'satellite' && this.activeNav() === 'GPS Tracking') {
+      setTimeout(() => {
+        this.updateSatelliteMarkers();
+        this.centerMapOnSite(site);
+      }, 50);
+    }
   }
 
   protected onDateChange(newDate: string) {
@@ -3145,14 +3637,29 @@ export class App implements AfterViewInit, OnDestroy {
       }, 100);
     }
 
+    if (nav === 'Check in/Check out') {
+      this.fetchAssignments();
+      this.startAssignmentPolling();
+    } else {
+      this.stopAssignmentPolling();
+    }
+
+    if (nav === 'RFID Operations') {
+      this.fetchTagsThenAssets();
+      this.startScanSession();
+    } else {
+      this.stopScanSession();
+    }
+
     if (nav === 'Dashboard') {
       this.loadAllApiData();
     } else if (nav === 'Assets') {
       this.fetchAssets();
-    } else if (nav === 'Check in/Check out') {
-      this.fetchAssignments();
     } else if (nav === 'GPS Tracking') {
       this.fetchLiveGpsLocations();
+      if (this.gpsMapMode() === 'satellite') {
+        setTimeout(() => this.initSatelliteMap(), 150);
+      }
     }
   }
 
@@ -3173,6 +3680,15 @@ export class App implements AfterViewInit, OnDestroy {
     this.activeNav.set(parentName);
     if (parentName === 'Assets') {
       this.fetchAssets();
+    } else if (parentName === 'RFID Operations') {
+      this.fetchTagsThenAssets();
+      if (sub === 'Scan Session Monitor') {
+        this.startScanSession();
+      } else {
+        this.stopScanSession();
+      }
+    } else {
+      this.stopScanSession();
     }
   }
 
@@ -3209,28 +3725,8 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected triggerRefresh() {
     this.isLoading.set(true);
+    this.loadAllApiData();
     setTimeout(() => {
-      // Perturb stats slightly to look like actual update
-      const site = this.selectedSite();
-      const base = this.siteData[site];
-      if (base) {
-        const delta = Math.floor(Math.random() * 20) - 10;
-        const total = base.totalAssets + delta;
-        const active = base.activeAssets + Math.floor(delta * 0.9);
-        const inUse = base.assetsInUse + Math.floor(delta * 0.68);
-        
-        this.currentStats.update(s => ({
-          ...s,
-          totalAssets: total,
-          activeAssets: active,
-          assetsInUse: inUse,
-          rfidReadsToday: s.rfidReadsToday + Math.floor(Math.random() * 1500),
-          gpsPingsToday: s.gpsPingsToday + Math.floor(Math.random() * 3000),
-        }));
-      }
-
-      this.destroyCharts();
-      this.buildCharts();
       this.isLoading.set(false);
     }, 800);
   }
@@ -3924,7 +4420,11 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected resetReportsFilters() {
-    this.reportsDateRange.set('01 May 2025 - 20 May 2025');
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const pad = (n: number) => String(n).padStart(2, '0');
+    this.reportsDateRange.set(`${pad(startOfMonth.getDate())} ${months[startOfMonth.getMonth()]} ${startOfMonth.getFullYear()} - ${pad(today.getDate())} ${months[today.getMonth()]} ${today.getFullYear()}`);
     this.reportsSelectedSite.set('All Sites');
     this.reportsSelectedCategory.set('All Categories');
     this.reportsSelectedDepartment.set('All Departments');
@@ -4120,20 +4620,20 @@ export class App implements AfterViewInit, OnDestroy {
     } else if (reportName === 'Check-In / Check-Out Report') {
       headers = ['Timestamp', 'Asset ID', 'Category', 'Custodian', 'Event Type', 'Destination Site', 'Status'];
       rows = [
-        ['20 May 2025, 10:14:02', 'RM-COIL-402', 'Raw Material', 'Amit Sharma', 'Check-In', 'Pune DC', 'Success'],
-        ['20 May 2025, 09:42:15', 'FL-0098', 'Forklift', 'Rajesh Kumar', 'Check-Out', 'Maintenance Bay', 'Success'],
-        ['20 May 2025, 08:31:50', 'TR-102', 'Trailer', 'Deepak Patil', 'Check-Out', 'Delhi NCR Route', 'Success'],
-        ['19 May 2025, 17:15:33', 'PL-8890', 'Pallet Pl', 'Karan Singh', 'Check-In', 'Mumbai WH', 'Success'],
-        ['19 May 2025, 16:04:12', 'TOOL-881', 'Calibration Tool', 'Vijay Nair', 'Check-Out', 'Manufacturing Line 2', 'Success']
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:14:02'), 'RM-COIL-402', 'Raw Material', 'Amit Sharma', 'Check-In', 'Pune DC', 'Success'],
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '09:42:15'), 'FL-0098', 'Forklift', 'Rajesh Kumar', 'Check-Out', 'Maintenance Bay', 'Success'],
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '08:31:50',), 'TR-102', 'Trailer', 'Deepak Patil', 'Check-Out', 'Delhi NCR Route', 'Success'],
+        [this.getRelativeDateStr(-1, 'd mmm yyyy, hh:mm:ss', '17:15:33'), 'PL-8890', 'Pallet Pl', 'Karan Singh', 'Check-In', 'Mumbai WH', 'Success'],
+        [this.getRelativeDateStr(-1, 'd mmm yyyy, hh:mm:ss', '16:04:12'), 'TOOL-881', 'Calibration Tool', 'Vijay Nair', 'Check-Out', 'Manufacturing Line 2', 'Success']
       ];
     } else if (reportName === 'Movement History') {
       headers = ['Timestamp', 'Asset ID', 'RFID Tag EPC', 'From Zone', 'To Zone', 'Dwell Time', 'Reader Gate'];
       rows = [
-        ['20 May 2025, 10:21:40', 'RM-COIL-402', 'E28011702000021A3F4B2C91', 'Staging A', 'Production Area', '45 Mins', 'Gate 4'],
-        ['20 May 2025, 09:55:12', 'PL-8890', 'E28011702000021A3F4B2C92', 'Receiving Bay', 'Storage Row 12', '12 Mins', 'Gate 2'],
-        ['20 May 2025, 08:14:03', 'TOOL-881', 'E28011702000021A3F4B2C93', 'Tool Room', 'Lab 1', '3 Hrs 12 Mins', 'Lab Reader'],
-        ['19 May 2025, 16:48:32', 'FL-0098', 'E28011702000021A3F4B2C94', 'Zone A', 'Maintenance Area', '18 Mins', 'Maint Door'],
-        ['19 May 2025, 15:30:11', 'TR-102', 'E28011702000021A3F4B2C95', 'Outbound Gate', 'Highway 4', '5 Mins', 'Main Exit']
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:21:40'), 'RM-COIL-402', 'E28011702000021A3F4B2C91', 'Staging A', 'Production Area', '45 Mins', 'Gate 4'],
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '09:55:12'), 'PL-8890', 'E28011702000021A3F4B2C92', 'Receiving Bay', 'Storage Row 12', '12 Mins', 'Gate 2'],
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '08:14:03'), 'TOOL-881', 'E28011702000021A3F4B2C93', 'Tool Room', 'Lab 1', '3 Hrs 12 Mins', 'Lab Reader'],
+        [this.getRelativeDateStr(-1, 'd mmm yyyy, hh:mm:ss', '16:48:32'), 'FL-0098', 'E28011702000021A3F4B2C94', 'Zone A', 'Maintenance Area', '18 Mins', 'Maint Door'],
+        [this.getRelativeDateStr(-1, 'd mmm yyyy, hh:mm:ss', '15:30:11'), 'TR-102', 'E28011702000021A3F4B2C95', 'Outbound Gate', 'Highway 4', '5 Mins', 'Main Exit']
       ];
     } else if (reportName === 'Zone Occupancy') {
       headers = ['Site', 'Zone Name', 'Current Occupancy', 'Design Capacity', 'Utilization Rate (%)', 'Alert Status'];
@@ -4157,21 +4657,21 @@ export class App implements AfterViewInit, OnDestroy {
     } else if (reportName === 'Lost / Missing Asset Report') {
       headers = ['Asset ID', 'Category', 'Site', 'Last Scanned Zone', 'Last Seen Timestamp', 'RFID Tag EPC', 'Flagged By'];
       rows = [
-        ['TOOL-401', 'Calibration Tool', 'Pune DC', 'Lab 2', '18 May 2025, 14:12:00', 'E28011702000021A3F4B2CA1', 'Admin'],
-        ['PL-0023', 'Pallet Pl', 'Mumbai WH', 'Zone C', '15 May 2025, 08:31:02', 'E28011702000021A3F4B2CA2', 'System'],
-        ['FL-0097', 'Forklift', 'Bengaluru Hub', 'Main Yard', '10 May 2025, 11:42:15', 'E28011702000021A3F4B2CA3', 'Supervisor'],
-        ['RM-COIL-102', 'Raw Material', 'Delhi NCR', 'Buffer B', '12 May 2025, 17:33:01', 'E28011702000021A3F4B2CA4', 'System'],
-        ['RFID-GATE-3', 'Handheld Reader', 'Hyderabad DC', 'Front Desk', '05 May 2025, 09:12:30', 'E28011702000021A3F4B2CA5', 'S. Kumar']
+        ['TOOL-401', 'Calibration Tool', 'Pune DC', 'Lab 2', this.getRelativeDateStr(-2, 'd mmm yyyy, hh:mm:ss', '14:12:00'), 'E28011702000021A3F4B2CA1', 'Admin'],
+        ['PL-0023', 'Pallet Pl', 'Mumbai WH', 'Zone C', this.getRelativeDateStr(-5, 'd mmm yyyy, hh:mm:ss', '08:31:02'), 'E28011702000021A3F4B2CA2', 'System'],
+        ['FL-0097', 'Forklift', 'Bengaluru Hub', 'Main Yard', this.getRelativeDateStr(-10, 'd mmm yyyy, hh:mm:ss', '11:42:15'), 'E28011702000021A3F4B2CA3', 'Supervisor'],
+        ['RM-COIL-102', 'Raw Material', 'Delhi NCR', 'Buffer B', this.getRelativeDateStr(-8, 'd mmm yyyy, hh:mm:ss', '17:33:01'), 'E28011702000021A3F4B2CA4', 'System'],
+        ['RFID-GATE-3', 'Handheld Reader', 'Hyderabad DC', 'Front Desk', this.getRelativeDateStr(-15, 'd mmm yyyy, hh:mm:ss', '09:12:30'), 'E28011702000021A3F4B2CA5', 'S. Kumar']
       ];
     } else if (reportName === 'Reader Performance') {
       headers = ['Reader Name', 'Location', 'Total Scans (Today)', 'Success Rate (%)', 'Uptime (%)', 'Connection Status', 'Last Activity'];
       rows = [
-        ['Gate Reader 1', 'Pune DC Main Exit', '14,258', '99.8%', '100.0%', 'Online', '20 May 2025, 10:24:02'],
-        ['Forklift Reader 2', 'Pune DC FL-0098', '3,452', '98.5%', '99.2%', 'Online', '20 May 2025, 10:23:45'],
-        ['Dock Reader A', 'Mumbai WH Dock 4', '8,901', '99.2%', '100.0%', 'Online', '20 May 2025, 10:23:12'],
-        ['Staging Reader', 'Chennai Plant Zone A', '5,671', '99.4%', '98.1%', 'Online', '20 May 2025, 10:21:00'],
-        ['Yard Reader 1', 'Bengaluru Hub Yard', '12,982', '97.2%', '99.5%', 'Online', '20 May 2025, 10:24:00'],
-        ['Exit Reader 2', 'Delhi NCR Gate 2', '7,890', '99.7%', '85.4%', 'Warning - High Noise', '20 May 2025, 10:23:59']
+        ['Gate Reader 1', 'Pune DC Main Exit', '14,258', '99.8%', '100.0%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:24:02')],
+        ['Forklift Reader 2', 'Pune DC FL-0098', '3,452', '98.5%', '99.2%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:23:45')],
+        ['Dock Reader A', 'Mumbai WH Dock 4', '8,901', '99.2%', '100.0%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:23:12')],
+        ['Staging Reader', 'Chennai Plant Zone A', '5,671', '99.4%', '98.1%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:21:00')],
+        ['Yard Reader 1', 'Bengaluru Hub Yard', '12,982', '97.2%', '99.5%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:24:00')],
+        ['Exit Reader 2', 'Delhi NCR Gate 2', '7,890', '99.7%', '85.4%', 'Warning - High Noise', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:23:59')]
       ];
     } else if (reportName === 'Tag Read Accuracy') {
       headers = ['Asset Category', 'Total Read Attempts', 'Missed Read Count', 'Accuracy Rate (%)', 'Uptime (%)', 'RSSI Average (dB)'];
@@ -4196,12 +4696,12 @@ export class App implements AfterViewInit, OnDestroy {
     } else { // User Activity
       headers = ['Timestamp', 'Username', 'Role', 'Action Executed', 'IP Address', 'Result Status'];
       rows = [
-        ['20 May 2025, 10:24:02', 'rohit.k', 'Operations Manager', 'Export Reports PDF', '192.168.1.45', 'Success'],
-        ['20 May 2025, 10:18:15', 'rohit.k', 'Operations Manager', 'Apply Report Filter: Pune DC', '192.168.1.45', 'Success'],
-        ['20 May 2025, 09:44:30', 'karan.s', 'Supervisor', 'Bulk Upload Asset list', '192.168.1.92', 'Success - 124 Items'],
-        ['20 May 2025, 09:12:11', 'system_cron', 'Background Service', 'Trigger Auto Backup', '127.0.0.1', 'Success'],
-        ['20 May 2025, 08:30:00', 'amit.s', 'Administrator', 'Change Reader Configuration: Gate 1', '192.168.1.12', 'Success'],
-        ['20 May 2025, 08:02:15', 'rohit.k', 'Operations Manager', 'User Authentication Login', '192.168.1.45', 'Success']
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:24:02'), 'rohit.k', 'Operations Manager', 'Export Reports PDF', '192.168.1.45', 'Success'],
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:18:15'), 'rohit.k', 'Operations Manager', 'Apply Report Filter: Pune DC', '192.168.1.45', 'Success'],
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '09:44:30'), 'karan.s', 'Supervisor', 'Bulk Upload Asset list', '192.168.1.92', 'Success - 124 Items'],
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '09:12:11'), 'system_cron', 'Background Service', 'Trigger Auto Backup', '127.0.0.1', 'Success'],
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '08:30:00'), 'amit.s', 'Administrator', 'Change Reader Configuration: Gate 1', '192.168.1.12', 'Success'],
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '08:02:15'), 'rohit.k', 'Operations Manager', 'User Authentication Login', '192.168.1.45', 'Success']
       ];
     }
 
@@ -4222,7 +4722,7 @@ export class App implements AfterViewInit, OnDestroy {
       
       pdf.setTextColor(100, 116, 139);
       pdf.setFontSize(9);
-      pdf.text(`Report Generated On: 20 May 2025, 10:24 AM  |  Operator: Rohit Kumar (Operations Manager)`, 30, 110);
+      pdf.text(`Report Generated On: ${this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm AM/PM', '10:24 AM')}  |  Operator: Rohit Kumar (Operations Manager)`, 30, 110);
       
       pdf.setDrawColor(226, 232, 240);
       pdf.setLineWidth(1);
@@ -4277,26 +4777,8 @@ export class App implements AfterViewInit, OnDestroy {
     }
   }
 
-  private startGpsSimulation() {
+  private startGpsAutoRefreshInterval() {
     if (isPlatformBrowser(this.platformId)) {
-      // Coordinate paths for moving assets (percentage coordinates on map layout)
-      const forkliftPath = [
-        { x: 60, y: 45 }, { x: 63, y: 50 }, { x: 67, y: 55 }, { x: 72, y: 52 },
-        { x: 76, y: 48 }, { x: 70, y: 40 }, { x: 65, y: 35 }, { x: 58, y: 38 }
-      ];
-      let flPathIndex = 0;
-
-      const truckPath = [
-        { x: 82, y: 85 }, { x: 86, y: 88 }, { x: 92, y: 82 }, { x: 95, y: 72 },
-        { x: 90, y: 62 }, { x: 84, y: 52 }, { x: 80, y: 65 }, { x: 78, y: 75 }
-      ];
-      let trkPathIndex = 0;
-
-      const toolPath = [
-        { x: 52, y: 52 }, { x: 54, y: 54 }, { x: 56, y: 51 }, { x: 53, y: 49 }
-      ];
-      let toolPathIndex = 0;
-
       this.gpsTimerInterval = setInterval(() => {
         if (!this.gpsAutoRefresh() || this.activeNav() !== 'GPS Tracking') return;
         this.fetchLiveGpsLocations();
@@ -4307,29 +4789,66 @@ export class App implements AfterViewInit, OnDestroy {
   protected fetchLiveGpsLocations() {
     if (!this.isLoggedIn()) return;
     this.apiService.getVehicles().subscribe({
-      next: (list: any[]) => {
-        if (Array.isArray(list)) {
+      next: (res: any) => {
+        let list: any[] = [];
+        if (Array.isArray(res)) {
+          list = res;
+        } else if (res && Array.isArray(res.value)) {
+          list = res.value;
+        }
+
+        if (list.length >= 0) {
           this.gpsAssets.set(list.map((v: any) => {
-            const x = Math.min(100, Math.max(0, Math.round(((v.lon - 73.8067) / (73.9067 - 73.8067)) * 100)));
-            const y = Math.min(100, Math.max(0, Math.round(((v.lat - 18.4704) / (18.5704 - 18.4704)) * 100)));
+            const linkedAsset = this.assets().find(a => a.gpsId === v.deviceNum);
+            let assetType: 'Vehicle' | 'Forklift' | 'Pallet/Bin' | 'Container' | 'Tool/Equipment' | 'Mobile Equipment' = 'Vehicle';
+            if (linkedAsset) {
+              const cat = (linkedAsset.category || '').toLowerCase();
+              if (cat.includes('forklift')) {
+                assetType = 'Forklift';
+              } else if (cat.includes('pallet') || cat.includes('bin') || cat.includes('returnable')) {
+                assetType = 'Pallet/Bin';
+              } else if (cat.includes('container')) {
+                assetType = 'Container';
+              } else if (cat.includes('tool') || cat.includes('equip') || cat.includes('maint')) {
+                assetType = 'Tool/Equipment';
+              } else if (cat.includes('mobile')) {
+                assetType = 'Mobile Equipment';
+              }
+            }
+
+            const x = Math.min(100, Math.max(0, Math.round(((v.lon - 73.8540) / (73.8600 - 73.8540)) * 100)));
+            const y = Math.min(100, Math.max(0, Math.round(((18.6230 - v.lat) / (18.6230 - 18.6180)) * 100)));
 
             const currentZone = v.speed > 0 ? 'Transit Route' : 'Main Yard';
+            
+            let lastRfidRead = '—';
+            if (linkedAsset && linkedAsset.rfidTag) {
+              const matchingEvents = this.scanEventsList().filter(evt => evt.epc === linkedAsset.rfidTag);
+              if (matchingEvents.length > 0) {
+                lastRfidRead = matchingEvents[0].time;
+              }
+            }
+
+            const exception = v.battery < 25 ? 'Low Battery' : '';
+
             return {
               id: v.deviceNum,
-              name: v.regName || ('Vehicle ' + v.deviceNum),
-              tag: 'GPS Tracker',
-              type: 'Vehicle',
+              name: linkedAsset ? linkedAsset.name : (v.regName || ('Vehicle ' + v.deviceNum)),
+              tag: linkedAsset ? 'Asset: ' + (linkedAsset.assetNumber || linkedAsset.id) : 'GPS Tracker',
+              type: assetType,
               status: v.status || 'Active',
-              battery: Math.round(v.battery * 100),
+              battery: Math.round(v.battery),
               speed: v.speed,
               latitude: v.lat,
               longitude: v.lon,
               currentZone: currentZone,
               lastGpsPing: new Date(v.gpsTime).toLocaleTimeString(),
-              lastRfidRead: '—',
-              exception: 'None',
-              site: 'Pune DC',
-              operator: 'Operator ' + v.deviceNum.substring(v.deviceNum.length - 4),
+              lastRfidRead: lastRfidRead,
+              exception: exception,
+              site: linkedAsset ? (linkedAsset.site || 'Pune DC') : 'Pune DC',
+              operator: linkedAsset ? (linkedAsset.currentCustodian || linkedAsset.custodian || 'Unassigned') : 'Operator ' + v.deviceNum.substring(v.deviceNum.length - 4),
+              make: linkedAsset ? linkedAsset.manufacturer : '',
+              model: linkedAsset ? linkedAsset.model : '',
               x,
               y,
               trail: [],
@@ -4345,11 +4864,13 @@ export class App implements AfterViewInit, OnDestroy {
           }));
 
           if (this.gpsAssets().length > 0 && !this.gpsSelectedAsset()) {
-            this.gpsSelectedAsset.set(this.gpsAssets()[0]);
+            this.selectGpsAsset(this.gpsAssets()[0]);
           } else if (this.gpsSelectedAsset()) {
             const updatedSelected = this.gpsAssets().find(a => a.id === this.gpsSelectedAsset()?.id);
             if (updatedSelected) {
               this.gpsSelectedAsset.set(updatedSelected);
+              this.fetchGpsAssetHistory(updatedSelected.id);
+              this.fetchSelectedLiveGpsLocation(updatedSelected.id);
             }
           }
 
@@ -4359,16 +4880,396 @@ export class App implements AfterViewInit, OnDestroy {
           this.gpsIdleCount.set(assets.filter(a => a.speed === 0).length);
           this.gpsStoppedCount.set(assets.filter(a => a.status.includes('ACC OFF') || a.speed === 0).length);
           this.gpsLowBatteryCount.set(assets.filter(a => a.battery < 25).length);
-          this.gpsExceptionCount.set(0);
+          this.gpsExceptionCount.set(assets.filter(a => a.exception !== '').length);
           this.gpsOfflineCount.set(assets.filter(a => a.status.includes('Offline')).length);
+          if (this.gpsMapMode() === 'satellite') {
+            this.updateSatelliteMarkers();
+          }
         }
       },
       error: (err) => console.error('Failed to load GPS vehicles from PostgreSQL', err)
     });
   }
 
+  protected fetchGpsAssetHistory(imei: string) {
+    const dateStr = this.gpsSelectedDate();
+    // Parse start and end of selected date in local time
+    const begin = new Date(dateStr + 'T00:00:00');
+    const end = new Date(dateStr + 'T23:59:59');
+    
+    this.apiService.getGPSHistory(imei, begin.toISOString(), end.toISOString()).subscribe({
+      next: (res) => {
+        let list: any[] = [];
+        if (res && res.detail) {
+          list = Array.isArray(res.detail) ? res.detail : (res.detail.data || []);
+        }
+        this.gpsAssetHistory.set(list);
+        if (this.gpsMapMode() === 'satellite') {
+          this.updateSatelliteMarkers();
+        }
+      },
+      error: (err) => {
+        console.error('Failed to load GPS history for ' + imei, err);
+        this.gpsAssetHistory.set([]);
+      }
+    });
+  }
+
+  protected onGpsDateChange(newDate: string) {
+    if (!newDate) return;
+    this.gpsSelectedDate.set(newDate);
+    const selected = this.gpsSelectedAsset();
+    if (selected) {
+      this.fetchGpsAssetHistory(selected.id);
+    }
+  }
+
+  protected fetchSelectedLiveGpsLocation(vehicleId: string) {
+    this.apiService.getGPSLocation(vehicleId).subscribe({
+      next: (res: any) => {
+        if (res && res.detail && res.detail.data && res.detail.data.length > 0) {
+          const v = res.detail.data[0];
+          const lat = parseFloat(v.Lat || '0');
+          const lon = parseFloat(v.Lon || '0');
+          const speed = parseFloat(v.Speed || '0');
+          const direction = v.Direction || '0';
+          const battery = parseFloat(v.Battery || '100');
+          const status = v.OnlineStatusStr || v.OnlineStatus || 'Active';
+          const gpsTime = v.GpsTime ? new Date(v.GpsTime).toLocaleTimeString() : new Date().toLocaleTimeString();
+
+          const x = Math.min(100, Math.max(0, Math.round(((lon - 73.8540) / (73.8600 - 73.8540)) * 100)));
+          const y = Math.min(100, Math.max(0, Math.round(((18.6230 - lat) / (18.6230 - 18.6180)) * 100)));
+
+          const currentSel = this.gpsSelectedAsset();
+          if (currentSel && currentSel.id === vehicleId) {
+            const updated = {
+              ...currentSel,
+              latitude: lat,
+              longitude: lon,
+              speed: speed,
+              direction: direction,
+              battery: isNaN(battery) ? 100 : Math.round(battery),
+              status: status,
+              lastGpsPing: gpsTime,
+              x: x,
+              y: y
+            };
+            this.gpsSelectedAsset.set(updated);
+            this.gpsAssets.update(list => list.map(a => a.id === vehicleId ? updated : a));
+            if (this.gpsMapMode() === 'satellite') {
+              this.updateSatelliteMarkers();
+            }
+          }
+        }
+      },
+      error: (err) => console.error('Failed to fetch live location for ' + vehicleId, err)
+    });
+  }
+
+  protected toggleMapMode() {
+    const newMode = this.gpsMapMode() === 'blueprint' ? 'satellite' : 'blueprint';
+    this.gpsMapMode.set(newMode);
+    if (newMode === 'satellite') {
+      setTimeout(() => this.initSatelliteMap(), 100);
+    } else {
+      this.destroySatelliteMap();
+    }
+  }
+
+  protected switchMapLayer(layer: 'satellite' | 'hybrid' | 'street') {
+    this.gpsMapLayer.set(layer);
+    if (this.satelliteMap && typeof window !== 'undefined' && (window as any).L) {
+      const L = (window as any).L;
+      if (this.satelliteTileLayer) {
+        this.satelliteTileLayer.remove();
+      }
+      this.satelliteTileLayer = this.createTileLayer(L, layer);
+      this.satelliteTileLayer.addTo(this.satelliteMap);
+    }
+  }
+
+  private getTileLayerConfig(layer: 'satellite' | 'hybrid' | 'street'): { url: string; attribution: string; maxZoom: number } {
+    if (layer === 'satellite') {
+      return {
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+        maxZoom: 19
+      };
+    } else if (layer === 'hybrid') {
+      return {
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+        maxZoom: 19
+      };
+    } else {
+      return {
+        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      };
+    }
+  }
+
+  private createTileLayer(L: any, layer: 'satellite' | 'hybrid' | 'street'): any {
+    const config = this.getTileLayerConfig(layer);
+    const tileLayer = L.tileLayer(config.url, {
+      attribution: config.attribution,
+      maxZoom: config.maxZoom,
+      crossOrigin: true
+    });
+    if (layer === 'hybrid') {
+      // Add road overlay on top of satellite for hybrid
+      const roadOverlay = L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { opacity: 0.45, maxZoom: 19, crossOrigin: true }
+      );
+      // Return a group-like object
+      const group = L.layerGroup([tileLayer, roadOverlay]);
+      return group;
+    }
+    return tileLayer;
+  }
+
+  protected centerMapOnSite(site: string) {
+    if (!this.satelliteMap) return;
+    const siteCoords: Record<string, { lat: number; lon: number; zoom: number }> = {
+      'Pune DC': { lat: 18.6203, lon: 73.8567, zoom: 16 },
+      'Mumbai Warehouse': { lat: 19.2183, lon: 73.0862, zoom: 16 },
+      'Chennai Plant': { lat: 13.0827, lon: 80.2707, zoom: 16 },
+      'Bengaluru Hub': { lat: 12.9716, lon: 77.5946, zoom: 16 },
+      'All Sites': { lat: 20.5937, lon: 78.9629, zoom: 5 }
+    };
+    const config = siteCoords[site] || siteCoords['Pune DC'];
+    this.satelliteMap.setView([config.lat, config.lon], config.zoom, { animate: true, duration: 1.0 });
+  }
+
+  private initSatelliteMap() {
+    if (typeof window === 'undefined' || !(window as any).L) return;
+    const L = (window as any).L;
+
+    if (this.satelliteMap) {
+      this.destroySatelliteMap();
+    }
+
+    const site = this.selectedSite();
+    const siteCoords: Record<string, { lat: number; lon: number; zoom: number }> = {
+      'Pune DC': { lat: 18.6203, lon: 73.8567, zoom: 16 },
+      'Mumbai Warehouse': { lat: 19.2183, lon: 73.0862, zoom: 16 },
+      'Chennai Plant': { lat: 13.0827, lon: 80.2707, zoom: 16 },
+      'Bengaluru Hub': { lat: 12.9716, lon: 77.5946, zoom: 16 },
+      'All Sites': { lat: 20.5937, lon: 78.9629, zoom: 5 }
+    };
+    const siteConfig = siteCoords[site] || siteCoords['Pune DC'];
+
+    let centerLat = siteConfig.lat;
+    let centerLon = siteConfig.lon;
+    let initialZoom = siteConfig.zoom;
+
+    const selected = this.gpsSelectedAsset();
+    const filteredAssets = this.filteredGpsAssets();
+    const firstAsset = filteredAssets[0];
+
+    if (selected && selected.latitude && selected.longitude) {
+      centerLat = selected.latitude;
+      centerLon = selected.longitude;
+      initialZoom = 17;
+    } else if (firstAsset && firstAsset.latitude && firstAsset.longitude) {
+      centerLat = firstAsset.latitude;
+      centerLon = firstAsset.longitude;
+      initialZoom = 16;
+    }
+
+    this.satelliteMap = L.map('leaflet-satellite-map', {
+      zoomControl: false,
+      attributionControl: true
+    }).setView([centerLat, centerLon], initialZoom);
+
+    // Add the selected tile layer
+    this.satelliteTileLayer = this.createTileLayer(L, this.gpsMapLayer());
+    this.satelliteTileLayer.addTo(this.satelliteMap);
+
+    // Add zoom control at bottom-right
+    L.control.zoom({ position: 'bottomright' }).addTo(this.satelliteMap);
+
+    // Add scale bar
+    L.control.scale({ position: 'bottomleft', imperial: false }).addTo(this.satelliteMap);
+
+    this.updateSatelliteMarkers();
+  }
+
+  private destroySatelliteMap() {
+    if (this.satelliteMap) {
+      try {
+        this.satelliteMap.remove();
+      } catch (e) {
+        console.error('Error removing Leaflet map:', e);
+      }
+      this.satelliteMap = null;
+    }
+    this.satelliteMarkers.clear();
+    this.satelliteAccuracyCircles.clear();
+    this.satelliteTrailPolyline = null;
+    this.satelliteTileLayer = null;
+  }
+
+  private updateSatelliteMarkers() {
+    if (!this.satelliteMap || typeof window === 'undefined' || !(window as any).L) return;
+    const L = (window as any).L;
+
+    const assets = this.filteredGpsAssets();
+    const selected = this.gpsSelectedAsset();
+    const activeIds = new Set(assets.map(a => a.id));
+
+    // Remove stale markers
+    for (const [id, marker] of this.satelliteMarkers.entries()) {
+      if (!activeIds.has(id)) {
+        marker.remove();
+        this.satelliteMarkers.delete(id);
+      }
+    }
+    for (const [id, circle] of this.satelliteAccuracyCircles.entries()) {
+      if (!activeIds.has(id)) {
+        circle.remove();
+        this.satelliteAccuracyCircles.delete(id);
+      }
+    }
+
+    for (const asset of assets) {
+      if (!asset.latitude || !asset.longitude) continue;
+
+      const isSelected = selected?.id === asset.id;
+      const isMoving = asset.speed > 0;
+      const isOffline = asset.status.toLowerCase().includes('offline');
+      const color = isSelected ? '#3b82f6' : (isMoving ? '#10b981' : (isOffline ? '#64748b' : '#f59e0b'));
+      const iconName = asset.type === 'Vehicle' ? 'local_shipping' : (asset.type === 'Forklift' ? 'precision_manufacturing' : 'inventory_2');
+
+      const iconHtml = `
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+          ${isSelected ? `
+            <div style="position: absolute; width: 42px; height: 42px; border-radius: 50%; border: 2.5px solid #3b82f6; animation: pulse-ring 1.5s infinite; transform: translate(-9px, -9px); pointer-events:none;"></div>
+            <div style="position: absolute; width: 28px; height: 28px; border-radius: 50%; background: rgba(59,130,246,0.18); transform: translate(-2px, -2px); pointer-events:none;"></div>
+          ` : ''}
+          <div style="background: ${color}; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 8px rgba(0,0,0,0.4); border: 2.5px solid white; z-index: 10; transition: background 0.3s;">
+            <span class="material-symbols-outlined" style="font-size: 13px; font-variation-settings: 'FILL' 1;">${iconName}</span>
+          </div>
+          <div style="background: rgba(10,14,28,0.9); color: white; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px; white-space: nowrap; margin-top: 3px; box-shadow: 0 2px 6px rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.12); letter-spacing: 0.01em;">
+            ${asset.name}${isMoving ? ' <span style="color:#10b981;">▶</span>' : ''}
+          </div>
+          ${isSelected ? `<div style="font-size:8.5px; color: rgba(255,255,255,0.75); background: rgba(10,14,28,0.75); padding: 1px 5px; border-radius: 3px; margin-top: 2px; white-space:nowrap; font-family:monospace;">${asset.latitude.toFixed(5)}, ${asset.longitude.toFixed(5)}</div>` : ''}
+        </div>
+      `;
+
+      const customIcon = L.divIcon({
+        html: iconHtml,
+        className: 'custom-leaflet-marker',
+        iconSize: [24, isSelected ? 60 : 44],
+        iconAnchor: [12, 12]
+      });
+
+      // Accuracy circle for selected asset (GPS accuracy ~10-50m)
+      if (isSelected) {
+        let circle = this.satelliteAccuracyCircles.get(asset.id);
+        if (circle) {
+          circle.setLatLng([asset.latitude, asset.longitude]);
+        } else {
+          circle = L.circle([asset.latitude, asset.longitude], {
+            radius: 30,
+            color: '#3b82f6',
+            fillColor: '#3b82f6',
+            fillOpacity: 0.08,
+            weight: 1.5,
+            dashArray: '4,4',
+            interactive: false
+          }).addTo(this.satelliteMap);
+          this.satelliteAccuracyCircles.set(asset.id, circle);
+        }
+      } else {
+        const oldCircle = this.satelliteAccuracyCircles.get(asset.id);
+        if (oldCircle) {
+          oldCircle.remove();
+          this.satelliteAccuracyCircles.delete(asset.id);
+        }
+      }
+
+      let marker = this.satelliteMarkers.get(asset.id);
+      if (marker) {
+        marker.setLatLng([asset.latitude, asset.longitude]);
+        marker.setIcon(customIcon);
+      } else {
+        marker = L.marker([asset.latitude, asset.longitude], { icon: customIcon, zIndexOffset: isSelected ? 1000 : 0 })
+          .addTo(this.satelliteMap)
+          .on('click', () => {
+            this.zone.run(() => {
+              this.selectGpsAsset(asset);
+            });
+          });
+        this.satelliteMarkers.set(asset.id, marker);
+      }
+    }
+
+    // Auto-track: pan & zoom to selected asset if auto-track is on
+    if (selected && selected.latitude && selected.longitude && this.gpsAutoTrack()) {
+      const currentZoom = this.satelliteMap.getZoom();
+      const targetZoom = Math.max(currentZoom, 17);
+      this.satelliteMap.setView([selected.latitude, selected.longitude], targetZoom, { animate: true, duration: 0.5 });
+    }
+
+    // Draw trail polyline
+    if (this.satelliteTrailPolyline) {
+      this.satelliteTrailPolyline.remove();
+      this.satelliteTrailPolyline = null;
+    }
+
+    const trailPoints = this.gpsAssetHistory();
+    if (trailPoints && trailPoints.length > 0) {
+      const latLngs = trailPoints
+        .map((pt: any) => {
+          const lat = pt.latitude !== undefined ? pt.latitude : pt.Latitude;
+          const lon = pt.longitude !== undefined ? pt.longitude : pt.Longitude;
+          return (lat && lon) ? [lat, lon] : null;
+        })
+        .filter((pt: any) => pt !== null);
+
+      if (latLngs.length > 0) {
+        // Draw route trail with gradient-like segments
+        this.satelliteTrailPolyline = L.polyline(latLngs, {
+          color: '#3b82f6',
+          weight: 4,
+          opacity: 0.75,
+          dashArray: '6, 5',
+          lineCap: 'round'
+        }).addTo(this.satelliteMap);
+
+        // Start marker (first point)
+        if (latLngs.length > 1) {
+          const startIcon = L.divIcon({
+            html: `<div style="width:10px;height:10px;border-radius:50%;background:#10b981;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.4);"></div>`,
+            className: '',
+            iconSize: [10, 10],
+            iconAnchor: [5, 5]
+          });
+          L.marker(latLngs[0] as any, { icon: startIcon, interactive: false }).addTo(this.satelliteMap);
+        }
+      }
+    }
+  }
+
+  protected centerOnSelectedAsset() {
+    if (!this.satelliteMap || !this.gpsSelectedAsset()) return;
+    const asset = this.gpsSelectedAsset()!;
+    if (asset.latitude && asset.longitude) {
+      this.satelliteMap.setView([asset.latitude, asset.longitude], 18, { animate: true, duration: 0.8 });
+    }
+  }
+
   protected selectGpsAsset(asset: GPSAsset) {
     this.gpsSelectedAsset.set(asset);
+    this.gpsDetailTab.set('overview');
+    this.fetchGpsAssetHistory(asset.id);
+    this.fetchSelectedLiveGpsLocation(asset.id);
+    if (this.gpsMapMode() === 'satellite') {
+      setTimeout(() => this.updateSatelliteMarkers(), 100);
+    }
   }
 
   protected triggerGpsRefresh() {
@@ -4885,7 +5786,8 @@ export class App implements AfterViewInit, OnDestroy {
       }
     }
 
-    const txId = (mode === 'issue' ? 'ISS-' : mode === 'return' ? 'RET-' : 'IST-') + '2025-05-0' + Math.floor(202 + Math.random() * 99);
+    const txYearMonth = new Date().toISOString().split('T')[0].substring(0, 7);
+    const txId = (mode === 'issue' ? 'ISS-' : mode === 'return' ? 'RET-' : 'IST-') + txYearMonth + '-' + Math.floor(100 + Math.random() * 899);
     const tx = {
       id: txId,
       time: new Date().toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }),
@@ -4915,7 +5817,9 @@ export class App implements AfterViewInit, OnDestroy {
     this.checkoutPurpose.set('');
     this.checkoutAssignee.set('Amit Verma');
     this.checkoutAssigneeType.set('Employee');
-    this.checkoutExpectedReturnDate.set('2025-05-27');
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    this.checkoutExpectedReturnDate.set(d.toISOString().split('T')[0]);
     this.checkoutExpectedReturnTime.set('18:00');
   }
 

@@ -175,6 +175,15 @@ export class ApiService {
     return this.http.get<any>(`${this.baseUrl}/scanevents`);
   }
 
+  // Handheld Sessions
+  getHandheldSessions(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/device/sessions`);
+  }
+
+  endScanSession(sessionId: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/device/end-session/${sessionId}`, {});
+  }
+
   // GPS
   getGPSTracking(): Observable<any> {
     return this.http.get<any>(`${this.baseUrl}/Gps/vehicle-android-location/16512010049`);
@@ -183,7 +192,7 @@ export class ApiService {
     return this.http.get<any>(`${this.baseUrl}/Gps/vehicle-android-location/${deviceNum}`);
   }
   getGPSLocation(vehicleId: string): Observable<any> {
-    return this.http.get<any>(`${this.baseUrl}/Gps/vehicle-location/${vehicleId}`);
+    return this.http.get<any>(`https://api.prosperassettracking.com/api/Gps/vehicle-location/${vehicleId}`);
   }
   getGPSHistory(vehicleId: string, beginTime: string, endTime: string): Observable<any> {
     const params = new HttpParams()
