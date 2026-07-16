@@ -38,6 +38,7 @@ interface Asset {
   assetType?: string;
   lastSeen?: string;
   nextMaintenance?: string;
+  lastReader?: string;
   imei?: string;
   sim?: string;
   custodianEmail?: string;
@@ -994,6 +995,65 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected readonly handheldSessionsList = signal<any[]>([]);
 
+  protected fetchHandheldSessions() {
+    if (!this.isLoggedIn()) return;
+    this.apiService.getScanSessions(1, 200).subscribe({
+      next: (res) => {
+        const body = res.body || res || [];
+        if (Array.isArray(body)) {
+          const handheldSessions = body.filter((s: any) => s.handheldDeviceId != null);
+          this.handheldSessionsList.set(handheldSessions.map((s: any) => {
+            const date = new Date(s.startTime);
+            const duration = s.endTime 
+              ? `${Math.round((new Date(s.endTime).getTime() - date.getTime()) / 60000)} mins`
+              : 'Active';
+            return {
+              id: s.id,
+              operator: s.handheldDeviceName ? s.handheldDeviceName.replace('Handheld ', '') : 'Operator',
+              model: s.handheldDeviceName || 'C72 Reader',
+              type: s.sessionName && s.sessionName.includes('Inventory') ? 'Inventory' : 'Scanning',
+              startTime: date.toLocaleString(),
+              duration: duration,
+              scannedTags: s.scanEvents ? s.scanEvents.length : 0,
+              discrepancies: 0,
+              status: s.isRunning ? 'In Progress' : 'Synced'
+            };
+          }));
+        }
+      },
+      error: (err) => console.error('Failed to fetch handheld sessions', err)
+    });
+  }
+
+  protected fetchRfidEvents() {
+    if (!this.isLoggedIn()) return;
+    this.http.get<any>('http://localhost:5025/api/movements?page=1&size=200').subscribe({
+      next: (res) => {
+        const body = res.body || res || [];
+        const movements = Array.isArray(body) ? body : (body.items ?? []);
+        if (Array.isArray(movements)) {
+          this.rfidEventsList.set(movements.map((m: any) => {
+            const date = new Date(m.movementDate);
+            const source = m.readerName || m.handheldDeviceName || 'System';
+            const location = m.remarks || m.destinationLocationName || 'Pune DC';
+            return {
+              id: m.id,
+              severity: 'Info',
+              time: date.toLocaleTimeString(),
+              date: date.toLocaleDateString(),
+              eventType: m.movementType || 'Asset Scan',
+              message: `Asset ${m.assetName} (${m.assetNumber}) moved to ${location}`,
+              reader: source,
+              antenna: '1',
+              rssi: '-58 dBm'
+            };
+          }));
+        }
+      },
+      error: (err) => console.error('Failed to fetch asset movements for RFID events', err)
+    });
+  }
+
   protected readonly filteredHandheldSessionsList = computed(() => {
     const search = this.handheldSearchQuery().toLowerCase().trim();
     const status = this.handheldStatusFilter();
@@ -1517,6 +1577,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly apiSites = signal<any[]>([]);
   protected readonly apiWarehouses = signal<any[]>([]);
   protected readonly apiZones = signal<any[]>([]);
+  protected readonly apiLocations = signal<any[]>([]);
 
   // Warehouses filtered by selected site
   protected readonly filteredWarehouses = computed(() => {
@@ -2452,7 +2513,10 @@ export class App implements AfterViewInit, OnDestroy {
             purchaseDate: item.purchaseDate ? new Date(item.purchaseDate).toLocaleDateString() : '—',
             warranty: item.warrantyExpiryDate ? new Date(item.warrantyExpiryDate).toLocaleDateString() : '—',
             status: status,
-            currentLocation: item.currentLocation || 'Pune DC',
+            currentLocation: (() => {
+              const matchedLoc = this.apiLocations().find(l => l.id && item.locationId && l.id.toLowerCase() === item.locationId.toLowerCase());
+              return matchedLoc ? matchedLoc.name : (item.currentLocation || 'Pune DC');
+            })(),
             custodian: item.currentCustodian || 'Unassigned',
             currentCustodian: item.currentCustodian || 'Unassigned',
             ownerDepartment: item.ownerDepartment || '—',
@@ -2465,6 +2529,7 @@ export class App implements AfterViewInit, OnDestroy {
             assetType: item.assetType || 'Serialized',
             lastSeen: '—',
             nextMaintenance: '—',
+            lastReader: '—',
             imei: linkedGps ? linkedGps.imei : '—',
             sim: '—',
             custodianEmail: item.custodianEmail || '—',
@@ -2480,25 +2545,28 @@ export class App implements AfterViewInit, OnDestroy {
         });
 
         this.assets.set(mapped);
-        // Populate inventoryItems dynamically from the loaded assets
-        this.inventoryItems.set(mapped.map(asset => {
-          const isAvailableOrInUse = asset.status === 'Available' || asset.status === 'In Use';
+        this.fetchScanEvents();
+        
+        const inventory = mapped.map(a => {
+          const actualQty = a.status === 'Retired' ? 0 : 1;
+          const status = a.status === 'Retired' ? 'Missing' : 'In Stock';
           return {
-            id: asset.id,
-            sku: asset.assetNumber || asset.id,
-            name: asset.name,
-            category: asset.category,
-            rfidTag: asset.rfidTag,
+            id: a.id,
+            sku: a.assetNumber,
+            name: a.name,
+            category: a.category,
+            rfidTag: a.rfidTag,
             expectedQty: 1,
-            actualQty: isAvailableOrInUse ? 1 : 0,
-            unit: 'pcs',
-            zone: asset.zone && asset.zone !== '—' ? asset.zone : 'Finished Goods Area',
-            binLocation: asset.currentLocation && asset.currentLocation !== '—' ? asset.currentLocation : 'Bin A-1',
-            status: isAvailableOrInUse ? 'In Stock' : 'Discrepancy',
-            lastAuditTime: new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }),
-            checkedBy: 'Fixed Reader'
+            actualQty: actualQty,
+            unit: 'unit',
+            zone: a.site || 'Pune DC',
+            binLocation: a.currentLocation || 'Staging Zone A',
+            status: status as 'In Stock' | 'Low Stock' | 'Discrepancy' | 'Missing',
+            lastAuditTime: new Date().toLocaleString(),
+            checkedBy: 'Fixed Reader / Handheld'
           };
-        }));
+        });
+        this.inventoryItems.set(inventory);
 
         this.fetchTags();
         const allAssets = mapped;
@@ -3066,7 +3134,11 @@ export class App implements AfterViewInit, OnDestroy {
         const list = res || [];
         if (Array.isArray(list)) {
           this.scanEventsList.set(list.map((e: any, index: number) => {
-            const asset = this.assets().find(a => a.rfidTag === e.epcCode || a.assetNumber === e.epcCode);
+            const epcClean = (e.epcCode || '').trim().toLowerCase();
+            const asset = this.assets().find(a => 
+              (a.rfidTag || '').trim().toLowerCase() === epcClean || 
+              (a.assetNumber || '').trim().toLowerCase() === epcClean
+            );
             return {
               index: index + 1,
               epc: e.epcCode,
@@ -3076,8 +3148,9 @@ export class App implements AfterViewInit, OnDestroy {
               antenna: 'A' + e.antennaIndex,
               rssi: e.rssi + ' dBm',
               direction: 'IN',
-              status: e.status || 'Matched',
-              source: e.handheldDeviceName || e.readerName || 'Fixed Reader'
+              status: e.status === 'Processed' ? 'Matched' : (e.status || 'Matched'),
+              source: e.readerName || e.handheldDeviceName || 'Fixed Reader',
+              location: asset && asset.currentLocation ? `${asset.currentLocation} (${asset.site || '—'})` : '—'
             };
           }));
 
@@ -3089,6 +3162,35 @@ export class App implements AfterViewInit, OnDestroy {
           const handheldCount = list.filter((e: any) => e.handheldDeviceName).length;
           this.activeGateReaderReads.set(gateCount);
           this.activeHandheldReaderReads.set(handheldCount);
+
+          // Update each asset's lastReader and lastSeen details based on scan events
+          const updatedAssets = this.assets().map(a => {
+            const epcClean = (a.rfidTag || '').trim().toLowerCase();
+            const matchingScans = list.filter((e: any) => (e.epcCode || '').trim().toLowerCase() === epcClean);
+            
+            let lastReader = '—';
+            let lastSeen = a.lastSeen || '—';
+            
+            if (matchingScans.length > 0) {
+              const latestScan = matchingScans.sort((x: any, y: any) => new Date(y.timestamp).getTime() - new Date(x.timestamp).getTime())[0];
+              if (latestScan) {
+                if (latestScan.handheldDeviceName) {
+                  lastReader = `${latestScan.handheldDeviceName} (Handheld)`;
+                } else if (latestScan.readerName) {
+                  lastReader = `${latestScan.readerName} (Fixed)`;
+                } else {
+                  lastReader = 'Fixed Reader';
+                }
+                lastSeen = new Date(latestScan.timestamp).toLocaleString();
+              }
+            }
+            return {
+              ...a,
+              lastReader: lastReader,
+              lastSeen: lastSeen
+            };
+          });
+          this.assets.set(updatedAssets);
         }
       },
       error: (err) => console.error('Failed to load scan events from PostgreSQL', err)
@@ -3393,6 +3495,10 @@ export class App implements AfterViewInit, OnDestroy {
       next: (data) => { if (Array.isArray(data)) this.apiZones.set(data); },
       error: (err) => console.error('Failed to load zones', err)
     });
+    this.http.get<any[]>('http://localhost:5025/api/locations?page=1&size=200').subscribe({
+      next: (data) => { if (Array.isArray(data)) this.apiLocations.set(data); },
+      error: (err) => console.error('Failed to load locations', err)
+    });
   }
 
   protected fetchTagsThenAssets() {
@@ -3415,6 +3521,8 @@ export class App implements AfterViewInit, OnDestroy {
           // Now fetch assets — pools are ready for tag resolution
           this.fetchAssets();
           this.fetchLiveGpsLocations();
+          this.fetchHandheldSessions();
+          this.fetchRfidEvents();
 
           // Also populate tagsList for Tag Management view
           const list: any[] = [];
@@ -3692,6 +3800,12 @@ export class App implements AfterViewInit, OnDestroy {
       } else {
         this.stopScanSession();
       }
+      if (sub === 'Handheld Sessions') {
+        this.fetchHandheldSessions();
+      }
+      if (sub === 'RFID Events') {
+        this.fetchRfidEvents();
+      }
     } else {
       this.stopScanSession();
     }
@@ -3888,6 +4002,16 @@ export class App implements AfterViewInit, OnDestroy {
   private buildCharts() {
     const stats = this.currentStats();
     const isDark = this.currentTheme() === 'dark';
+    
+    // Destroy existing charts to avoid "Canvas is already in use" errors
+    Object.keys(this.charts).forEach(key => {
+      if (this.charts[key]) {
+        try {
+          this.charts[key].destroy();
+        } catch (e) {}
+      }
+    });
+    this.charts = {};
     
     const textColor = isDark ? '#94a3b8' : '#64748b';
     const gridColor = isDark ? '#1e293b' : '#f1f5f9';

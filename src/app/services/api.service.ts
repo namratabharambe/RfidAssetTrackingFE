@@ -184,6 +184,12 @@ export class ApiService {
     return this.http.post<any>(`${this.baseUrl}/device/end-session/${sessionId}`, {});
   }
 
+  // Scan Sessions
+  getScanSessions(page = 1, size = 200, search?: string): Observable<any> {
+    const params = this.getPagedParams(page, size, search);
+    return this.http.get<any>(`${this.baseUrl}/scansessions`, { params, observe: 'response' });
+  }
+
   // GPS
   getGPSTracking(): Observable<any> {
     return this.http.get<any>(`${this.baseUrl}/Gps/vehicle-android-location/16512010049`);
