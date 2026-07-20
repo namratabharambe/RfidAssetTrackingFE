@@ -175,6 +175,11 @@ export class ApiService {
     return this.http.get<any>(`${this.baseUrl}/scanevents`);
   }
 
+  // Inventory Scans (Android Scan Inventory)
+  getInventoryScans(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/rfid/inventory-scans`);
+  }
+
   // Handheld Sessions
   getHandheldSessions(): Observable<any> {
     return this.http.get<any>(`${this.baseUrl}/device/sessions`);

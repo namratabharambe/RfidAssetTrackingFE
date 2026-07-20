@@ -182,7 +182,7 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected readonly gpsMapMode = signal<'blueprint' | 'satellite'>('satellite');
   protected readonly gpsMapLayer = signal<'satellite' | 'hybrid' | 'street'>('satellite');
-  protected readonly gpsAutoTrack = signal<boolean>(true);
+  protected readonly gpsAutoTrack = signal<boolean>(false);
   private satelliteMap: any = null;
   private satelliteMarkers: Map<string, any> = new Map();
   private satelliteTrailPolyline: any = null;
@@ -386,6 +386,10 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly activeGateReaderReads = signal<number>(0);
   protected readonly activeHandheldReaderReads = signal<number>(0);
   protected readonly activeForkliftReaderReads = signal<number>(0);
+  protected readonly isAssignDropdownOpen = signal<boolean>(false);
+  protected readonly isAssignTagModalOpen = signal<boolean>(false);
+  protected readonly selectedEpcForAssignment = signal<string>('');
+  protected readonly formAssignAssetId = signal<string>('');
   private scanSessionInterval: any;
   private scanTimerInterval: any;
   private gpsTimerInterval: any;
@@ -1001,16 +1005,24 @@ export class App implements AfterViewInit, OnDestroy {
       next: (res) => {
         const body = res.body || res || [];
         if (Array.isArray(body)) {
-          const handheldSessions = body.filter((s: any) => s.handheldDeviceId != null);
+          const handheldSessions = body.filter((s: any) => s.handheldDeviceId != null || (s.sessionName && (s.sessionName.includes('Inventory') || s.sessionName.includes('Handheld'))));
           this.handheldSessionsList.set(handheldSessions.map((s: any) => {
             const date = new Date(s.startTime);
             const duration = s.endTime 
-              ? `${Math.round((new Date(s.endTime).getTime() - date.getTime()) / 60000)} mins`
+              ? `${Math.max(1, Math.round((new Date(s.endTime).getTime() - date.getTime()) / 60000))} mins`
               : 'Active';
+            
+            let opName = 'Operator';
+            if (s.sessionName && s.sessionName.includes(' – ')) {
+              opName = s.sessionName.split(' – ')[0].trim();
+            } else if (s.handheldDeviceName) {
+              opName = s.handheldDeviceName.replace('Handheld ', '');
+            }
+
             return {
               id: s.id,
-              operator: s.handheldDeviceName ? s.handheldDeviceName.replace('Handheld ', '') : 'Operator',
-              model: s.handheldDeviceName || 'C72 Reader',
+              operator: opName,
+              model: s.handheldDeviceName || 'C72 Handheld Reader',
               type: s.sessionName && s.sessionName.includes('Inventory') ? 'Inventory' : 'Scanning',
               startTime: date.toLocaleString(),
               duration: duration,
@@ -1630,7 +1642,21 @@ export class App implements AfterViewInit, OnDestroy {
     const siteFilter = this.activeAssetSite();
     const statusFilter = this.activeAssetStatus();
     const globalSite = this.selectedSite();
-    let list = this.assets();
+    let list = this.assets().map(asset => {
+      if (asset.gpsId && asset.gpsId !== '—') {
+        const matchingGps = this.gpsAssets().find(g => g.id === asset.gpsId);
+        if (matchingGps) {
+          return {
+            ...asset,
+            currentLocation: `Lat ${matchingGps.latitude.toFixed(4)}, Lon ${matchingGps.longitude.toFixed(4)}`,
+            lastSeen: matchingGps.lastGpsPing || asset.lastSeen,
+            zone: matchingGps.currentZone || asset.zone,
+            lastReader: `GPS Tracker (${matchingGps.speed} km/h)`
+          };
+        }
+      }
+      return asset;
+    });
     
     if (globalSite !== 'All Sites') {
       list = list.filter(asset => asset.site === globalSite);
@@ -2522,9 +2548,18 @@ export class App implements AfterViewInit, OnDestroy {
             ownerDepartment: item.ownerDepartment || '—',
             industry: item.industry || '—',
             businessUnit: item.businessUnit || '—',
-            site: item.siteId ? (item.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91' ? 'Pune DC' :
-                                 item.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c92' ? 'Mumbai Warehouse' :
-                                 item.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93' ? 'Chennai Plant' : 'Bengaluru Hub') : '—',
+            site: (() => {
+              if (item.siteId) {
+                const matchedSite = this.apiSites().find(s => s.id && s.id.toLowerCase() === item.siteId.toLowerCase());
+                if (matchedSite) return matchedSite.name;
+                
+                // Fallback for hardcoded IDs
+                return item.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91' ? 'Pune DC' :
+                       item.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c92' ? 'Mumbai Warehouse' :
+                       item.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93' ? 'Chennai Plant' : 'Bengaluru Hub';
+              }
+              return '—';
+            })(),
             zone: item.zoneId ? 'Zone A' : '—',
             assetType: item.assetType || 'Serialized',
             lastSeen: '—',
@@ -2546,28 +2581,7 @@ export class App implements AfterViewInit, OnDestroy {
 
         this.assets.set(mapped);
         this.fetchScanEvents();
-        
-        const inventory = mapped.map(a => {
-          const actualQty = a.status === 'Retired' ? 0 : 1;
-          const status = a.status === 'Retired' ? 'Missing' : 'In Stock';
-          return {
-            id: a.id,
-            sku: a.assetNumber,
-            name: a.name,
-            category: a.category,
-            rfidTag: a.rfidTag,
-            expectedQty: 1,
-            actualQty: actualQty,
-            unit: 'unit',
-            zone: a.site || 'Pune DC',
-            binLocation: a.currentLocation || 'Staging Zone A',
-            status: status as 'In Stock' | 'Low Stock' | 'Discrepancy' | 'Missing',
-            lastAuditTime: new Date().toLocaleString(),
-            checkedBy: 'Fixed Reader / Handheld'
-          };
-        });
-        this.inventoryItems.set(inventory);
-
+        this.fetchInventoryScans();
         this.fetchTags();
         const allAssets = mapped;
         const statusCategory = [
@@ -2668,6 +2682,22 @@ export class App implements AfterViewInit, OnDestroy {
     });
   }
 
+  protected fetchInventoryScans() {
+    this.apiService.getInventoryScans().subscribe({
+      next: (items: any[]) => {
+        if (Array.isArray(items)) {
+          this.inventoryItems.set(items);
+        } else {
+          this.inventoryItems.set([]);
+        }
+      },
+      error: (err) => {
+        console.error('Failed to fetch inventory scans:', err);
+        this.inventoryItems.set([]);
+      }
+    });
+  }
+
   protected openAddAssetModal() {
     this.modalMode.set('add');
     this.modalAssetId.set('');
@@ -2696,7 +2726,12 @@ export class App implements AfterViewInit, OnDestroy {
     this.formDepartment.set('');
     this.formIndustry.set('');
     this.formBusinessUnit.set('');
-    this.formSiteId.set('');
+    
+    // Pre-populate with currently selected global site
+    const currentSiteName = this.selectedSite();
+    const currentSite = this.apiSites().find(s => s.name === currentSiteName);
+    this.formSiteId.set(currentSite ? currentSite.id : '');
+
     this.formZoneId.set('');
     this.formWarehouseId.set('');
     this.formAssetType.set('Serialized');
@@ -3077,9 +3112,22 @@ export class App implements AfterViewInit, OnDestroy {
     });
   }
 
+  private sessionTimerSeconds = 0;
+
   protected startScanSession() {
     this.isScanSessionRunning.set(true);
     this.startScanPolling();
+    if (!this.scanTimerInterval) {
+      this.scanTimerInterval = setInterval(() => {
+        if (this.isScanSessionRunning()) {
+          this.sessionTimerSeconds++;
+          const hrs = String(Math.floor(this.sessionTimerSeconds / 3600)).padStart(2, '0');
+          const mins = String(Math.floor((this.sessionTimerSeconds % 3600) / 60)).padStart(2, '0');
+          const secs = String(this.sessionTimerSeconds % 60).padStart(2, '0');
+          this.scanSessionTime.set(`${hrs}:${mins}:${secs}`);
+        }
+      }, 1000);
+    }
   }
 
   protected pauseScanSession() {
@@ -3089,8 +3137,142 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected stopScanSession() {
     this.isScanSessionRunning.set(false);
+    this.sessionTimerSeconds = 0;
     this.scanSessionTime.set('00:00:00');
+    if (this.scanTimerInterval) {
+      clearInterval(this.scanTimerInterval);
+      this.scanTimerInterval = null;
+    }
     this.stopScanPolling();
+  }
+
+  protected downloadScanEventsCSV() {
+    const events = this.scanEventsList();
+    if (!events || events.length === 0) {
+      alert('No scan events available to export.');
+      return;
+    }
+
+    const headers = ['Index', 'EPC Code', 'Asset ID', 'Asset Name', 'Read Time (IST)', 'Location', 'Antenna', 'RSSI', 'Direction', 'Status', 'Source'];
+    const rows = events.map((e: any) => [
+      e.index || '',
+      `"${e.epc || ''}"`,
+      `"${e.assetId || ''}"`,
+      `"${e.assetName || ''}"`,
+      `"${e.time || ''}"`,
+      `"${e.location || ''}"`,
+      `"${e.antenna || ''}"`,
+      `"${e.rssi || ''}"`,
+      `"${e.direction || ''}"`,
+      `"${e.status || ''}"`,
+      `"${e.source || ''}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `rfid_scan_events_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  protected toggleAssignDropdown(event?: Event) {
+    if (event) event.stopPropagation();
+    this.isAssignDropdownOpen.set(!this.isAssignDropdownOpen());
+  }
+
+  protected openAssignTagModal(epc?: string) {
+    this.isAssignDropdownOpen.set(false);
+    if (epc) {
+      this.selectedEpcForAssignment.set(epc);
+    } else {
+      const unknownEvent = this.scanEventsList().find(e => e.assetId === 'UNKNOWN TAG');
+      if (unknownEvent) {
+        this.selectedEpcForAssignment.set(unknownEvent.epc);
+      } else if (this.scanEventsList().length > 0) {
+        this.selectedEpcForAssignment.set(this.scanEventsList()[0].epc);
+      } else {
+        this.selectedEpcForAssignment.set('');
+      }
+    }
+    this.isAssignTagModalOpen.set(true);
+  }
+
+  protected closeAssignTagModal() {
+    this.isAssignTagModalOpen.set(false);
+  }
+
+  protected submitAssignTagToAsset() {
+    const epc = this.selectedEpcForAssignment().trim();
+    const assetId = this.formAssignAssetId().trim();
+
+    if (!epc) {
+      alert('Please specify an EPC Code.');
+      return;
+    }
+    if (!assetId) {
+      alert('Please select an Asset to assign to this RFID Tag.');
+      return;
+    }
+
+    const tagDto = {
+      epcCode: epc,
+      assetId: assetId
+    };
+
+    this.apiService.createRFIDTag(tagDto).subscribe({
+      next: () => {
+        alert(`RFID Tag ${epc} successfully assigned to Asset!`);
+        this.isAssignTagModalOpen.set(false);
+        this.fetchScanEvents();
+        this.fetchAssets();
+      },
+      error: (err: any) => {
+        console.error('Failed to assign tag:', err);
+        this.apiService.getAssets().subscribe({
+          next: (assets: any[]) => {
+            const targetAsset = assets.find(a => a.id === assetId);
+            if (targetAsset) {
+              targetAsset.rfidTag = epc;
+              this.apiService.updateAsset(assetId, targetAsset).subscribe({
+                next: () => {
+                  alert(`RFID Tag ${epc} assigned to Asset ${targetAsset.name} (${targetAsset.assetNumber})!`);
+                  this.isAssignTagModalOpen.set(false);
+                  this.fetchScanEvents();
+                  this.fetchAssets();
+                },
+                error: (e2) => alert('Failed to update asset tag assignment: ' + (e2.message || 'Error'))
+              });
+            }
+          }
+        });
+      }
+    });
+  }
+
+  protected quickAssignLocation() {
+    this.isAssignDropdownOpen.set(false);
+    const locName = prompt('Enter Location Name to assign to current scan session:', 'Aisle-777');
+    if (locName) {
+      alert(`Location set to "${locName}" for active scan session.`);
+    }
+  }
+
+  protected quickAssignCustodian() {
+    this.isAssignDropdownOpen.set(false);
+    const operator = prompt('Enter Operator / Custodian Name:', 'John Doe (C72 Operator)');
+    if (operator) {
+      alert(`Custodian set to "${operator}" for active scan session.`);
+    }
+  }
+
+  protected clearLiveScanStream() {
+    this.isAssignDropdownOpen.set(false);
+    if (confirm('Are you sure you want to clear the live event stream table?')) {
+      this.scanEventsList.set([]);
+    }
   }
 
   private startScanPolling() {
@@ -3197,6 +3379,68 @@ export class App implements AfterViewInit, OnDestroy {
     });
   }
 
+  protected async fetchRealEvents() {
+    if (!this.isLoggedIn()) return;
+
+    try {
+      const scans = await firstValueFrom(this.apiService.getScanEvents());
+      const alertsRes = await firstValueFrom(this.apiService.getAlerts());
+      const readersRes = await firstValueFrom(this.apiService.getReaders());
+
+      const alerts = alertsRes.body || alertsRes;
+      const readers = readersRes.body || readersRes;
+
+      const rawEvents: { timestamp: Date, item: EventItem }[] = [];
+
+      // Create a map of ReaderId -> SiteName
+      const readerSiteMap = new Map<string, string>();
+      if (Array.isArray(readers)) {
+        readers.forEach((r: any) => {
+          if (r.id) {
+            readerSiteMap.set(r.id.toLowerCase(), r.siteName || 'Pune DC');
+          }
+        });
+      }
+
+      if (Array.isArray(scans)) {
+        scans.forEach((e: any) => {
+          const asset = this.assets().find(a => a.rfidTag === e.epcCode || a.assetNumber === e.epcCode);
+          const dt = new Date(e.timestamp);
+          const timeStr = dt.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + dt.toLocaleTimeString('en-US', { hour12: true });
+          
+          let siteName = 'Pune DC';
+          if (e.readerId && readerSiteMap.has(e.readerId.toLowerCase())) {
+            siteName = readerSiteMap.get(e.readerId.toLowerCase())!;
+          }
+
+          rawEvents.push({
+            timestamp: dt,
+            item: {
+              id: e.id || e.epcCode,
+              time: timeStr,
+              type: 'RFID Read',
+              assetId: asset ? (asset.assetNumber || asset.id) : e.epcCode,
+              assetName: asset ? asset.name : 'Unknown Asset',
+              category: asset ? asset.category : 'Returnable Container',
+              location: siteName + ' - ' + (e.readerName || e.handheldDeviceName || 'Gate Reader'),
+              details: `Antenna: A${e.antennaIndex}, RSSI: ${e.rssi} dBm, Status: ${e.status}`,
+              source: e.handheldDeviceName ? 'Handheld Reader' : 'Fixed Reader',
+              operator: e.handheldDeviceName || 'System'
+            }
+          });
+        });
+      }
+
+      // Sort by timestamp descending
+      rawEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+      // Limit to 15 items
+      this.allEvents.set(rawEvents.slice(0, 15).map(x => x.item));
+    } catch (err) {
+      console.error('Failed to load real events from database', err);
+    }
+  }
+
   private startScanSessionSimulation() {
     if (isPlatformBrowser(this.platformId)) {
       // 1. Session Timer Interval
@@ -3220,72 +3464,12 @@ export class App implements AfterViewInit, OnDestroy {
         this.scanSessionTime.set(`${pad(hrs)}:${pad(mins)}:${pad(secs)}`);
       }, 1000);
 
-      // 2. Scan Events Simulation Interval
-      const assetIds = ['RM-STEEL-COIL-1026', 'RM-STEEL-COIL-1027', 'RM-CHEM-DRUM-8891', 'PALLET-PL-334456', 'TOOL-BOX-TB-0913', 'RM-AL-PLATE-5567', 'FG-PUMP-SET-5568'];
-      const sources = ['Gate Reader', 'Forklift Reader', 'Handheld Reader'];
-      const directions = ['IN', 'OUT'];
-      const antennas = ['A1', 'A2', 'A3', 'A4'];
-
+      // 2. Real Scan Events Fetching Interval
       this.scanSessionInterval = setInterval(() => {
         if (!this.isScanSessionRunning()) return;
-
-        // Generate dynamic scan
-        const source = sources[Math.floor(Math.random() * sources.length)];
-        const direction = directions[Math.random() > 0.3 ? 0 : 1];
-        const antenna = antennas[Math.floor(Math.random() * antennas.length)];
-        const rssi = -55 - Math.floor(Math.random() * 20);
-
-        let status = 'Matched';
-        let assetId = assetIds[Math.floor(Math.random() * assetIds.length)];
-        let epc = 'E28011702000021A3F4B2' + Math.floor(100 + Math.random() * 899).toString(16).toUpperCase();
-
-        const rand = Math.random();
-        if (rand > 0.85) {
-          status = 'Duplicate';
-          this.scanExceptionDuplicate.update(c => c + 1);
-        } else if (rand > 0.75) {
-          status = 'Unmatched';
-          assetId = 'UNKNOWN TAG';
-          epc = 'E2809999' + Math.floor(10000000 + Math.random() * 89999999).toString(16).toUpperCase();
-          this.scanExceptionUnknown.update(c => c + 1);
-        } else if (rand > 0.7) {
-          status = 'Matched';
-          // Simulate dynamic alert tags or movements
-          if (Math.random() > 0.5) {
-            this.scanExceptionUnauthorized.update(c => c + 1);
-          }
-        }
-
-        // Add scan to list
-        const currentList = [...this.scanEventsList()];
-        const nextIndex = currentList.length + 1;
-        const now = new Date();
-        const dateStr = `${this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', now.toLocaleTimeString('en-US', { hour12: true }))} IST`;
-
-        const newEvent = {
-          index: nextIndex,
-          epc,
-          assetId,
-          time: dateStr,
-          antenna,
-          rssi,
-          direction,
-          status,
-          source
-        };
-
-        this.scanEventsList.set([newEvent, ...currentList]);
-
-        // Increment stats
-        this.scanTotalReadCount.update(c => c + 1);
-        if (source === 'Gate Reader') {
-          this.activeGateReaderReads.update(c => c + 1);
-        } else if (source === 'Handheld Reader') {
-          this.activeHandheldReaderReads.update(c => c + 1);
-        } else if (source === 'Forklift Reader') {
-          this.activeForkliftReaderReads.update(c => c + 1);
-        }
-      }, 3500); // add one scan event every 3.5 seconds
+        this.fetchScanEvents();
+        this.fetchRealEvents();
+      }, 2000); // add one scan event every 3.5 seconds
     }
   }
 
@@ -3378,7 +3562,11 @@ export class App implements AfterViewInit, OnDestroy {
                 assetsInUse: s.inUse,
                 inUsePct: inUsePct,
                 underMaintenance: s.maintenance,
-                maintenancePct: maintPct
+                maintenancePct: maintPct,
+                rfidReadsToday: s.rfidReadsToday || 0,
+                gpsPingsToday: s.gpsPingsToday || 0,
+                exceptionAlerts: s.exceptionAlerts || 0,
+                complianceTasks: s.complianceTasks || 0
               };
             }
           });
@@ -3388,11 +3576,19 @@ export class App implements AfterViewInit, OnDestroy {
           let aggInUse = 0;
           let aggAvailable = 0;
           let aggMaintenance = 0;
+          let aggRfidReads = 0;
+          let aggGpsPings = 0;
+          let aggExceptionAlerts = 0;
+          let aggComplianceTasks = 0;
           res.siteStats.forEach((s: any) => {
             aggTotal += s.total;
             aggInUse += s.inUse;
             aggAvailable += s.available;
             aggMaintenance += s.maintenance;
+            aggRfidReads += s.rfidReadsToday || 0;
+            aggGpsPings += s.gpsPingsToday || 0;
+            aggExceptionAlerts += s.exceptionAlerts || 0;
+            aggComplianceTasks += s.complianceTasks || 0;
           });
 
           const aggActive = aggInUse + aggAvailable + aggMaintenance;
@@ -3408,7 +3604,11 @@ export class App implements AfterViewInit, OnDestroy {
             assetsInUse: aggInUse,
             inUsePct: aggInUsePct,
             underMaintenance: aggMaintenance,
-            maintenancePct: aggMaintPct
+            maintenancePct: aggMaintPct,
+            rfidReadsToday: aggRfidReads,
+            gpsPingsToday: aggGpsPings,
+            exceptionAlerts: aggExceptionAlerts,
+            complianceTasks: aggComplianceTasks
           };
 
           const selected = this.selectedSite();
@@ -3450,6 +3650,7 @@ export class App implements AfterViewInit, OnDestroy {
     this.fetchAlerts();
     this.fetchSitesZonesWarehouses();
     this.fetchScanEvents();
+    this.fetchRealEvents();
     // Categories must load first, which then triggers fetchAssets
     this.fetchCategories(() => {
       // After categories are loaded, load tags then assets (so tag pools are ready for asset mapping)
@@ -3578,15 +3779,29 @@ export class App implements AfterViewInit, OnDestroy {
               a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93' ? 'Chennai Plant' : 'Bengaluru Hub'
             ) : 'Pune DC';
 
+            const rawEntity = a.custodianName || a.assignedToUsername || 'Individual Custodian';
+            let formattedType = a.purpose || 'Individual Checkout';
+            if (formattedType === 'General Use' || formattedType === 'RFIDScan' || formattedType === 'HandheldInventory') {
+              if (rawEntity.toLowerCase().includes('truck') || rawEntity.toLowerCase().includes('vehicle')) {
+                formattedType = 'Truck Checkout';
+              } else if (rawEntity.toLowerCase().includes('driver')) {
+                formattedType = 'Driver Checkout';
+              } else {
+                formattedType = 'Individual Checkout';
+              }
+            }
+
+            const epcVal = a.asset && a.asset.rfidTag ? a.asset.rfidTag : (a.assetNumber || 'AST-TRC-001245');
+
             const item = {
-              entity: a.custodianName || a.assignedToUsername || 'System',
-              equipment: a.assetName || (a.asset ? a.asset.name : 'Unknown Equipment'),
-              type: 'HandHeld Reader',
-              epc: a.asset ? a.asset.rfidTag : (a.assetNumber || 'Unknown EPC'),
-              detected: '-',
-              time: new Date(a.assignedDate).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-              gateStatus: isReturned ? 'Passed' : '-',
-              checkinTime: a.actualReturnDate ? new Date(a.actualReturnDate).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '-',
+              entity: rawEntity,
+              equipment: a.assetName || (a.asset ? a.asset.name : 'Scanned Asset'),
+              type: formattedType,
+              epc: epcVal,
+              detected: a.notes && a.notes.includes('Gate') ? 'Fixed Gate Reader' : 'Handheld Reader',
+              time: new Date(a.assignedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }),
+              gateStatus: isReturned ? 'Passed' : 'Pending',
+              checkinTime: a.actualReturnDate ? new Date(a.actualReturnDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '-',
               site: siteName,
               raw: a
             };
@@ -3612,8 +3827,8 @@ export class App implements AfterViewInit, OnDestroy {
     if (isPlatformBrowser(this.platformId)) {
       this.buildCharts();
       
-      // Start periodic mock event injector to make it feel alive!
-      // this.startEventSimulation();
+      // Start periodic real event polling from database!
+      this.startRealEventPolling();
 
       // Start RFID scan session simulation!
       // this.startScanSessionSimulation();
@@ -3622,6 +3837,9 @@ export class App implements AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     this.destroyCharts();
+    if (this.realEventInterval) {
+      clearInterval(this.realEventInterval);
+    }
     if (this.simulationInterval) {
       clearInterval(this.simulationInterval);
     }
@@ -3856,6 +4074,15 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected markNotificationsRead() {
     this.notifications.update(list => list.map(n => ({ ...n, read: true })));
+  }
+
+  // Real Event Polling
+  private realEventInterval: any;
+  private startRealEventPolling() {
+    this.fetchRealEvents();
+    this.realEventInterval = setInterval(() => {
+      this.fetchRealEvents();
+    }, 5000);
   }
 
   // Simulation of live events
@@ -4927,10 +5154,12 @@ export class App implements AfterViewInit, OnDestroy {
         }
 
         if (list.length >= 0) {
-          this.gpsAssets.set(list.map((v: any) => {
-            const linkedAsset = this.assets().find(a => a.gpsId === v.deviceNum);
-            let assetType: 'Vehicle' | 'Forklift' | 'Pallet/Bin' | 'Container' | 'Tool/Equipment' | 'Mobile Equipment' = 'Vehicle';
-            if (linkedAsset) {
+          const filteredMapped = list
+            .map((v: any) => {
+              const linkedAsset = this.assets().find(a => a.gpsId === v.deviceNum);
+              if (!linkedAsset) return null;
+
+              let assetType: 'Vehicle' | 'Forklift' | 'Pallet/Bin' | 'Container' | 'Tool/Equipment' | 'Mobile Equipment' = 'Vehicle';
               const cat = (linkedAsset.category || '').toLowerCase();
               if (cat.includes('forklift')) {
                 assetType = 'Forklift';
@@ -4943,54 +5172,56 @@ export class App implements AfterViewInit, OnDestroy {
               } else if (cat.includes('mobile')) {
                 assetType = 'Mobile Equipment';
               }
-            }
 
-            const x = Math.min(100, Math.max(0, Math.round(((v.lon - 73.8540) / (73.8600 - 73.8540)) * 100)));
-            const y = Math.min(100, Math.max(0, Math.round(((18.6230 - v.lat) / (18.6230 - 18.6180)) * 100)));
+              const x = Math.min(100, Math.max(0, Math.round(((v.lon - 73.8540) / (73.8600 - 73.8540)) * 100)));
+              const y = Math.min(100, Math.max(0, Math.round(((18.6230 - v.lat) / (18.6230 - 18.6180)) * 100)));
 
-            const currentZone = v.speed > 0 ? 'Transit Route' : 'Main Yard';
-            
-            let lastRfidRead = '—';
-            if (linkedAsset && linkedAsset.rfidTag) {
-              const matchingEvents = this.scanEventsList().filter(evt => evt.epc === linkedAsset.rfidTag);
-              if (matchingEvents.length > 0) {
-                lastRfidRead = matchingEvents[0].time;
-              }
-            }
-
-            const exception = v.battery < 25 ? 'Low Battery' : '';
-
-            return {
-              id: v.deviceNum,
-              name: linkedAsset ? linkedAsset.name : (v.regName || ('Vehicle ' + v.deviceNum)),
-              tag: linkedAsset ? 'Asset: ' + (linkedAsset.assetNumber || linkedAsset.id) : 'GPS Tracker',
-              type: assetType,
-              status: v.status || 'Active',
-              battery: Math.round(v.battery),
-              speed: v.speed,
-              latitude: v.lat,
-              longitude: v.lon,
-              currentZone: currentZone,
-              lastGpsPing: new Date(v.gpsTime).toLocaleTimeString(),
-              lastRfidRead: lastRfidRead,
-              exception: exception,
-              site: linkedAsset ? (linkedAsset.site || 'Pune DC') : 'Pune DC',
-              operator: linkedAsset ? (linkedAsset.currentCustodian || linkedAsset.custodian || 'Unassigned') : 'Operator ' + v.deviceNum.substring(v.deviceNum.length - 4),
-              make: linkedAsset ? linkedAsset.manufacturer : '',
-              model: linkedAsset ? linkedAsset.model : '',
-              x,
-              y,
-              trail: [],
-              timeline: [
-                {
-                  time: new Date(v.gpsTime).toLocaleTimeString(),
-                  zone: currentZone,
-                  details: `Live telemetry from vehicle: Speed ${v.speed}km/h, Direction ${v.direction}°`,
-                  type: v.speed > 0 ? 'moving' as const : 'idle' as const
+              const currentZone = v.speed > 0 ? 'Transit Route' : 'Main Yard';
+              
+              let lastRfidRead = '—';
+              if (linkedAsset.rfidTag) {
+                const matchingEvents = this.scanEventsList().filter(evt => evt.epc === linkedAsset.rfidTag);
+                if (matchingEvents.length > 0) {
+                  lastRfidRead = matchingEvents[0].time;
                 }
-              ]
-            };
-          }));
+              }
+
+              const exception = v.battery < 25 ? 'Low Battery' : '';
+
+              return {
+                id: v.deviceNum,
+                name: linkedAsset.name,
+                tag: 'Asset: ' + (linkedAsset.assetNumber || linkedAsset.id),
+                type: assetType,
+                status: v.status || 'Active',
+                battery: Math.round(v.battery),
+                speed: v.speed,
+                latitude: v.lat,
+                longitude: v.lon,
+                currentZone: currentZone,
+                lastGpsPing: new Date(v.gpsTime).toLocaleTimeString(),
+                lastRfidRead: lastRfidRead,
+                exception: exception,
+                site: linkedAsset.site || 'Pune DC',
+                operator: linkedAsset.currentCustodian || linkedAsset.custodian || 'Unassigned',
+                make: linkedAsset.manufacturer || '',
+                model: linkedAsset.model || '',
+                x,
+                y,
+                trail: [],
+                timeline: [
+                  {
+                    time: new Date(v.gpsTime).toLocaleTimeString(),
+                    zone: currentZone,
+                    details: `Live telemetry from vehicle: Speed ${v.speed}km/h, Direction ${v.direction}°`,
+                    type: v.speed > 0 ? 'moving' as const : 'idle' as const
+                  }
+                ]
+              };
+            })
+            .filter((item): item is NonNullable<typeof item> => item !== null);
+
+          this.gpsAssets.set(filteredMapped);
 
           if (this.gpsAssets().length > 0 && !this.gpsSelectedAsset()) {
             this.selectGpsAsset(this.gpsAssets()[0]);
@@ -5338,9 +5569,15 @@ export class App implements AfterViewInit, OnDestroy {
 
     // Auto-track: pan & zoom to selected asset if auto-track is on
     if (selected && selected.latitude && selected.longitude && this.gpsAutoTrack()) {
+      const currentCenter = this.satelliteMap.getCenter();
       const currentZoom = this.satelliteMap.getZoom();
       const targetZoom = Math.max(currentZoom, 17);
-      this.satelliteMap.setView([selected.latitude, selected.longitude], targetZoom, { animate: true, duration: 0.5 });
+      const latDiff = Math.abs(currentCenter.lat - selected.latitude);
+      const lonDiff = Math.abs(currentCenter.lng - selected.longitude);
+
+      if (latDiff > 0.00005 || lonDiff > 0.00005 || currentZoom !== targetZoom) {
+        this.satelliteMap.setView([selected.latitude, selected.longitude], targetZoom, { animate: true, duration: 0.5 });
+      }
     }
 
     // Draw trail polyline
@@ -5396,6 +5633,11 @@ export class App implements AfterViewInit, OnDestroy {
     this.gpsDetailTab.set('overview');
     this.fetchGpsAssetHistory(asset.id);
     this.fetchSelectedLiveGpsLocation(asset.id);
+    if (this.satelliteMap && asset.latitude && asset.longitude) {
+      const currentZoom = this.satelliteMap.getZoom();
+      const targetZoom = Math.max(currentZoom, 18);
+      this.satelliteMap.setView([asset.latitude, asset.longitude], targetZoom, { animate: true, duration: 0.8 });
+    }
     if (this.gpsMapMode() === 'satellite') {
       setTimeout(() => this.updateSatelliteMarkers(), 100);
     }

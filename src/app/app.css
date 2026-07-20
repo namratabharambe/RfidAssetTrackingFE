@@ -349,12 +349,14 @@
 .top-header {
   background-color: var(--bg-card);
   border-bottom: 1px solid var(--border-color);
-  padding: 0.65rem 1rem;
+  padding: 0.75rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 68px;
+  min-height: 68px;
+  height: auto;
   flex-shrink: 0;
+  gap: 1rem;
   transition: background-color var(--transition-normal), border-color var(--transition-normal);
 }
 
@@ -362,6 +364,9 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .mobile-menu-btn {
@@ -372,17 +377,27 @@
   cursor: pointer;
 }
 
+.title-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
 .title-section h1 {
   font-family: var(--font-family-display);
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: var(--text-primary);
-  line-height: 1.2;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .title-section .subtitle {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-secondary);
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .header-right {
