@@ -87,11 +87,12 @@
 
     <!-- Top Header -->
     <header class="top-header" (click)="$event.stopPropagation()">
-      <div class="header-left">
-        <button class="mobile-menu-btn" (click)="isMobileSidebarOpen.set(true)" id="mobile-menu-toggle-btn">
-          <span class="material-symbols-outlined">menu</span>
-        </button>
-        <div class="title-section-wrapper" style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+      <!-- Main Header Row (Title & Global Actions) -->
+      <div class="top-header-row-main">
+        <div class="header-left">
+          <button class="mobile-menu-btn" (click)="isMobileSidebarOpen.set(true)" id="mobile-menu-toggle-btn">
+            <span class="material-symbols-outlined">menu</span>
+          </button>
           <div class="title-section">
             <h1 id="dashboard-main-heading">
               @if (activeNav() === 'Dashboard') {
@@ -122,111 +123,133 @@
               }
             </p>
           </div>
+        </div>
 
-          <!-- Site Dropdown Selector & Operations Segments -->
-          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-            <!-- Site Dropdown Selector -->
-            <div class="dropdown-wrapper">
-              <button class="dropdown-btn site-dropdown-btn-custom" (click)="toggleSiteDropdown()"
-                id="site-selector-dropdown-btn"
-                style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 14px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; box-shadow: var(--shadow-sm); font-size: 0.82rem; height: 36px; cursor: pointer; white-space: nowrap; flex-shrink: 0;">
-                @if (selectedSite() !== 'All Sites') {
-                  <span class="flag-icon" style="font-size: 1.1rem; line-height: 1;">🇮🇳</span>
-                } @else {
-                  <span class="material-symbols-outlined" style="font-size: 1.15rem; color: var(--text-secondary);">public</span>
+        <div class="header-right">
+          @if (activeNav() === 'Dashboard' || activeNav() === 'RFID Operations') {
+          <!-- Search input center/right -->
+          <div class="header-search-bar" style="position: relative; width: 220px; display: flex; align-items: center;">
+            <span class="material-symbols-outlined search-icon"
+              style="position: absolute; left: 10px; font-size: 1.15rem; color: var(--text-muted); pointer-events: none;">search</span>
+            <input type="text" placeholder="Search assets, tags, or locations..."
+              style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-card); border-radius: 20px; padding: 6px 12px 6px 30px; font-size: 0.78rem; outline: none; transition: all 0.2s; color: var(--text-primary);" />
+            <span class="search-shortcut"
+              style="position: absolute; right: 10px; font-size: 0.72rem; color: var(--text-muted); background: var(--bg-main); padding: 1px 5px; border-radius: 4px; font-family: monospace;">/</span>
+          </div>
+
+          <!-- Utility Buttons -->
+          <div class="utility-actions" style="display: flex; align-items: center; gap: 8px;">
+            <!-- Notification Bell -->
+            <div class="notification-wrapper">
+              <button class="icon-btn" (click)="toggleNotificationDropdown()" id="notification-bell-btn"
+                style="border: none; background: transparent; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; position: relative; color: var(--text-secondary); cursor: pointer;">
+                <span class="material-symbols-outlined" style="font-size: 1.35rem;">notifications</span>
+                @if (notifications().filter(n => !n.read).length > 0) {
+                <span class="notif-badge"
+                  style="position: absolute; top: -2px; right: -2px; background: var(--color-danger); color: white; font-size: 0.6rem; font-weight: 800; min-width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">{{
+                  notifications().filter(n => !n.read).length }}</span>
                 }
-                <span class="dropdown-label" style="white-space: nowrap;">{{ selectedSite() }}</span>
-                <span class="material-symbols-outlined arrow"
-                  style="font-size: 1.1rem; color: var(--text-muted);">expand_more</span>
               </button>
 
-              @if (isSiteDropdownOpen()) {
-              <ul class="dropdown-menu" id="site-selector-menu"
-                style="border-radius: 12px; box-shadow: var(--shadow-lg);">
-                <li (click)="selectSite('All Sites')" [class.selected]="selectedSite() === 'All Sites'">
-                  <span class="material-symbols-outlined">public</span> All Sites
-                  @if (selectedSite() === 'All Sites') {
-                  <span class="material-symbols-outlined check">check</span>
+              @if (isNotificationOpen()) {
+              <div class="notification-dropdown" id="notification-dropdown-panel"
+                style="border-radius: 12px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); background: var(--bg-card); width: 320px; position: absolute; top: calc(100% + 8px); right: 0; z-index: 1000; overflow: hidden;">
+                <div class="notif-header"
+                  style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                  <h3 style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary); margin: 0;">Notifications
+                  </h3>
+                  <div class="notif-actions" style="display: flex; gap: 0.5rem;">
+                    <button (click)="markNotificationsRead()" id="mark-notif-read-btn"
+                      style="background: none; border: none; font-size: 0.7rem; color: var(--color-primary); font-weight: 600; cursor: pointer;">Mark
+                      all read</button>
+                    <button (click)="clearNotifications()" id="clear-notif-btn"
+                      style="background: none; border: none; font-size: 0.7rem; color: var(--color-primary); font-weight: 600; cursor: pointer;">Clear
+                      all</button>
+                  </div>
+                </div>
+                <ul class="notif-list"
+                  style="list-style: none; max-height: 280px; overflow-y: auto; padding: 0; margin: 0;">
+                  @for (n of notifications(); track n.text) {
+                  <li [class.unread]="!n.read"
+                    style="display: flex; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-light); transition: background-color 0.2s;"
+                    [style.background-color]="!n.read ? 'rgba(37, 99, 255, 0.03)' : 'transparent'">
+                    <span class="material-symbols-outlined notif-icon"
+                      [style.color]="n.type === 'danger' ? 'var(--color-danger)' : n.type === 'warning' ? 'var(--color-warning)' : 'var(--text-secondary)'"
+                      style="font-size: 1.25rem; flex-shrink: 0; margin-top: 2px;">
+                      {{ n.type === 'danger' ? 'error' : n.type === 'warning' ? 'warning' : 'info' }}
+                    </span>
+                    <div class="notif-content"
+                      style="display: flex; flex-direction: column; gap: 0.2rem; text-align: left;">
+                      <p class="notif-text"
+                        style="font-size: 0.78rem; color: var(--text-primary); margin: 0; line-height: 1.3;">{{ n.text }}
+                      </p>
+                      <span class="notif-time" style="font-size: 0.68rem; color: var(--text-muted);">{{ n.time }}</span>
+                    </div>
+                  </li>
+                  } @empty {
+                  <li class="empty-notif"
+                    style="padding: 2rem; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">No new
+                    notifications</li>
                   }
-                </li>
-                @for (site of apiSites(); track site.id) {
-                <li (click)="selectSite(site.name)" [class.selected]="selectedSite() === site.name">
-                  <span style="font-size: 1.1rem; margin-right: 6px; line-height: 1;">🇮🇳</span>
-                  {{ site.name }}
-                  @if (selectedSite() === site.name) {
-                  <span class="material-symbols-outlined check">check</span>
-                  }
-                </li>
-                }
-              </ul>
+                </ul>
+              </div>
               }
             </div>
 
-            @if (activeNav() !== 'Dashboard') {
-            <!-- Operations Segment Filters -->
-            <div class="operation-segments" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-              <!-- All Operations -->
-              <button (click)="selectOperation('All Operations')"
-                [style.background]="activeOperation() === 'All Operations' ? '#eff6ff' : 'var(--bg-card)'"
-                [style.color]="activeOperation() === 'All Operations' ? '#2563eb' : 'var(--text-secondary)'"
-                [style.border-color]="activeOperation() === 'All Operations' ? '#2563eb' : 'var(--border-color)'"
-                style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid; border-radius: 8px; height: 36px; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
-                <span class="material-symbols-outlined" style="font-size: 1.15rem;">corporate_fare</span>
-                <span>All Operations</span>
-              </button>
-
-              <!-- Warehouse -->
-              <button (click)="selectOperation('Warehouse')"
-                [style.background]="activeOperation() === 'Warehouse' ? '#eff6ff' : 'var(--bg-card)'"
-                [style.color]="activeOperation() === 'Warehouse' ? '#2563eb' : 'var(--text-secondary)'"
-                [style.border-color]="activeOperation() === 'Warehouse' ? '#2563eb' : 'var(--border-color)'"
-                style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid; border-radius: 8px; height: 36px; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
-                <span class="material-symbols-outlined" style="font-size: 1.15rem;">warehouse</span>
-                <span>Warehouse</span>
-              </button>
-
-              <!-- Manufacturing -->
-              <button (click)="selectOperation('Manufacturing')"
-                [style.background]="activeOperation() === 'Manufacturing' ? '#eff6ff' : 'var(--bg-card)'"
-                [style.color]="activeOperation() === 'Manufacturing' ? '#2563eb' : 'var(--text-secondary)'"
-                [style.border-color]="activeOperation() === 'Manufacturing' ? '#2563eb' : 'var(--border-color)'"
-                style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid; border-radius: 8px; height: 36px; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
-                <span class="material-symbols-outlined" style="font-size: 1.15rem;">factory</span>
-                <span>Manufacturing</span>
-              </button>
-
-              <!-- Distribution -->
-              <button (click)="selectOperation('Distribution')"
-                [style.background]="activeOperation() === 'Distribution' ? '#eff6ff' : 'var(--bg-card)'"
-                [style.color]="activeOperation() === 'Distribution' ? '#2563eb' : 'var(--text-secondary)'"
-                [style.border-color]="activeOperation() === 'Distribution' ? '#2563eb' : 'var(--border-color)'"
-                style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid; border-radius: 8px; height: 36px; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
-                <span class="material-symbols-outlined" style="font-size: 1.15rem;">local_shipping</span>
-                <span>Distribution</span>
-              </button>
-            </div>
-            }
+            <!-- Theme Toggle Sun/Moon -->
+            <button class="icon-btn" (click)="toggleTheme()" title="Toggle Theme" id="theme-toggle-btn"
+              style="border: none; background: transparent; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer;">
+              <span class="material-symbols-outlined" style="font-size: 1.35rem;">
+                {{ currentTheme() === 'light' ? 'light_mode' : 'dark_mode' }}
+              </span>
+            </button>
           </div>
-        </div>
-      </div>
 
-      <div class="header-right">
-        @if (activeNav() === 'Dashboard' || activeNav() === 'RFID Operations') {
-        <!-- Search input center/right -->
-        <div class="header-search-bar" style="position: relative; width: 220px; display: flex; align-items: center;">
-          <span class="material-symbols-outlined search-icon"
-            style="position: absolute; left: 10px; font-size: 1.15rem; color: var(--text-muted); pointer-events: none;">search</span>
-          <input type="text" placeholder="Search assets, tags, or locations..."
-            style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-card); border-radius: 20px; padding: 6px 12px 6px 30px; font-size: 0.78rem; outline: none; transition: all 0.2s; color: var(--text-primary);" />
-          <span class="search-shortcut"
-            style="position: absolute; right: 10px; font-size: 0.72rem; color: var(--text-muted); background: var(--bg-main); padding: 1px 5px; border-radius: 4px; font-family: monospace;">/</span>
-        </div>
+          <!-- User Profile Pill -->
+          <div class="profile-card"
+            style="display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--border-color); padding-left: 10px; margin-left: 4px;">
+            <div class="avatar"
+              style="width: 32px; height: 32px; border-radius: 50%; background-color: var(--color-primary-soft); color: var(--color-primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem; border: 1px solid var(--border-color);">
+              PA</div>
+            <div class="profile-info" style="display: flex; flex-direction: column; text-align: left; line-height: 1.2;">
+              <span class="username" style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">Prosper
+                Admin</span>
+              <span class="user-role" style="font-size: 0.65rem; color: var(--text-secondary);">Administrator</span>
+            </div>
+          </div>
 
-        <!-- Utility Buttons -->
-        <div class="utility-actions" style="display: flex; align-items: center; gap: 8px;">
+          <!-- Datepicker -->
+          <div style="position: relative; display: inline-block;">
+            <button class="date-selector" id="date-picker-btn" (click)="datePickerInput.showPicker()"
+              style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 6px 12px; font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; cursor: pointer;">
+              <span class="material-symbols-outlined"
+                style="font-size: 1rem; color: var(--text-secondary);">calendar_today</span>
+              <span>{{ formattedSelectedDate() }}</span>
+              <span class="material-symbols-outlined"
+                style="font-size: 0.95rem; color: var(--text-muted);">expand_more</span>
+            </button>
+            <input type="date" #datePickerInput [value]="selectedDate()" (change)="onDateChange(datePickerInput.value)"
+              style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; pointer-events: none;" />
+          </div>
+
+          <!-- Refresh Button -->
+          <button class="refresh-btn" (click)="triggerRefresh()" id="refresh-dashboard-btn"
+            style="background: var(--color-primary); border: none; border-radius: 20px; padding: 6px 14px; font-size: 0.78rem; font-weight: 600; color: #ffffff; display: flex; align-items: center; gap: 4px; cursor: pointer; box-shadow: 0 4px 10px rgba(37,99,255,0.15);">
+            <span class="material-symbols-outlined" style="font-size: 1rem;">refresh</span>
+            <span>Refresh</span>
+          </button>
+
+          <!-- Logout Button -->
+          <button class="logout-btn" (click)="onSignOut()" id="logout-btn"
+            style="background: #ef4444; border: none; border-radius: 20px; padding: 6px 14px; font-size: 0.78rem; font-weight: 600; color: #ffffff; display: flex; align-items: center; gap: 4px; cursor: pointer; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.15); transition: all 0.2s;"
+            onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
+            <span class="material-symbols-outlined" style="font-size: 1rem;">logout</span>
+            <span>Logout</span>
+          </button>
+          } @else {
           <!-- Notification Bell -->
           <div class="notification-wrapper">
-            <button class="icon-btn" (click)="toggleNotificationDropdown()" id="notification-bell-btn"
+            <button class="icon-btn" (click)="toggleNotificationDropdown()" id="asset-notif-bell-btn"
               style="border: none; background: transparent; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; position: relative; color: var(--text-secondary); cursor: pointer;">
               <span class="material-symbols-outlined" style="font-size: 1.35rem;">notifications</span>
               @if (notifications().filter(n => !n.read).length > 0) {
@@ -237,17 +260,17 @@
             </button>
 
             @if (isNotificationOpen()) {
-            <div class="notification-dropdown" id="notification-dropdown-panel"
+            <div class="notification-dropdown" id="notification-dropdown-panel-else"
               style="border-radius: 12px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); background: var(--bg-card); width: 320px; position: absolute; top: calc(100% + 8px); right: 0; z-index: 1000; overflow: hidden;">
               <div class="notif-header"
                 style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
                 <h3 style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary); margin: 0;">Notifications
                 </h3>
                 <div class="notif-actions" style="display: flex; gap: 0.5rem;">
-                  <button (click)="markNotificationsRead()" id="mark-notif-read-btn"
+                  <button (click)="markNotificationsRead()" id="mark-notif-read-btn-else"
                     style="background: none; border: none; font-size: 0.7rem; color: var(--color-primary); font-weight: 600; cursor: pointer;">Mark
                     all read</button>
-                  <button (click)="clearNotifications()" id="clear-notif-btn"
+                  <button (click)="clearNotifications()" id="clear-notif-btn-else"
                     style="background: none; border: none; font-size: 0.7rem; color: var(--color-primary); font-weight: 600; cursor: pointer;">Clear
                     all</button>
                 </div>
@@ -281,75 +304,102 @@
             }
           </div>
 
-          <!-- Theme Toggle Sun/Moon -->
-          <button class="icon-btn" (click)="toggleTheme()" title="Toggle Theme" id="theme-toggle-btn"
-            style="border: none; background: transparent; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer;">
-            <span class="material-symbols-outlined" style="font-size: 1.35rem;">
-              {{ currentTheme() === 'light' ? 'light_mode' : 'dark_mode' }}
-            </span>
-          </button>
-        </div>
-
-        <!-- User Profile Pill -->
-        <div class="profile-card"
-          style="display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--border-color); padding-left: 10px; margin-left: 4px;">
-          <div class="avatar"
-            style="width: 32px; height: 32px; border-radius: 50%; background-color: var(--color-primary-soft); color: var(--color-primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem; border: 1px solid var(--border-color);">
-            PA</div>
-          <div class="profile-info" style="display: flex; flex-direction: column; text-align: left; line-height: 1.2;">
-            <span class="username" style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">Prosper
-              Admin</span>
-            <span class="user-role" style="font-size: 0.65rem; color: var(--text-secondary);">Administrator</span>
+          <!-- User Profile -->
+          <div class="profile-card">
+            <div class="avatar" style="background-color: #d1fae5; color: #065f46;">PA</div>
+            <div class="profile-info">
+              <span class="username">Prosper Admin</span>
+              <span class="user-role">Administrator</span>
+            </div>
           </div>
+          }
         </div>
-
-        <!-- Datepicker -->
-        <div style="position: relative; display: inline-block;">
-          <button class="date-selector" id="date-picker-btn" (click)="datePickerInput.showPicker()"
-            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 6px 12px; font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; cursor: pointer;">
-            <span class="material-symbols-outlined"
-              style="font-size: 1rem; color: var(--text-secondary);">calendar_today</span>
-            <span>{{ formattedSelectedDate() }}</span>
-            <span class="material-symbols-outlined"
-              style="font-size: 0.95rem; color: var(--text-muted);">expand_more</span>
-          </button>
-          <input type="date" #datePickerInput [value]="selectedDate()" (change)="onDateChange(datePickerInput.value)"
-            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; pointer-events: none;" />
-        </div>
-
-        <!-- Refresh Button -->
-        <button class="refresh-btn" (click)="triggerRefresh()" id="refresh-dashboard-btn"
-          style="background: var(--color-primary); border: none; border-radius: 20px; padding: 6px 14px; font-size: 0.78rem; font-weight: 600; color: #ffffff; display: flex; align-items: center; gap: 4px; cursor: pointer; box-shadow: 0 4px 10px rgba(37,99,255,0.15);">
-          <span class="material-symbols-outlined" style="font-size: 1rem;">refresh</span>
-          <span>Refresh</span>
-        </button>
-
-        <!-- Logout Button -->
-        <button class="logout-btn" (click)="onSignOut()" id="logout-btn"
-          style="background: #ef4444; border: none; border-radius: 20px; padding: 6px 14px; font-size: 0.78rem; font-weight: 600; color: #ffffff; display: flex; align-items: center; gap: 4px; cursor: pointer; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.15); transition: all 0.2s;"
-          onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
-          <span class="material-symbols-outlined" style="font-size: 1rem;">logout</span>
-          <span>Logout</span>
-        </button>
-        } @else {
-        <!-- Notification Bell -->
-        <div class="notification-wrapper">
-          <button class="icon-btn" id="asset-notif-bell-btn">
-            <span class="material-symbols-outlined">notifications</span>
-            <span class="notif-badge">7</span>
-          </button>
-        </div>
-
-        <!-- User Profile -->
-        <div class="profile-card">
-          <div class="avatar" style="background-color: #d1fae5; color: #065f46;">PA</div>
-          <div class="profile-info">
-            <span class="username">Prosper Admin</span>
-            <span class="user-role">Administrator</span>
-          </div>
-        </div>
-        }
       </div>
+
+      <!-- Sub Header Toolbar Row (Site Selector & Segment Filters) -->
+      @if (activeNav() === 'Dashboard' || activeNav() === 'RFID Operations') {
+      <div class="top-header-row-sub">
+        <!-- Site Dropdown Selector -->
+        <div class="dropdown-wrapper">
+          <button class="dropdown-btn site-dropdown-btn-custom" (click)="toggleSiteDropdown()"
+            id="site-selector-dropdown-btn"
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 14px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; box-shadow: var(--shadow-sm); font-size: 0.82rem; height: 36px; cursor: pointer; white-space: nowrap; flex-shrink: 0;">
+            @if (selectedSite() !== 'All Sites') {
+              <span class="flag-icon" style="font-size: 1.1rem; line-height: 1;">🇮🇳</span>
+            } @else {
+              <span class="material-symbols-outlined" style="font-size: 1.15rem; color: var(--text-secondary);">public</span>
+            }
+            <span class="dropdown-label" style="white-space: nowrap;">{{ selectedSite() }}</span>
+            <span class="material-symbols-outlined arrow"
+              style="font-size: 1.1rem; color: var(--text-muted);">expand_more</span>
+          </button>
+
+          @if (isSiteDropdownOpen()) {
+          <ul class="dropdown-menu" id="site-selector-menu"
+            style="border-radius: 12px; box-shadow: var(--shadow-lg);">
+            <li (click)="selectSite('All Sites')" [class.selected]="selectedSite() === 'All Sites'">
+              <span class="material-symbols-outlined">public</span> All Sites
+              @if (selectedSite() === 'All Sites') {
+              <span class="material-symbols-outlined check">check</span>
+              }
+            </li>
+            @for (site of apiSites(); track site.id) {
+            <li (click)="selectSite(site.name)" [class.selected]="selectedSite() === site.name">
+              <span style="font-size: 1.1rem; margin-right: 6px; line-height: 1;">🇮🇳</span>
+              {{ site.name }}
+              @if (selectedSite() === site.name) {
+              <span class="material-symbols-outlined check">check</span>
+              }
+            </li>
+            }
+          </ul>
+          }
+        </div>
+
+        <!-- Operations Segment Filters -->
+        <div class="operation-segments" style="display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; overflow-x: auto;">
+          <!-- All Operations -->
+          <button (click)="selectOperation('All Operations')"
+            [style.background]="activeOperation() === 'All Operations' ? '#eff6ff' : 'var(--bg-card)'"
+            [style.color]="activeOperation() === 'All Operations' ? '#2563eb' : 'var(--text-secondary)'"
+            [style.border-color]="activeOperation() === 'All Operations' ? '#2563eb' : 'var(--border-color)'"
+            style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid; border-radius: 8px; height: 36px; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
+            <span class="material-symbols-outlined" style="font-size: 1.15rem;">corporate_fare</span>
+            <span>All Operations</span>
+          </button>
+
+          <!-- Warehouse -->
+          <button (click)="selectOperation('Warehouse')"
+            [style.background]="activeOperation() === 'Warehouse' ? '#eff6ff' : 'var(--bg-card)'"
+            [style.color]="activeOperation() === 'Warehouse' ? '#2563eb' : 'var(--text-secondary)'"
+            [style.border-color]="activeOperation() === 'Warehouse' ? '#2563eb' : 'var(--border-color)'"
+            style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid; border-radius: 8px; height: 36px; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
+            <span class="material-symbols-outlined" style="font-size: 1.15rem;">warehouse</span>
+            <span>Warehouse</span>
+          </button>
+
+          <!-- Manufacturing -->
+          <button (click)="selectOperation('Manufacturing')"
+            [style.background]="activeOperation() === 'Manufacturing' ? '#eff6ff' : 'var(--bg-card)'"
+            [style.color]="activeOperation() === 'Manufacturing' ? '#2563eb' : 'var(--text-secondary)'"
+            [style.border-color]="activeOperation() === 'Manufacturing' ? '#2563eb' : 'var(--border-color)'"
+            style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid; border-radius: 8px; height: 36px; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
+            <span class="material-symbols-outlined" style="font-size: 1.15rem;">factory</span>
+            <span>Manufacturing</span>
+          </button>
+
+          <!-- Distribution -->
+          <button (click)="selectOperation('Distribution')"
+            [style.background]="activeOperation() === 'Distribution' ? '#eff6ff' : 'var(--bg-card)'"
+            [style.color]="activeOperation() === 'Distribution' ? '#2563eb' : 'var(--text-secondary)'"
+            [style.border-color]="activeOperation() === 'Distribution' ? '#2563eb' : 'var(--border-color)'"
+            style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid; border-radius: 8px; height: 36px; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
+            <span class="material-symbols-outlined" style="font-size: 1.15rem;">local_shipping</span>
+            <span>Distribution</span>
+          </button>
+        </div>
+      </div>
+      }
     </header>
 
     <!-- Main Content Container -->
@@ -507,7 +557,7 @@
           </div>
           <div class="kpi-card-body-new">
             <span class="kpi-card-label-new">Checked-Out Items</span>
-            <h2 class="kpi-card-val-new">{{ currentStats().checkedOut | number }}</h2>
+            <h2 class="kpi-card-val-new">{{ checkedOutCount() | number }}</h2>
             <span class="kpi-card-trend-new underline text-orange">View details</span>
           </div>
           <div class="kpi-card-sparkline-new">
@@ -616,7 +666,7 @@
             </div>
             <div class="status-title-group">
               <span class="status-label">GPS Pings Today</span>
-              <h3 class="status-value">{{ currentStats().gpsPingsToday | number }}</h3>
+              <h3 class="status-value">{{ (currentStats().gpsPingsToday > 0 ? currentStats().gpsPingsToday : gpsDevicesPool().length) | number }}</h3>
             </div>
           </div>
           <div class="status-card-footer">
@@ -1062,7 +1112,8 @@
       <!-- Asset Master & Inventory Split View -->
       <div class="asset-master-layout">
         <div class="asset-main-col">
-          <!-- Asset KPIs (4 Cards) -->
+          <!-- Asset KPIs hidden per user request - only show the list -->
+          @if (false) {
           <div class="asset-kpi-row">
             <div class="asset-kpi-card blue-theme">
               <div class="kpi-top-row">
@@ -1219,6 +1270,7 @@
               <span class="material-symbols-outlined">chevron_right</span>
             </button>
           </div>
+          }
 
           <!-- Toolbar: Search Bar, Filters, Export, Refresh -->
           <div class="asset-toolbar">
@@ -2240,8 +2292,9 @@
             equipment status</p>
           <div class="filter-pills-row">
             @for (opt of checkoutFilterOptions(); track opt) {
-            <button class="pill-btn" [class.active]="checkoutFilter() === opt" (click)="checkoutFilter.set(opt)">{{ opt
-              }}</button>
+            <button class="pill-btn" [class.active]="checkoutFilter() === opt" (click)="checkoutFilter.set(opt)">
+              {{ opt }} <span style="font-size: 0.72rem; opacity: 0.85; margin-left: 4px;">({{ getCheckoutCountForFilter(opt) }})</span>
+            </button>
             }
           </div>
         </div>
@@ -2259,7 +2312,7 @@
               </h3>
               <span class="records-badge green"
                 style="background: rgba(13, 148, 136, 0.1); color: #0d9488; font-weight: 700; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem;">
-                {{ filteredCheckoutRecords().length }} records
+                {{ filteredCheckoutRecords().length }} Assets Checked Out
               </span>
             </div>
 
@@ -2276,7 +2329,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @for (rec of filteredCheckoutRecords(); track rec.epc) {
+                  @for (rec of filteredCheckoutRecords(); track rec.id || rec.epc + rec.time || $index) {
                   <tr (click)="toggleCheckOutStatus(rec)" style="cursor: pointer;" title="Click to Check In">
                     <td class="text-semibold" style="color: var(--text-primary); font-weight: 700;">{{ rec.entity }}
                     </td>
@@ -2290,7 +2343,17 @@
                     </td>
                     <td style="font-family: monospace; font-size: 0.78rem; color: var(--text-secondary);">{{ rec.epc }}
                     </td>
-                    <td>{{ rec.detected }}</td>
+                    <td>
+                      @if (rec.detected === 'COMPLETED' || rec.detected === 'Completed') {
+                      <span style="background: #dcfce7; color: #166534; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; display: inline-block; text-transform: uppercase; letter-spacing: 0.4px;">COMPLETED</span>
+                      } @else if (rec.detected === 'RETURNED' || rec.detected === 'Returned') {
+                      <span style="background: #dcfce7; color: #166534; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; display: inline-block; text-transform: uppercase; letter-spacing: 0.4px;">RETURNED</span>
+                      } @else if (rec.detected === 'MISSING' || rec.detected === 'Missing') {
+                      <span style="background: #fee2e2; color: #991b1b; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; display: inline-block; text-transform: uppercase; letter-spacing: 0.4px;">MISSING</span>
+                      } @else {
+                      <span style="color: var(--text-muted); font-size: 0.82rem;">—</span>
+                      }
+                    </td>
                     <td style="font-size: 0.78rem; color: var(--text-secondary);">{{ rec.time }}</td>
                   </tr>
                   } @empty {
@@ -2322,7 +2385,7 @@
               </h3>
               <span class="records-badge blue"
                 style="background: rgba(59, 130, 246, 0.1); color: #2563eb; font-weight: 700; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem;">
-                {{ filteredCheckinRecords().length }} records
+                {{ filteredCheckinRecords().length }} Assets Checked In
               </span>
             </div>
 
@@ -2338,7 +2401,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @for (rec of filteredCheckinRecords(); track rec.epc) {
+                  @for (rec of filteredCheckinRecords(); track rec.id || rec.epc + rec.checkinTime || $index) {
                   <tr (click)="toggleCheckInStatus(rec)" style="cursor: pointer;" title="Click to Check Out">
                     <td class="text-semibold" style="color: var(--text-primary); font-weight: 700;">{{ rec.entity }}
                     </td>
@@ -2351,9 +2414,15 @@
                       </span>
                     </td>
                     <td>
-                      <span class="status-pill success"
-                        style="padding: 2px 6px; font-size: 0.72rem; font-weight: 700; border-radius: 4px;">{{
-                        rec.gateStatus }}</span>
+                      @if (rec.gateStatus === 'COMPLETED' || rec.gateStatus === 'Completed') {
+                      <span style="background: #dcfce7; color: #166534; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; display: inline-block; text-transform: uppercase; letter-spacing: 0.4px;">COMPLETED</span>
+                      } @else if (rec.gateStatus === 'RETURNED' || rec.gateStatus === 'Returned' || rec.gateStatus === 'Matched' || rec.gateStatus === 'Passed') {
+                      <span style="background: #dcfce7; color: #166534; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; display: inline-block; text-transform: uppercase; letter-spacing: 0.4px;">RETURNED</span>
+                      } @else if (rec.gateStatus === 'MISSING' || rec.gateStatus === 'Missing') {
+                      <span style="background: #fee2e2; color: #991b1b; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; display: inline-block; text-transform: uppercase; letter-spacing: 0.4px;">MISSING</span>
+                      } @else {
+                      <span style="background: #dcfce7; color: #166534; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; display: inline-block; text-transform: uppercase; letter-spacing: 0.4px;">{{ rec.gateStatus | uppercase }}</span>
+                      }
                     </td>
                     <td style="font-size: 0.78rem; color: var(--text-secondary);">{{ rec.checkinTime }}</td>
                   </tr>
@@ -5855,11 +5924,11 @@
             style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: #dcfce7; border: 1px solid #86efac; border-radius: 6px; color: #15803d; cursor: pointer; font-size: 0.75rem; font-weight: 600; transition: background 0.2s;">
             <span class="material-symbols-outlined" style="font-size: 0.95rem;">table_view</span> Export Excel
           </button>
-          <button (click)="alert('Email Schedule configured for rohit.kumar@trackit.in')"
+          <button (click)="openScheduleEmailModal()"
             style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: #dbeafe; border: 1px solid #93c5fd; border-radius: 6px; color: #1d4ed8; cursor: pointer; font-size: 0.75rem; font-weight: 600; transition: background 0.2s;">
             <span class="material-symbols-outlined" style="font-size: 0.95rem;">mail</span> Schedule Email
           </button>
-          <button (click)="alert('Share link copied to clipboard!')"
+          <button (click)="openShareModal()"
             style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); cursor: pointer; font-size: 0.75rem; font-weight: 600; transition: background 0.2s;">
             <span class="material-symbols-outlined" style="font-size: 0.95rem;">share</span> Share
           </button>
@@ -5870,15 +5939,61 @@
           style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.65rem; align-items: end;">
 
           <!-- Date Range -->
-          <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; flex-direction: column; gap: 4px; position: relative;">
             <label style="font-size: 0.68rem; font-weight: 600; color: var(--text-secondary);">Date Range</label>
-            <div style="position: relative; display: flex; align-items: center;">
+            <div (click)="toggleReportsDatePicker()" id="reports-date-range-picker-btn"
+              style="position: relative; display: flex; align-items: center; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; cursor: pointer; user-select: none;">
               <span class="material-symbols-outlined"
-                style="position: absolute; left: 8px; font-size: 0.95rem; color: var(--text-muted);">calendar_month</span>
-              <input type="text" [ngModel]="reportsDateRange()" (ngModelChange)="reportsDateRange.set($event)"
-                style="width: 100%; padding: 6px 8px 6px 28px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 0.7rem; font-weight: 600; outline: none;"
-                [placeholder]="reportsDateRange()">
+                style="font-size: 0.95rem; color: var(--color-primary); margin-right: 6px;">calendar_month</span>
+              <span style="font-size: 0.72rem; font-weight: 700; color: var(--text-primary); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                {{ reportsDateRangeDisplay() }}
+              </span>
+              <span class="material-symbols-outlined"
+                style="font-size: 0.9rem; color: var(--text-muted); margin-left: 4px;">expand_more</span>
             </div>
+
+            <!-- Date Picker Dropdown Popover -->
+            @if (isReportsDatePickerOpen()) {
+            <div class="date-range-popover animate-fade-in"
+              style="position: absolute; top: calc(100% + 4px); left: 0; z-index: 1000; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: var(--shadow-lg); padding: 12px; width: 280px; display: flex; flex-direction: column; gap: 10px;">
+              
+              <!-- Quick Presets -->
+              <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                <button type="button" (click)="setReportsDatePreset('today')"
+                  style="flex: 1; min-width: 60px; padding: 4px 6px; font-size: 0.65rem; font-weight: 600; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); cursor: pointer;">Today</button>
+                <button type="button" (click)="setReportsDatePreset('week')"
+                  style="flex: 1; min-width: 60px; padding: 4px 6px; font-size: 0.65rem; font-weight: 600; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); cursor: pointer;">This Week</button>
+                <button type="button" (click)="setReportsDatePreset('month')"
+                  style="flex: 1; min-width: 60px; padding: 4px 6px; font-size: 0.65rem; font-weight: 600; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); cursor: pointer;">This Month</button>
+                <button type="button" (click)="setReportsDatePreset('last30')"
+                  style="flex: 1; min-width: 60px; padding: 4px 6px; font-size: 0.65rem; font-weight: 600; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); cursor: pointer;">Last 30 Days</button>
+              </div>
+
+              <div style="border-top: 1px solid var(--border-color); margin: 2px 0;"></div>
+
+              <!-- From & To Date Inputs -->
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                  <label style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary);">From Date</label>
+                  <input type="date" [value]="reportsStartDate()" (change)="reportsStartDate.set($any($event.target).value)"
+                    style="padding: 5px 8px; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-main); color: var(--text-primary); outline: none;" />
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                  <label style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary);">To Date</label>
+                  <input type="date" [value]="reportsEndDate()" (change)="reportsEndDate.set($any($event.target).value)"
+                    style="padding: 5px 8px; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-main); color: var(--text-primary); outline: none;" />
+                </div>
+              </div>
+
+              <!-- Footer Actions -->
+              <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
+                <button type="button" (click)="isReportsDatePickerOpen.set(false)"
+                  style="padding: 4px 10px; font-size: 0.68rem; font-weight: 600; border: 1px solid var(--border-color); background: transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer;">Close</button>
+                <button type="button" (click)="applyCustomDateRange()"
+                  style="padding: 4px 12px; font-size: 0.68rem; font-weight: 600; border: none; background: #0066ff; border-radius: 4px; color: #ffffff; cursor: pointer;">Apply</button>
+              </div>
+            </div>
+            }
           </div>
 
           <!-- Site -->
@@ -8163,6 +8278,125 @@
         </button>
       </div>
     </form>
+  </div>
+</div>
+}
+
+@if (isScheduleEmailModalOpen()) {
+<div class="modal-overlay" (click)="closeScheduleEmailModal()"
+  style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+  <div class="modal-container" (click)="$event.stopPropagation()"
+    style="background: #ffffff; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); width: 100%; max-width: 480px; overflow: hidden; padding: 24px;">
+    
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="color: #2563eb; font-size: 1.5rem;">mail</span>
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #0f172a;">Schedule Email Report</h3>
+      </div>
+      <button (click)="closeScheduleEmailModal()" style="background: none; border: none; cursor: pointer; color: #64748b;">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <form (submit)="$event.preventDefault(); submitScheduleEmail();">
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: #475569; margin-bottom: 6px;">Recipient Email Address</label>
+        <input type="email" [value]="scheduleEmailAddress()" (input)="scheduleEmailAddress.set($any($event.target).value)"
+          placeholder="e.g. manager@trackit.com" required
+          style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; background: #f8fafc;" />
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+        <div>
+          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: #475569; margin-bottom: 6px;">Frequency</label>
+          <select [value]="scheduleEmailFrequency()" (change)="scheduleEmailFrequency.set($any($event.target).value)"
+            style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; color: #0f172a;">
+            <option value="Daily">Daily</option>
+            <option value="Weekly">Weekly</option>
+            <option value="Monthly">Monthly</option>
+          </select>
+        </div>
+        <div>
+          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: #475569; margin-bottom: 6px;">Export Format</label>
+          <select [value]="scheduleEmailFormat()" (change)="scheduleEmailFormat.set($any($event.target).value)"
+            style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; color: #0f172a;">
+            <option value="PDF">PDF Document</option>
+            <option value="Excel">Excel Spreadsheet</option>
+            <option value="Both">Both PDF & Excel</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: #475569; margin-bottom: 6px;">Send Time (IST)</label>
+        <select [value]="scheduleEmailTime()" (change)="scheduleEmailTime.set($any($event.target).value)"
+          style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; color: #0f172a;">
+          <option value="08:00 AM">08:00 AM</option>
+          <option value="09:00 AM">09:00 AM (Default)</option>
+          <option value="12:00 PM">12:00 PM (Noon)</option>
+          <option value="06:00 PM">06:00 PM (Evening)</option>
+        </select>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+        <button type="button" (click)="closeScheduleEmailModal()"
+          style="padding: 8px 16px; border: 1px solid #cbd5e1; background: transparent; border-radius: 6px; font-weight: 600; font-size: 0.82rem; cursor: pointer;">
+          Cancel
+        </button>
+        <button type="submit"
+          style="padding: 8px 18px; border: none; background: #2563eb; color: white; border-radius: 6px; font-weight: 600; font-size: 0.82rem; cursor: pointer; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);">
+          Schedule Email
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}
+
+@if (isShareModalOpen()) {
+<div class="modal-overlay" (click)="closeShareModal()"
+  style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+  <div class="modal-container" (click)="$event.stopPropagation()"
+    style="background: #ffffff; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); width: 100%; max-width: 480px; overflow: hidden; padding: 24px;">
+    
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="color: #2563eb; font-size: 1.5rem;">share</span>
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #0f172a;">Share Dashboard Report</h3>
+      </div>
+      <button (click)="closeShareModal()" style="background: none; border: none; cursor: pointer; color: #64748b;">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+      <label style="display: block; font-size: 0.82rem; font-weight: 600; color: #475569; margin-bottom: 6px;">Shareable Link</label>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <input type="text" value="http://localhost:4200/reports?site=All&range=Jul2026" readonly
+          style="flex: 1; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.82rem; background: #f8fafc; color: #334155; font-family: monospace;" />
+        <button (click)="copyShareLink()"
+          style="padding: 10px 16px; border: none; background: #2563eb; color: white; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+          {{ shareLinkCopied() ? 'Copied!' : 'Copy Link' }}
+        </button>
+      </div>
+      @if (shareLinkCopied()) {
+      <div style="font-size: 0.75rem; color: #16a34a; font-weight: 600; margin-top: 6px; display: flex; align-items: center; gap: 4px;">
+        <span class="material-symbols-outlined" style="font-size: 0.9rem;">check_circle</span> Shareable link copied to clipboard!
+      </div>
+      }
+    </div>
+
+    <div style="margin-bottom: 24px; padding: 12px; background: #f1f5f9; border-radius: 8px;">
+      <div style="font-size: 0.8rem; font-weight: 700; color: #1e293b; margin-bottom: 4px;">Access Permission</div>
+      <div style="font-size: 0.75rem; color: #64748b;">Anyone with this link can view the current filtered Reports & Analytics dashboard snapshot.</div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+      <button type="button" (click)="closeShareModal()"
+        style="padding: 8px 18px; border: none; background: #2563eb; color: white; border-radius: 6px; font-weight: 600; font-size: 0.82rem; cursor: pointer;">
+        Done
+      </button>
+    </div>
   </div>
 </div>
 }

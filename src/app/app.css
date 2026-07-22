@@ -351,22 +351,39 @@
   border-bottom: 1px solid var(--border-color);
   padding: 0.75rem 1.25rem;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 68px;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-height: 64px;
   height: auto;
   flex-shrink: 0;
-  gap: 1rem;
   transition: background-color var(--transition-normal), border-color var(--transition-normal);
+}
+
+.top-header-row-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.top-header-row-sub {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--border-color);
+  flex-wrap: wrap;
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 1rem;
-  flex-wrap: wrap;
   min-width: 0;
-  flex: 1;
 }
 
 .mobile-menu-btn {

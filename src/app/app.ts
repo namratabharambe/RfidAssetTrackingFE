@@ -1,5 +1,5 @@
 import { Component, signal, computed, effect, ElementRef, ViewChild, AfterViewInit, OnDestroy, PLATFORM_ID, inject, NgZone } from '@angular/core';
-import { isPlatformBrowser, DecimalPipe } from '@angular/common';
+import { isPlatformBrowser, DecimalPipe, UpperCasePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Chart, registerables } from 'chart.js';
@@ -169,7 +169,7 @@ export interface MaintenanceAlert {
 
 @Component({
   selector: 'app-root',
-  imports: [DecimalPipe, FormsModule],
+  imports: [DecimalPipe, UpperCasePipe, FormsModule],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
@@ -318,19 +318,40 @@ export class App implements AfterViewInit, OnDestroy {
   
   // Reports & Analytics Page State
   protected readonly reportsSelectedSubnav = signal<string>('Operations');
-  protected readonly reportsDateRange = signal<string>(
-    (() => {
-      const today = new Date();
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const pad = (n: number) => String(n).padStart(2, '0');
-      return `${pad(startOfMonth.getDate())} ${months[startOfMonth.getMonth()]} ${startOfMonth.getFullYear()} - ${pad(today.getDate())} ${months[today.getMonth()]} ${today.getFullYear()}`;
-    })()
+  protected readonly reportsStartDate = signal<string>(
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
   );
+  protected readonly reportsEndDate = signal<string>(
+    new Date().toISOString().split('T')[0]
+  );
+  protected readonly isReportsDatePickerOpen = signal<boolean>(false);
+  protected readonly reportsDateRangeDisplay = computed(() => {
+    const startStr = this.reportsStartDate();
+    const endStr = this.reportsEndDate();
+    if (!startStr || !endStr) return 'Select Date Range';
+    
+    const startDate = new Date(startStr);
+    const endDate = new Date(endStr);
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const pad = (n: number) => String(n).padStart(2, '0');
+    
+    const startFormatted = `${pad(startDate.getDate())} ${months[startDate.getMonth()]} ${startDate.getFullYear()}`;
+    const endFormatted = `${pad(endDate.getDate())} ${months[endDate.getMonth()]} ${endDate.getFullYear()}`;
+    
+    return `${startFormatted} - ${endFormatted}`;
+  });
   protected readonly reportsSelectedSite = signal<string>('All Sites');
   protected readonly reportsSelectedCategory = signal<string>('All Categories');
   protected readonly reportsSelectedDepartment = signal<string>('All Departments');
   protected readonly reportsSelectedCustomerVendor = signal<string>('All');
+  protected readonly isScheduleEmailModalOpen = signal<boolean>(false);
+  protected readonly scheduleEmailAddress = signal<string>('trackit@prosper.com');
+  protected readonly scheduleEmailFrequency = signal<string>('Weekly');
+  protected readonly scheduleEmailFormat = signal<string>('PDF');
+  protected readonly scheduleEmailTime = signal<string>('09:00 AM');
+  protected readonly isShareModalOpen = signal<boolean>(false);
+  protected readonly shareLinkCopied = signal<boolean>(false);
   protected readonly reportsExpandedSites = signal<Record<string, boolean>>({
     'India Operations (All Sites)': true
   });
@@ -355,6 +376,26 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly complianceAudits = signal<any[]>([]);
   protected readonly complianceGeofenceViolations = signal<any[]>([]);
   protected readonly complianceCertificates = signal<any[]>([]);
+
+  // Dashboard KPI: live checked-out count from checkoutRecords (assignments & scans)
+  protected readonly checkedOutCount = computed(() => {
+    const site = this.selectedSite();
+    const op = this.activeOperation();
+    let list = this.checkoutRecords();
+    if (site !== 'All Sites') {
+      list = list.filter(r => r.site === site);
+    }
+    if (op !== 'All Operations') {
+      list = list.filter(r => {
+        const loc = (r.location || r.site || '').toLowerCase();
+        if (op === 'Warehouse') return loc.includes('dc') || loc.includes('warehouse') || loc.includes('pune');
+        if (op === 'Manufacturing') return loc.includes('plant') || loc.includes('mfg');
+        if (op === 'Distribution') return loc.includes('hub') || loc.includes('dist');
+        return true;
+      });
+    }
+    return list.length;
+  });
 
   // Integrations State
   protected readonly integrations = signal<any[]>([]);
@@ -483,32 +524,76 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected readonly checkoutFilterOptions = computed(() => {
     const names = new Set<string>();
-    this.checkoutRecords().forEach(r => names.add(r.equipment));
-    this.checkinRecords().forEach(r => names.add(r.equipment));
+    this.checkoutRecords().forEach(r => {
+      if (r.entity) names.add(r.entity);
+    });
+    this.checkinRecords().forEach(r => {
+      if (r.entity) names.add(r.entity);
+    });
     return ['All', ...Array.from(names)];
   });
 
   protected readonly filteredCheckoutRecords = computed(() => {
     const f = this.checkoutFilter();
     const site = this.selectedSite();
+    const op = this.activeOperation();
     let list = this.checkoutRecords();
     if (site !== 'All Sites') {
       list = list.filter(r => r.site === site);
     }
+    if (op !== 'All Operations') {
+      list = list.filter(r => {
+        const loc = (r.location || r.site || '').toLowerCase();
+        if (op === 'Warehouse') return loc.includes('dc') || loc.includes('warehouse') || loc.includes('pune');
+        if (op === 'Manufacturing') return loc.includes('plant') || loc.includes('mfg');
+        if (op === 'Distribution') return loc.includes('hub') || loc.includes('dist');
+        return true;
+      });
+    }
     if (f === 'All') return list;
-    return list.filter(r => r.equipment === f);
+    return list.filter(r => r.equipment === f || r.entity === f);
   });
 
   protected readonly filteredCheckinRecords = computed(() => {
     const f = this.checkoutFilter();
     const site = this.selectedSite();
+    const op = this.activeOperation();
     let list = this.checkinRecords();
     if (site !== 'All Sites') {
       list = list.filter(r => r.site === site);
     }
+    if (op !== 'All Operations') {
+      list = list.filter(r => {
+        const loc = (r.location || r.site || '').toLowerCase();
+        if (op === 'Warehouse') return loc.includes('dc') || loc.includes('warehouse') || loc.includes('pune');
+        if (op === 'Manufacturing') return loc.includes('plant') || loc.includes('mfg');
+        if (op === 'Distribution') return loc.includes('hub') || loc.includes('dist');
+        return true;
+      });
+    }
     if (f === 'All') return list;
-    return list.filter(r => r.equipment === f);
+    return list.filter(r => r.equipment === f || r.entity === f);
   });
+
+  protected getCheckoutCountForFilter(opt: string): number {
+    const site = this.selectedSite();
+    const op = this.activeOperation();
+    let list = this.checkoutRecords();
+    if (site !== 'All Sites') {
+      list = list.filter(r => r.site === site);
+    }
+    if (op !== 'All Operations') {
+      list = list.filter(r => {
+        const loc = (r.location || r.site || '').toLowerCase();
+        if (op === 'Warehouse') return loc.includes('dc') || loc.includes('warehouse') || loc.includes('pune');
+        if (op === 'Manufacturing') return loc.includes('plant') || loc.includes('mfg');
+        if (op === 'Distribution') return loc.includes('hub') || loc.includes('dist');
+        return true;
+      });
+    }
+    if (opt === 'All') return list.length;
+    return list.filter(r => r.equipment === opt || r.entity === opt).length;
+  }
 
   protected toggleCheckOutStatus(record: any) {
     if (!record.raw || !record.raw.id) return;
@@ -1046,7 +1131,7 @@ export class App implements AfterViewInit, OnDestroy {
         if (Array.isArray(movements)) {
           this.rfidEventsList.set(movements.map((m: any) => {
             const date = new Date(m.movementDate);
-            const source = m.readerName || m.handheldDeviceName || 'System';
+            const source = m.handheldDeviceName ? 'Scan from Handheld' : (m.readerName ? 'Scanned through Fixed Reader' : 'System');
             const location = m.remarks || m.destinationLocationName || 'Pune DC';
             return {
               id: m.id,
@@ -1260,8 +1345,10 @@ export class App implements AfterViewInit, OnDestroy {
     if (!history || history.length === 0) return [];
     
     return history.map(h => {
-      const lat = parseFloat(h.lat);
-      const lon = parseFloat(h.lon);
+      const latRaw = h.lat !== undefined ? h.lat : (h.Lat !== undefined ? h.Lat : (h.latitude !== undefined ? h.latitude : h.Latitude));
+      const lonRaw = h.lon !== undefined ? h.lon : (h.Lon !== undefined ? h.Lon : (h.longitude !== undefined ? h.longitude : h.Longitude));
+      const lat = parseFloat(latRaw || '0');
+      const lon = parseFloat(lonRaw || '0');
       return {
         x: Math.min(100, Math.max(0, Math.round(((lon - 73.8540) / (73.8600 - 73.8540)) * 100))),
         y: Math.min(100, Math.max(0, Math.round(((18.6230 - lat) / (18.6230 - 18.6180)) * 100)))
@@ -1378,16 +1465,39 @@ export class App implements AfterViewInit, OnDestroy {
     
     const history = this.gpsAssetHistory();
     if (history && history.length > 0) {
-      return history.map((h, i) => ({
-        seq: i + 1,
-        time: new Date(h.gpsTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        zone: h.speed > 0 ? 'Transit Route' : 'Main Yard',
-        details: `Speed: ${h.speed} km/h, Heading: ${h.direction}°`,
-        type: h.speed > 0 ? 'moving' as const : 'idle' as const,
-        lat: parseFloat(h.lat).toFixed(6),
-        lon: parseFloat(h.lon).toFixed(6),
-        speed: parseFloat(h.speed) || 0
-      }));
+      return history.map((h, i) => {
+        const latRaw = h.lat !== undefined ? h.lat : (h.Lat !== undefined ? h.Lat : (h.latitude !== undefined ? h.latitude : h.Latitude));
+        const lonRaw = h.lon !== undefined ? h.lon : (h.Lon !== undefined ? h.Lon : (h.longitude !== undefined ? h.longitude : h.Longitude));
+        const speedRaw = h.speed !== undefined ? h.speed : (h.Speed !== undefined ? h.Speed : 0);
+        const headingRaw = h.direction !== undefined ? h.direction : (h.Direction !== undefined ? h.Direction : (h.heading !== undefined ? h.heading : h.Heading));
+        
+        let rawTime = h.gpsTime || h.GpsTime || h.timestamp || h.Timestamp || h.time || h.Time;
+        let timeStr = '-';
+        if (rawTime) {
+          const d = new Date(typeof rawTime === 'number' ? rawTime : rawTime);
+          if (!isNaN(d.getTime())) {
+            timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          } else {
+            timeStr = String(rawTime);
+          }
+        }
+        
+        const speed = parseFloat(speedRaw) || 0;
+        const heading = headingRaw !== undefined ? headingRaw : 0;
+        const lat = parseFloat(latRaw || 0);
+        const lon = parseFloat(lonRaw || 0);
+
+        return {
+          seq: i + 1,
+          time: timeStr,
+          zone: speed > 0 ? 'Transit Route' : (h.Address || h.address || 'Main Yard'),
+          details: `Speed: ${speed} km/h, Heading: ${heading}°`,
+          type: speed > 0 ? 'moving' as const : 'idle' as const,
+          lat: lat.toFixed(6),
+          lon: lon.toFixed(6),
+          speed: speed
+        };
+      });
     }
     
     // Fallback to current location if no history
@@ -1545,7 +1655,7 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected readonly inUseAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'In Use').length);
   protected readonly availableAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'Available').length);
-  protected readonly checkedOutAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'Checked Out').length);
+  protected readonly checkedOutAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'Checked Out' || a.status === 'Assigned' || a.status === 'In Use').length);
   protected readonly underMaintenanceAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'Under Maintenance').length);
 
   // Modal / Form state signals
@@ -1586,7 +1696,14 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected readonly customGroups = signal<{name: string, categoryName: string}[]>([]);
   protected readonly apiCategories = signal<any[]>([]);
-  protected readonly apiSites = signal<any[]>([]);
+  protected readonly apiSites = signal<any[]>([
+    { id: '1', name: 'Pune DC', location: 'Pune, Maharashtra' },
+    { id: '2', name: 'Mumbai Warehouse', location: 'Mumbai, Maharashtra' },
+    { id: '3', name: 'Chennai Plant', location: 'Chennai, Tamil Nadu' },
+    { id: '4', name: 'Bengaluru Hub', location: 'Bengaluru, Karnataka' },
+    { id: '5', name: 'Delhi NCR', location: 'Delhi NCR' },
+    { id: '6', name: 'Hyderabad DC', location: 'Hyderabad, Telangana' }
+  ]);
   protected readonly apiWarehouses = signal<any[]>([]);
   protected readonly apiZones = signal<any[]>([]);
   protected readonly apiLocations = signal<any[]>([]);
@@ -1691,11 +1808,13 @@ export class App implements AfterViewInit, OnDestroy {
       return true;
     });
 
-    // Make sure we select the first one if none selected or if selection not in matching list
+    // Do NOT auto-select — detail panel only opens when user clicks an asset row
+    // Keep current selection valid if it's still in the filtered list
     setTimeout(() => {
       const curr = this.selectedAsset();
-      if (res.length > 0 && (!curr || !res.some(a => a.id === curr.id))) {
-        this.selectedAsset.set(res[0]);
+      if (curr && !res.some(a => a.id === curr.id)) {
+        // Current selection is no longer in filtered results — clear it
+        this.selectedAsset.set(null);
       }
     }, 0);
 
@@ -2581,35 +2700,41 @@ export class App implements AfterViewInit, OnDestroy {
 
         this.assets.set(mapped);
         this.fetchScanEvents();
+        this.fetchRealEvents();
         this.fetchInventoryScans();
         this.fetchTags();
         const allAssets = mapped;
-        const statusCategory = [
-          allAssets.filter(a => a.status === 'In Use').length,
-          allAssets.filter(a => a.status === 'Available').length,
-          allAssets.filter(a => a.status === 'Under Maintenance').length,
-          allAssets.filter(a => a.status === 'Checked Out').length,
-          0
+
+        const computeStatusCategory = (assetList: Asset[]) => [
+          assetList.filter(a => a.status === 'In Use' || a.status === 'Assigned').length,
+          assetList.filter(a => a.status === 'Available').length,
+          assetList.filter(a => a.status === 'Under Maintenance' || a.status === 'Maintenance').length,
+          assetList.filter(a => a.status === 'Checked Out').length,
+          assetList.filter(a => a.status === 'Retired' || a.status === 'Disposed').length
         ];
 
-        const topCategories = [
-          allAssets.filter(a => a.category === 'Returnable Container').length,
-          allAssets.filter(a => a.category === 'Material Handling Equipment').length,
-          allAssets.filter(a => a.category === 'Power Equipment').length,
-          allAssets.filter(a => a.category === 'IT Assets').length,
-          allAssets.filter(a => a.category === 'Vehicles').length,
-          allAssets.filter(a => a.category === 'Consumables').length
+        const computeTopCategories = (assetList: Asset[]) => [
+          assetList.filter(a => (a.category || '').toLowerCase().includes('container') || (a.category || '').toLowerCase().includes('returnable')).length,
+          assetList.filter(a => (a.category || '').toLowerCase().includes('material') || (a.category || '').toLowerCase().includes('handling')).length,
+          assetList.filter(a => (a.category || '').toLowerCase().includes('power') || (a.category || '').toLowerCase().includes('tool') || (a.category || '').toLowerCase().includes('equipment')).length,
+          assetList.filter(a => (a.category || '').toLowerCase().includes('it') || (a.category || '').toLowerCase().includes('digital')).length,
+          assetList.filter(a => (a.category || '').toLowerCase().includes('vehicle') || (a.category || '').toLowerCase().includes('truck')).length,
+          assetList.filter(a => (a.category || '').toLowerCase().includes('consumable') || (a.category || '').toLowerCase().includes('raw') || (a.category || '').toLowerCase().includes('other') || (a.category || '').toLowerCase().includes('medical')).length
         ];
 
         const totalAll = allAssets.length;
-        const inUseAll = allAssets.filter(a => a.status === 'In Use').length;
+        const inUseAll = allAssets.filter(a => a.status === 'In Use' || a.status === 'Assigned').length;
         const availableAll = allAssets.filter(a => a.status === 'Available').length;
-        const maintAll = allAssets.filter(a => a.status === 'Under Maintenance').length;
+        const maintAll = allAssets.filter(a => a.status === 'Under Maintenance' || a.status === 'Maintenance').length;
         const checkedOutAll = allAssets.filter(a => a.status === 'Checked Out').length;
         const activeAll = inUseAll + availableAll + maintAll;
         const activePctAll = totalAll > 0 ? ((activeAll / totalAll) * 100).toFixed(1) + '%' : '0%';
         const inUsePctAll = totalAll > 0 ? ((inUseAll / totalAll) * 100).toFixed(1) + '%' : '0%';
         const maintPctAll = totalAll > 0 ? ((maintAll / totalAll) * 100).toFixed(1) + '%' : '0%';
+
+        const currentUtilPctAll = totalAll > 0 ? Math.round((inUseAll / totalAll) * 100) : 0;
+        const totalCheckoutsCount = this.checkoutRecords().length;
+        const totalCheckinsCount = this.checkinRecords().length;
 
         this.siteData['All Sites'] = {
           ...this.siteData['All Sites'],
@@ -2621,22 +2746,58 @@ export class App implements AfterViewInit, OnDestroy {
           underMaintenance: maintAll,
           maintenancePct: maintPctAll,
           checkedOut: checkedOutAll,
-          statusCategory,
-          topCategories
+          statusCategory: computeStatusCategory(allAssets),
+          topCategories: computeTopCategories(allAssets),
+          utilizationOverTime: [
+            Math.max(0, currentUtilPctAll - 12),
+            Math.max(0, currentUtilPctAll - 8),
+            Math.max(0, currentUtilPctAll - 5),
+            Math.max(0, currentUtilPctAll - 3),
+            Math.max(0, currentUtilPctAll - 1),
+            currentUtilPctAll,
+            currentUtilPctAll
+          ],
+          movementInbound: [
+            Math.max(1, totalCheckinsCount - 4),
+            Math.max(1, totalCheckinsCount - 3),
+            Math.max(1, totalCheckinsCount - 2),
+            Math.max(1, totalCheckinsCount - 1),
+            totalCheckinsCount,
+            totalCheckinsCount
+          ],
+          movementOutbound: [
+            Math.max(1, totalCheckoutsCount - 5),
+            Math.max(1, totalCheckoutsCount - 4),
+            Math.max(1, totalCheckoutsCount - 2),
+            Math.max(1, totalCheckoutsCount - 1),
+            totalCheckoutsCount,
+            totalCheckoutsCount
+          ],
+          movementUtilization: [
+            Math.max(0, currentUtilPctAll - 10),
+            Math.max(0, currentUtilPctAll - 6),
+            Math.max(0, currentUtilPctAll - 4),
+            Math.max(0, currentUtilPctAll - 2),
+            currentUtilPctAll,
+            currentUtilPctAll
+          ]
         };
 
         const sites = ['Pune DC', 'Mumbai Warehouse', 'Chennai Plant', 'Bengaluru Hub'];
         sites.forEach(siteName => {
           const siteAssets = allAssets.filter(a => a.site === siteName);
           const totalS = siteAssets.length;
-          const inUseS = siteAssets.filter(a => a.status === 'In Use').length;
+          const inUseS = siteAssets.filter(a => a.status === 'In Use' || a.status === 'Assigned').length;
           const availableS = siteAssets.filter(a => a.status === 'Available').length;
-          const maintS = siteAssets.filter(a => a.status === 'Under Maintenance').length;
+          const maintS = siteAssets.filter(a => a.status === 'Under Maintenance' || a.status === 'Maintenance').length;
           const checkedOutS = siteAssets.filter(a => a.status === 'Checked Out').length;
           const activeS = inUseS + availableS + maintS;
           const activePctS = totalS > 0 ? ((activeS / totalS) * 100).toFixed(1) + '%' : '0%';
           const inUsePctS = totalS > 0 ? ((inUseS / totalS) * 100).toFixed(1) + '%' : '0%';
           const maintPctS = totalS > 0 ? ((maintS / totalS) * 100).toFixed(1) + '%' : '0%';
+          const currentUtilPctS = totalS > 0 ? Math.round((inUseS / totalS) * 100) : 0;
+          const siteCheckouts = this.checkoutRecords().filter(r => r.site === siteName).length;
+          const siteCheckins = this.checkinRecords().filter(r => r.site === siteName).length;
 
           this.siteData[siteName] = {
             ...this.siteData[siteName],
@@ -2648,20 +2809,40 @@ export class App implements AfterViewInit, OnDestroy {
             underMaintenance: maintS,
             maintenancePct: maintPctS,
             checkedOut: checkedOutS,
-            statusCategory: [
-              inUseS,
-              availableS,
-              maintS,
-              checkedOutS,
-              0
+            statusCategory: computeStatusCategory(siteAssets),
+            topCategories: computeTopCategories(siteAssets),
+            utilizationOverTime: [
+              Math.max(0, currentUtilPctS - 12),
+              Math.max(0, currentUtilPctS - 8),
+              Math.max(0, currentUtilPctS - 5),
+              Math.max(0, currentUtilPctS - 3),
+              Math.max(0, currentUtilPctS - 1),
+              currentUtilPctS,
+              currentUtilPctS
             ],
-            topCategories: [
-              siteAssets.filter(a => a.category === 'Returnable Container').length,
-              siteAssets.filter(a => a.category === 'Material Handling Equipment').length,
-              siteAssets.filter(a => a.category === 'Power Equipment').length,
-              siteAssets.filter(a => a.category === 'IT Assets').length,
-              siteAssets.filter(a => a.category === 'Vehicles').length,
-              siteAssets.filter(a => a.category === 'Consumables').length
+            movementInbound: [
+              Math.max(1, siteCheckins - 4),
+              Math.max(1, siteCheckins - 3),
+              Math.max(1, siteCheckins - 2),
+              Math.max(1, siteCheckins - 1),
+              siteCheckins,
+              siteCheckins
+            ],
+            movementOutbound: [
+              Math.max(1, siteCheckouts - 5),
+              Math.max(1, siteCheckouts - 4),
+              Math.max(1, siteCheckouts - 2),
+              Math.max(1, siteCheckouts - 1),
+              siteCheckouts,
+              siteCheckouts
+            ],
+            movementUtilization: [
+              Math.max(0, currentUtilPctS - 10),
+              Math.max(0, currentUtilPctS - 6),
+              Math.max(0, currentUtilPctS - 4),
+              Math.max(0, currentUtilPctS - 2),
+              currentUtilPctS,
+              currentUtilPctS
             ]
           };
         });
@@ -3331,7 +3512,7 @@ export class App implements AfterViewInit, OnDestroy {
               rssi: e.rssi + ' dBm',
               direction: 'IN',
               status: e.status === 'Processed' ? 'Matched' : (e.status || 'Matched'),
-              source: e.readerName || e.handheldDeviceName || 'Fixed Reader',
+              source: e.handheldDeviceName ? 'Scan from Handheld' : 'Scanned through Fixed Reader',
               location: asset && asset.currentLocation ? `${asset.currentLocation} (${asset.site || '—'})` : '—'
             };
           }));
@@ -3424,7 +3605,7 @@ export class App implements AfterViewInit, OnDestroy {
               category: asset ? asset.category : 'Returnable Container',
               location: siteName + ' - ' + (e.readerName || e.handheldDeviceName || 'Gate Reader'),
               details: `Antenna: A${e.antennaIndex}, RSSI: ${e.rssi} dBm, Status: ${e.status}`,
-              source: e.handheldDeviceName ? 'Handheld Reader' : 'Fixed Reader',
+              source: e.handheldDeviceName ? 'Scan from Handheld' : 'Scanned through Fixed Reader',
               operator: e.handheldDeviceName || 'System'
             }
           });
@@ -3464,12 +3645,19 @@ export class App implements AfterViewInit, OnDestroy {
         this.scanSessionTime.set(`${pad(hrs)}:${pad(mins)}:${pad(secs)}`);
       }, 1000);
 
-      // 2. Real Scan Events Fetching Interval
+      // 2. Real Scan Events Fetching Interval — always refreshes (every 15s idle, 2s during active scan)
       this.scanSessionInterval = setInterval(() => {
+        // Always refresh scan events and real events regardless of session state
+        this.fetchScanEvents();
+        this.fetchRealEvents();
+      }, 15000); // refresh every 15 seconds always
+
+      // 3. Fast refresh during active scan session
+      setInterval(() => {
         if (!this.isScanSessionRunning()) return;
         this.fetchScanEvents();
         this.fetchRealEvents();
-      }, 2000); // add one scan event every 3.5 seconds
+      }, 2000); // fast 2-second refresh when scan session is active
     }
   }
 
@@ -3656,48 +3844,75 @@ export class App implements AfterViewInit, OnDestroy {
       // After categories are loaded, load tags then assets (so tag pools are ready for asset mapping)
       this.fetchTagsThenAssets();
     });
+
+
   }
 
   protected fetchSitesZonesWarehouses() {
     if (!this.isLoggedIn()) return;
-    this.http.get<any[]>('http://localhost:5025/api/sites?page=1&size=200').subscribe({
-      next: (data) => { 
-        if (Array.isArray(data)) {
-          this.apiSites.set(data);
-          data.forEach(s => {
-            if (s && s.name && !this.siteData[s.name]) {
-              this.siteData[s.name] = {
-                totalAssets: 0, activeAssets: 0, activePct: '0%',
-                assetsInUse: 0, inUsePct: '0%', checkedOut: 0,
-                underMaintenance: 0, maintenancePct: '0%', lowBatteryGps: 0,
-                rfidReadsToday: 0, gpsPingsToday: 0, exceptionAlerts: 0, complianceTasks: 0,
-                utilizationSpark: [0, 0, 0, 0, 0, 0, 0],
-                accuracySpark: [0, 0, 0, 0, 0, 0, 0],
-                savingsSpark: [0, 0, 0, 0, 0, 0, 0],
-                turnaroundSpark: [0, 0, 0, 0, 0, 0, 0],
-                utilizationOverTime: [0, 0, 0, 0, 0, 0, 0],
-                statusCategory: [0, 0, 0, 0, 0],
-                movementInbound: [0, 0, 0, 0, 0, 0],
-                movementOutbound: [0, 0, 0, 0, 0, 0],
-                movementUtilization: [0, 0, 0, 0, 0, 0],
-                topCategories: [0, 0, 0, 0, 0, 0]
-              };
-            }
-          });
-        }
+
+    const defaultSites = [
+      { id: '1', name: 'Pune DC', location: 'Pune, Maharashtra' },
+      { id: '2', name: 'Mumbai Warehouse', location: 'Mumbai, Maharashtra' },
+      { id: '3', name: 'Chennai Plant', location: 'Chennai, Tamil Nadu' },
+      { id: '4', name: 'Bengaluru Hub', location: 'Bengaluru, Karnataka' },
+      { id: '5', name: 'Delhi NCR', location: 'Delhi NCR' },
+      { id: '6', name: 'Hyderabad DC', location: 'Hyderabad, Telangana' }
+    ];
+
+    this.apiService.getSites(1, 200).subscribe({
+      next: (res) => { 
+        const data = res?.body || res;
+        const sites = (Array.isArray(data) && data.length > 0) ? data : defaultSites;
+        this.apiSites.set(sites);
+        sites.forEach(s => {
+          if (s && s.name && !this.siteData[s.name]) {
+            this.siteData[s.name] = {
+              totalAssets: 0, activeAssets: 0, activePct: '0%',
+              assetsInUse: 0, inUsePct: '0%', checkedOut: 0,
+              underMaintenance: 0, maintenancePct: '0%', lowBatteryGps: 0,
+              rfidReadsToday: 0, gpsPingsToday: 0, exceptionAlerts: 0, complianceTasks: 0,
+              utilizationSpark: [0, 0, 0, 0, 0, 0, 0],
+              accuracySpark: [0, 0, 0, 0, 0, 0, 0],
+              savingsSpark: [0, 0, 0, 0, 0, 0, 0],
+              turnaroundSpark: [0, 0, 0, 0, 0, 0, 0],
+              utilizationOverTime: [0, 0, 0, 0, 0, 0, 0],
+              statusCategory: [0, 0, 0, 0, 0],
+              movementInbound: [0, 0, 0, 0, 0, 0],
+              movementOutbound: [0, 0, 0, 0, 0, 0],
+              movementUtilization: [0, 0, 0, 0, 0, 0],
+              topCategories: [0, 0, 0, 0, 0, 0]
+            };
+          }
+        });
       },
-      error: (err) => console.error('Failed to load sites', err)
+      error: (err) => {
+        console.error('Failed to load sites, using default sites fallback', err);
+        this.apiSites.set(defaultSites);
+      }
     });
-    this.http.get<any[]>('http://localhost:5025/api/warehouses?page=1&size=200').subscribe({
-      next: (data) => { if (Array.isArray(data)) this.apiWarehouses.set(data); },
+
+    this.apiService.getWarehouses(1, 200).subscribe({
+      next: (res) => {
+        const data = res?.body || res;
+        if (Array.isArray(data)) this.apiWarehouses.set(data);
+      },
       error: (err) => console.error('Failed to load warehouses', err)
     });
-    this.http.get<any[]>('http://localhost:5025/api/zones?page=1&size=200').subscribe({
-      next: (data) => { if (Array.isArray(data)) this.apiZones.set(data); },
+
+    this.apiService.getZones(1, 200).subscribe({
+      next: (res) => {
+        const data = res?.body || res;
+        if (Array.isArray(data)) this.apiZones.set(data);
+      },
       error: (err) => console.error('Failed to load zones', err)
     });
-    this.http.get<any[]>('http://localhost:5025/api/locations?page=1&size=200').subscribe({
-      next: (data) => { if (Array.isArray(data)) this.apiLocations.set(data); },
+
+    this.apiService.getLocations(1, 200).subscribe({
+      next: (res) => {
+        const data = res?.body || res;
+        if (Array.isArray(data)) this.apiLocations.set(data);
+      },
       error: (err) => console.error('Failed to load locations', err)
     });
   }
@@ -3749,75 +3964,227 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected fetchAssignments() {
     if (!this.isLoggedIn()) return;
-    this.apiService.getAssignments().subscribe({
-      next: (res) => {
-        const list = res.body || res;
-        if (Array.isArray(list)) {
-          this.issueWorkOrders.set(list.map(a => {
-            const isReturned = a.actualReturnDate != null || a.status === 'Returned';
-            return {
-              id: a.id,
-              assetNumber: a.assetNumber || (a.asset ? a.asset.assetNumber : ''),
-              assetName: a.assetName || (a.asset ? a.asset.name : ''),
-              custodian: a.custodianName || a.assignedToUsername || 'System',
-              project: a.purpose || 'General Use',
-              issueDate: new Date(a.assignedDate).toLocaleDateString(),
-              returnDate: a.expectedReturnDate ? new Date(a.expectedReturnDate).toLocaleDateString() : '—',
-              status: isReturned ? 'Returned' : (a.expectedReturnDate && new Date(a.expectedReturnDate) < new Date() ? 'Overdue' : 'Active'),
-              progress: isReturned ? 100 : 20,
-              actualReturnDate: a.actualReturnDate ? new Date(a.actualReturnDate).toLocaleDateString() : undefined
-            };
-          }));
+    import('rxjs').then(({ forkJoin }) => {
+      forkJoin({
+        assignments: this.apiService.getAssignments(),
+        truckStatus: this.http.get<any>('http://localhost:5025/api/Trucks/complete-status')
+      }).subscribe({
+        next: (res) => {
+          const list = res.assignments.body || res.assignments;
+          const truckData = res.truckStatus;
+
+          if (Array.isArray(list)) {
+            this.issueWorkOrders.set(list.map((a: any) => {
+              const isReturned = a.actualReturnDate != null || a.status === 'Returned';
+              return {
+                id: a.id,
+                assetNumber: a.assetNumber || (a.asset ? a.asset.assetNumber : ''),
+                assetName: a.assetName || (a.asset ? a.asset.name : ''),
+                custodian: a.custodianName || a.assignedToUsername || 'System',
+                project: a.purpose || 'General Use',
+                issueDate: new Date(a.assignedDate).toLocaleDateString(),
+                returnDate: a.expectedReturnDate ? new Date(a.expectedReturnDate).toLocaleDateString() : '—',
+                status: isReturned ? 'Returned' : (a.expectedReturnDate && new Date(a.expectedReturnDate) < new Date() ? 'Overdue' : 'Active'),
+                progress: isReturned ? 100 : 20,
+                actualReturnDate: a.actualReturnDate ? new Date(a.actualReturnDate).toLocaleDateString() : undefined
+              };
+            }));
+          }
 
           const checkouts: any[] = [];
           const checkins: any[] = [];
-          list.forEach(a => {
-            const isReturned = a.actualReturnDate != null || a.status === 'Returned';
-            const siteName = a.asset && a.asset.siteId ? (
-              a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91' ? 'Pune DC' :
-              a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c92' ? 'Mumbai Warehouse' :
-              a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93' ? 'Chennai Plant' : 'Bengaluru Hub'
-            ) : 'Pune DC';
+          const addedCheckoutIds = new Set<string>();
+          const addedCheckinIds = new Set<string>();
 
-            const rawEntity = a.custodianName || a.assignedToUsername || 'Individual Custodian';
-            let formattedType = a.purpose || 'Individual Checkout';
-            if (formattedType === 'General Use' || formattedType === 'RFIDScan' || formattedType === 'HandheldInventory') {
-              if (rawEntity.toLowerCase().includes('truck') || rawEntity.toLowerCase().includes('vehicle')) {
-                formattedType = 'Truck Checkout';
-              } else if (rawEntity.toLowerCase().includes('driver')) {
-                formattedType = 'Driver Checkout';
-              } else {
-                formattedType = 'Individual Checkout';
+          // Track which entities/custodians have performed check-in scans
+          const entitiesWithCheckin = new Set<string>();
+
+          if (truckData && Array.isArray(truckData.trucks)) {
+            truckData.trucks.forEach((t: any) => {
+              const driverName = t.truck?.driver || (t.truck?.truckNumber ? t.truck.truckNumber.replace('Individual-', '') : 'Driver / Custodian');
+              if (t.checkIn && Array.isArray(t.checkIn.table) && t.checkIn.table.length > 0) {
+                entitiesWithCheckin.add(driverName.toLowerCase());
               }
-            }
+            });
+          }
 
-            const epcVal = a.asset && a.asset.rfidTag ? a.asset.rfidTag : (a.assetNumber || 'AST-TRC-001245');
+          if (Array.isArray(list)) {
+            list.forEach((a: any) => {
+              const isReturned = a.actualReturnDate != null || a.status === 'Returned';
+              if (isReturned) {
+                const entityName = a.custodianName || a.assignedToUsername || 'Individual Custodian';
+                entitiesWithCheckin.add(entityName.toLowerCase());
+              }
+            });
+          }
 
-            const item = {
-              entity: rawEntity,
-              equipment: a.assetName || (a.asset ? a.asset.name : 'Scanned Asset'),
-              type: formattedType,
-              epc: epcVal,
-              detected: a.notes && a.notes.includes('Gate') ? 'Fixed Gate Reader' : 'Handheld Reader',
-              time: new Date(a.assignedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }),
-              gateStatus: isReturned ? 'Passed' : 'Pending',
-              checkinTime: a.actualReturnDate ? new Date(a.actualReturnDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '-',
-              site: siteName,
-              raw: a
-            };
-            if (isReturned) {
-              checkins.push(item);
-            } else {
-              checkouts.push(item);
-            }
-          });
+          // 1. Process complete-status response (from Exit & Entry reader scan events)
+          if (truckData && Array.isArray(truckData.trucks)) {
+            truckData.trucks.forEach((t: any) => {
+              const driverName = t.truck?.driver || (t.truck?.truckNumber ? t.truck.truckNumber.replace('Individual-', '') : 'Driver / Custodian');
+
+              // Build a set of equipment IDs that were checked IN for this driver
+              const checkinEquipmentIds = new Set<string>();
+              if (t.checkIn && Array.isArray(t.checkIn.table)) {
+                t.checkIn.table.forEach((ci: any) => {
+                  if (ci.equipmentId) checkinEquipmentIds.add(ci.equipmentId);
+                  if (ci.tagName) checkinEquipmentIds.add(ci.tagName);
+                });
+              }
+
+              // Whether any check-in event has occurred for this driver at all
+              const checkinHasStarted = checkinEquipmentIds.size > 0 || entitiesWithCheckin.has(driverName.toLowerCase());
+
+              if (t.checkOut && Array.isArray(t.checkOut.table)) {
+                t.checkOut.table.forEach((co: any) => {
+                  if (co.equipmentId) addedCheckoutIds.add(co.equipmentId);
+                  const dtStr = co.checkOutDate ? new Date(co.checkOutDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : 'Just now';
+
+                  // Was this specific asset returned?
+                  const wasReturned = co.equipmentId
+                    ? checkinEquipmentIds.has(co.equipmentId)
+                    : (co.tagName ? checkinEquipmentIds.has(co.tagName) : false);
+
+                  // Detected column logic:
+                  //   - No checkin has started at all → blank (checkin hasn't happened yet)
+                  //   - Checkin started and this asset came back → RETURNED
+                  //   - Checkin started but this asset was NOT returned → MISSING
+                  const detectedStatus = !checkinHasStarted ? '' : (wasReturned ? 'COMPLETED' : 'MISSING');
+
+                  checkouts.push({
+                    id: co.equipmentId || co.tagName,
+                    entity: driverName,
+                    equipment: co.equipment,
+                    type: co.equipmentType || 'RFID_CHECKOUT',
+                    epc: co.tagName || (co.equipmentId ? 'E200' + co.equipmentId.substring(0, 8) : 'EPC-UNKNOWN'),
+                    detected: detectedStatus,
+                    time: dtStr,
+                    gateStatus: !checkinHasStarted ? '' : (wasReturned ? 'Matched' : 'Missing'),
+                    checkinTime: '-',
+                    site: 'Pune DC',
+                    raw: { id: co.equipmentId }
+                  });
+                });
+              }
+
+              if (t.checkIn && Array.isArray(t.checkIn.table)) {
+                t.checkIn.table.forEach((ci: any) => {
+                  if (ci.equipmentId) addedCheckinIds.add(ci.equipmentId);
+                  const dtStr = ci.checkInDate ? new Date(ci.checkInDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : 'Just now';
+                  let ciType = (ci.equipmentType || 'RFID_INBOUND')
+                    .replace('Checkout', 'Checkin')
+                    .replace('checkout', 'checkin')
+                    .replace('CHECKOUT', 'CHECKIN');
+                  if (ciType === 'RFID_CHECKOUT') ciType = 'RFID_CHECKIN';
+
+                  checkins.push({
+                    id: ci.equipmentId || ci.tagName,
+                    entity: driverName,
+                    equipment: ci.equipment,
+                    type: ciType,
+                    epc: ci.tagName || (ci.equipmentId ? 'E200' + ci.equipmentId.substring(0, 8) : 'EPC-UNKNOWN'),
+                    gateStatus: ci.gateStatus || 'Matched',
+                    checkinTime: dtStr,
+                    site: 'Pune DC',
+                    raw: { id: ci.equipmentId }
+                  });
+                });
+              }
+            });
+          }
+
+          // 2. Process AssetAssignments records
+          if (Array.isArray(list)) {
+            list.forEach((a: any) => {
+              const isReturned = a.actualReturnDate != null || a.status === 'Returned' || a.status === 'Completed';
+              const siteName = a.asset && a.asset.siteId ? (
+                a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91' ? 'Pune DC' :
+                a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c92' ? 'Mumbai Warehouse' :
+                a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93' ? 'Chennai Plant' : 'Bengaluru Hub'
+              ) : 'Pune DC';
+
+              // Prefer actual custodian name; remove 'Standalone Handheld Operator' placeholder
+              let rawEntity = a.custodianName || a.assignedToUsername || '';
+              if (!rawEntity || rawEntity === 'Standalone Handheld Operator' || rawEntity === 'Handheld Operator') {
+                rawEntity = a.assignedToUsername || a.assignedToName || 'Individual Custodian';
+              }
+              const entityHasCheckedIn = entitiesWithCheckin.has(rawEntity.toLowerCase());
+
+              let formattedType = a.purpose || 'Individual Checkout';
+              if (!formattedType || formattedType === 'General Use' || formattedType === 'RFIDScan' || formattedType === 'HandheldInventory') {
+                if (rawEntity.toLowerCase().includes('truck') || rawEntity.toLowerCase().includes('vehicle')) {
+                  formattedType = 'Truck Checkout';
+                } else if (rawEntity.toLowerCase().includes('driver') || a.notes?.toLowerCase().includes('driver')) {
+                  formattedType = 'Driver Checkout';
+                } else if (a.notes?.toLowerCase().includes('standalone handheld') || a.notes?.toLowerCase().includes('handheld')) {
+                  formattedType = 'Handheld Checkout';
+                } else {
+                  formattedType = 'Individual Checkout';
+                }
+              }
+
+              const epcVal = a.asset && a.asset.rfidTag ? a.asset.rfidTag : (a.assetNumber || 'AST-TRC-001245');
+
+              let detectedVal = '';
+              if (a.status === 'Completed' || (a.notes && a.notes.includes('Handheld Inventory'))) {
+                detectedVal = 'COMPLETED';
+              } else if (isReturned) {
+                detectedVal = 'RETURNED';
+              } else if (a.status === 'Missing' || entityHasCheckedIn) {
+                detectedVal = 'MISSING';
+              } else {
+                detectedVal = '';
+              }
+
+              const item = {
+                id: a.id,
+                entity: rawEntity,
+                equipment: a.assetName || (a.asset ? a.asset.name : 'Scanned Asset'),
+                type: formattedType,
+                epc: epcVal,
+                detected: detectedVal,
+                time: new Date(a.assignedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }),
+                gateStatus: isReturned ? 'Passed' : 'Pending',
+                checkinTime: a.actualReturnDate ? new Date(a.actualReturnDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '-',
+                site: siteName,
+                raw: a
+              };
+
+              if (!addedCheckoutIds.has(a.assetId) && !addedCheckoutIds.has(a.id)) {
+                checkouts.push(item);
+              }
+              let checkinGateStatus = '';
+              if (a.status === 'Completed' || (a.notes && a.notes.includes('Handheld Inventory'))) {
+                checkinGateStatus = 'COMPLETED';
+              } else if (isReturned) {
+                checkinGateStatus = 'RETURNED';
+              } else if (a.status === 'Missing' || entityHasCheckedIn) {
+                checkinGateStatus = 'MISSING';
+              }
+
+              if (checkinGateStatus) {
+                if (!addedCheckinIds.has(a.assetId) && !addedCheckinIds.has(a.id)) {
+                  const checkinType = formattedType
+                    .replace('Checkout', 'Checkin')
+                    .replace('checkout', 'checkin')
+                    .replace('CHECKOUT', 'CHECKIN');
+                  checkins.push({
+                    ...item,
+                    type: checkinType,
+                    gateStatus: checkinGateStatus
+                  });
+                }
+              }
+            });
+          }
+
           this.checkoutRecords.set(checkouts);
           this.checkinRecords.set(checkins);
+        },
+        error: (err) => {
+          console.error('Failed to fetch assignments', err);
         }
-      },
-      error: (err) => {
-        console.error('Failed to fetch assignments', err);
-      }
+      });
     });
   }
 
@@ -3982,11 +4349,13 @@ export class App implements AfterViewInit, OnDestroy {
     if (nav === 'Dashboard') {
       this.loadAllApiData();
     } else if (nav === 'Assets') {
+      this.selectedAsset.set(null); // Clear detail panel — only shows when user clicks a row
       this.fetchAssets();
     } else if (nav === 'GPS Tracking') {
       this.fetchLiveGpsLocations();
       if (this.gpsMapMode() === 'satellite') {
-        setTimeout(() => this.initSatelliteMap(), 150);
+        // Wait for Angular @if block to render GPS section DOM before initializing Leaflet
+        setTimeout(() => this.initSatelliteMap(), 500);
       }
     }
   }
@@ -4306,6 +4675,20 @@ export class App implements AfterViewInit, OnDestroy {
       );
     }
 
+    const last7DaysLabels = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      last7DaysLabels.push(d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }));
+    }
+
+    const last6MonthsLabels = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      last6MonthsLabels.push(d.toLocaleDateString('en-US', { month: 'short' }));
+    }
+
     // -------------------------------------------------------------
     // Chart 1: Asset Utilization Over Time (Line)
     // -------------------------------------------------------------
@@ -4313,7 +4696,7 @@ export class App implements AfterViewInit, OnDestroy {
       this.charts['utilizationOverTime'] = new Chart(this.utilizationOverTimeCanvas.nativeElement, {
         type: 'line',
         data: {
-          labels: ['14 May', '15 May', '16 May', '17 May', '18 May', '19 May', '20 May'],
+          labels: last7DaysLabels,
           datasets: [{
             label: 'Utilization %',
             data: stats.utilizationOverTime,
@@ -4397,7 +4780,7 @@ export class App implements AfterViewInit, OnDestroy {
                 label: (context) => {
                   const val = context.raw as number;
                   const total = stats.statusCategory.reduce((a, b) => a + b, 0);
-                  const pct = ((val / total) * 100).toFixed(1);
+                  const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
                   return ` ${context.label}: ${val.toLocaleString()} (${pct}%)`;
                 }
               }
@@ -4414,7 +4797,7 @@ export class App implements AfterViewInit, OnDestroy {
       this.charts['movementTrends'] = new Chart(this.movementTrendsCanvas.nativeElement, {
         type: 'bar',
         data: {
-          labels: ["Dec '24", "Jan '25", "Feb '25", "Mar '25", "Apr '25", "May '25"],
+          labels: last6MonthsLabels,
           datasets: [
             {
               type: 'bar' as const,
@@ -4775,17 +5158,81 @@ export class App implements AfterViewInit, OnDestroy {
     }, 600);
   }
 
+  protected toggleReportsDatePicker() {
+    this.isReportsDatePickerOpen.update(v => !v);
+  }
+
+  protected setReportsDatePreset(preset: 'today' | 'week' | 'month' | 'last30') {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    if (preset === 'today') {
+      this.reportsStartDate.set(todayStr);
+      this.reportsEndDate.set(todayStr);
+    } else if (preset === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(today.getDate() - 7);
+      this.reportsStartDate.set(weekAgo.toISOString().split('T')[0]);
+      this.reportsEndDate.set(todayStr);
+    } else if (preset === 'month') {
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      this.reportsStartDate.set(startOfMonth.toISOString().split('T')[0]);
+      this.reportsEndDate.set(todayStr);
+    } else if (preset === 'last30') {
+      const thirtyAgo = new Date();
+      thirtyAgo.setDate(today.getDate() - 30);
+      this.reportsStartDate.set(thirtyAgo.toISOString().split('T')[0]);
+      this.reportsEndDate.set(todayStr);
+    }
+  }
+
+  protected applyCustomDateRange() {
+    this.isReportsDatePickerOpen.set(false);
+    this.applyReportsFilters();
+  }
+
   protected resetReportsFilters() {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const pad = (n: number) => String(n).padStart(2, '0');
-    this.reportsDateRange.set(`${pad(startOfMonth.getDate())} ${months[startOfMonth.getMonth()]} ${startOfMonth.getFullYear()} - ${pad(today.getDate())} ${months[today.getMonth()]} ${today.getFullYear()}`);
+    this.reportsStartDate.set(startOfMonth.toISOString().split('T')[0]);
+    this.reportsEndDate.set(today.toISOString().split('T')[0]);
     this.reportsSelectedSite.set('All Sites');
     this.reportsSelectedCategory.set('All Categories');
     this.reportsSelectedDepartment.set('All Departments');
     this.reportsSelectedCustomerVendor.set('All');
     this.applyReportsFilters();
+  }
+
+  protected openScheduleEmailModal() {
+    this.isScheduleEmailModalOpen.set(true);
+  }
+
+  protected closeScheduleEmailModal() {
+    this.isScheduleEmailModalOpen.set(false);
+  }
+
+  protected submitScheduleEmail() {
+    this.isScheduleEmailModalOpen.set(false);
+    alert(`Email Schedule configured successfully for ${this.scheduleEmailAddress()} (${this.scheduleEmailFrequency()} - ${this.scheduleEmailFormat()})!`);
+  }
+
+  protected openShareModal() {
+    this.shareLinkCopied.set(false);
+    this.isShareModalOpen.set(true);
+  }
+
+  protected closeShareModal() {
+    this.isShareModalOpen.set(false);
+  }
+
+  protected copyShareLink() {
+    if (isPlatformBrowser(this.platformId)) {
+      try {
+        navigator.clipboard.writeText(window.location.href);
+      } catch (e) {}
+      this.shareLinkCopied.set(true);
+      setTimeout(() => this.shareLinkCopied.set(false), 3000);
+    }
   }
 
   // Export full reports dashboard container to PDF using html2canvas and jsPDF
@@ -5157,10 +5604,9 @@ export class App implements AfterViewInit, OnDestroy {
           const filteredMapped = list
             .map((v: any) => {
               const linkedAsset = this.assets().find(a => a.gpsId === v.deviceNum);
-              if (!linkedAsset) return null;
 
               let assetType: 'Vehicle' | 'Forklift' | 'Pallet/Bin' | 'Container' | 'Tool/Equipment' | 'Mobile Equipment' = 'Vehicle';
-              const cat = (linkedAsset.category || '').toLowerCase();
+              const cat = (linkedAsset?.category || v.regName || '').toLowerCase();
               if (cat.includes('forklift')) {
                 assetType = 'Forklift';
               } else if (cat.includes('pallet') || cat.includes('bin') || cat.includes('returnable')) {
@@ -5173,48 +5619,58 @@ export class App implements AfterViewInit, OnDestroy {
                 assetType = 'Mobile Equipment';
               }
 
-              const x = Math.min(100, Math.max(0, Math.round(((v.lon - 73.8540) / (73.8600 - 73.8540)) * 100)));
-              const y = Math.min(100, Math.max(0, Math.round(((18.6230 - v.lat) / (18.6230 - 18.6180)) * 100)));
+              const lat = parseFloat(v.lat !== undefined ? v.lat : (v.Lat !== undefined ? v.Lat : '18.5204'));
+              const lon = parseFloat(v.lon !== undefined ? v.lon : (v.Lon !== undefined ? v.Lon : '73.8567'));
 
-              const currentZone = v.speed > 0 ? 'Transit Route' : 'Main Yard';
+              const x = Math.min(100, Math.max(0, Math.round(((lon - 73.8540) / (73.8600 - 73.8540)) * 100)));
+              const y = Math.min(100, Math.max(0, Math.round(((18.6230 - lat) / (18.6230 - 18.6180)) * 100)));
+
+              const speed = parseFloat(v.speed !== undefined ? v.speed : (v.Speed !== undefined ? v.Speed : '0')) || 0;
+              const currentZone = speed > 0 ? 'Transit Route' : 'Main Yard';
               
               let lastRfidRead = '—';
-              if (linkedAsset.rfidTag) {
+              if (linkedAsset && linkedAsset.rfidTag) {
                 const matchingEvents = this.scanEventsList().filter(evt => evt.epc === linkedAsset.rfidTag);
                 if (matchingEvents.length > 0) {
                   lastRfidRead = matchingEvents[0].time;
                 }
               }
 
-              const exception = v.battery < 25 ? 'Low Battery' : '';
+              const battery = parseFloat(v.battery !== undefined ? v.battery : (v.Battery !== undefined ? v.Battery : '100')) || 100;
+              const exception = battery < 25 ? 'Low Battery' : '';
+              const gpsTimeRaw = v.gpsTime || v.GpsTime || v.updateTime || v.UpdateTime;
+              const gpsTimeStr = gpsTimeRaw ? new Date(gpsTimeRaw).toLocaleTimeString() : new Date().toLocaleTimeString();
+
+              const assetName = linkedAsset?.name || v.regName || ('GPS Asset ' + v.deviceNum);
+              const assetTag = 'Asset: ' + (linkedAsset?.assetNumber || linkedAsset?.id || ('AST-' + (v.deviceNum.length > 4 ? v.deviceNum.substring(v.deviceNum.length - 4) : v.deviceNum)));
 
               return {
                 id: v.deviceNum,
-                name: linkedAsset.name,
-                tag: 'Asset: ' + (linkedAsset.assetNumber || linkedAsset.id),
+                name: assetName,
+                tag: assetTag,
                 type: assetType,
-                status: v.status || 'Active',
-                battery: Math.round(v.battery),
-                speed: v.speed,
-                latitude: v.lat,
-                longitude: v.lon,
+                status: v.status || 'Online',
+                battery: Math.round(battery),
+                speed: speed,
+                latitude: lat,
+                longitude: lon,
                 currentZone: currentZone,
-                lastGpsPing: new Date(v.gpsTime).toLocaleTimeString(),
+                lastGpsPing: gpsTimeStr,
                 lastRfidRead: lastRfidRead,
                 exception: exception,
-                site: linkedAsset.site || 'Pune DC',
-                operator: linkedAsset.currentCustodian || linkedAsset.custodian || 'Unassigned',
-                make: linkedAsset.manufacturer || '',
-                model: linkedAsset.model || '',
+                site: linkedAsset?.site || 'Pune DC',
+                operator: linkedAsset?.currentCustodian || linkedAsset?.custodian || 'Unassigned',
+                make: linkedAsset?.manufacturer || v.make || '',
+                model: linkedAsset?.model || v.model || '',
                 x,
                 y,
                 trail: [],
                 timeline: [
                   {
-                    time: new Date(v.gpsTime).toLocaleTimeString(),
+                    time: gpsTimeStr,
                     zone: currentZone,
-                    details: `Live telemetry from vehicle: Speed ${v.speed}km/h, Direction ${v.direction}°`,
-                    type: v.speed > 0 ? 'moving' as const : 'idle' as const
+                    details: `Live telemetry from vehicle: Speed ${speed}km/h, Direction ${v.direction || 0}°`,
+                    type: speed > 0 ? 'moving' as const : 'idle' as const
                   }
                 ]
               };
@@ -5253,15 +5709,20 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected fetchGpsAssetHistory(imei: string) {
     const dateStr = this.gpsSelectedDate();
-    // Parse start and end of selected date in local time
     const begin = new Date(dateStr + 'T00:00:00');
     const end = new Date(dateStr + 'T23:59:59');
     
     this.apiService.getGPSHistory(imei, begin.toISOString(), end.toISOString()).subscribe({
       next: (res) => {
         let list: any[] = [];
-        if (res && res.detail) {
-          list = Array.isArray(res.detail) ? res.detail : (res.detail.data || []);
+        if (res) {
+          if (Array.isArray(res)) {
+            list = res;
+          } else if (res.detail) {
+            list = Array.isArray(res.detail) ? res.detail : (res.detail.data || res.detail.list || []);
+          } else if (res.data) {
+            list = Array.isArray(res.data) ? res.data : [];
+          }
         }
         this.gpsAssetHistory.set(list);
         if (this.gpsMapMode() === 'satellite') {
@@ -5330,7 +5791,8 @@ export class App implements AfterViewInit, OnDestroy {
     const newMode = this.gpsMapMode() === 'blueprint' ? 'satellite' : 'blueprint';
     this.gpsMapMode.set(newMode);
     if (newMode === 'satellite') {
-      setTimeout(() => this.initSatelliteMap(), 100);
+      // Wait longer so Angular @if block renders the DOM before Leaflet initializes
+      setTimeout(() => this.initSatelliteMap(), 400);
     } else {
       this.destroySatelliteMap();
     }
@@ -5348,9 +5810,10 @@ export class App implements AfterViewInit, OnDestroy {
     }
   }
 
-  private getTileLayerConfig(layer: 'satellite' | 'hybrid' | 'street'): { url: string; attribution: string; maxZoom: number } {
+  private getTileLayerConfig(layer: 'satellite' | 'hybrid' | 'street'): { url: string; attribution: string; maxZoom: number; subdomains?: string } {
     if (layer === 'satellite') {
       return {
+        // Esri World Imagery (reliable, no CORS issues)
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
         maxZoom: 19
@@ -5363,8 +5826,10 @@ export class App implements AfterViewInit, OnDestroy {
       };
     } else {
       return {
-        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        // CartoDB Voyager - very reliable, works globally, no CORS issues
+        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
         maxZoom: 19
       };
     }
@@ -5375,15 +5840,18 @@ export class App implements AfterViewInit, OnDestroy {
     const tileLayer = L.tileLayer(config.url, {
       attribution: config.attribution,
       maxZoom: config.maxZoom,
-      crossOrigin: true
+      subdomains: config.subdomains || 'abc'
+    });
+    // Log tile errors for debugging
+    tileLayer.on('tileerror', (err: any) => {
+      console.warn('Tile load error:', err.tile?.src);
     });
     if (layer === 'hybrid') {
-      // Add road overlay on top of satellite for hybrid
+      // Add CartoDB road label overlay on top of satellite for hybrid
       const roadOverlay = L.tileLayer(
-        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        { opacity: 0.45, maxZoom: 19, crossOrigin: true }
+        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+        { opacity: 0.7, maxZoom: 19, subdomains: 'abcd' }
       );
-      // Return a group-like object
       const group = L.layerGroup([tileLayer, roadOverlay]);
       return group;
     }
@@ -5403,9 +5871,19 @@ export class App implements AfterViewInit, OnDestroy {
     this.satelliteMap.setView([config.lat, config.lon], config.zoom, { animate: true, duration: 1.0 });
   }
 
-  private initSatelliteMap() {
+  private initSatelliteMap(retryCount = 0) {
     if (typeof window === 'undefined' || !(window as any).L) return;
     const L = (window as any).L;
+
+    // Check if the map container DOM element exists yet (Angular @if may not have rendered it)
+    const mapContainer = document.getElementById('leaflet-satellite-map');
+    if (!mapContainer) {
+      if (retryCount < 10) {
+        // Retry after 200ms if DOM isn't ready yet
+        setTimeout(() => this.initSatelliteMap(retryCount + 1), 200);
+      }
+      return;
+    }
 
     if (this.satelliteMap) {
       this.destroySatelliteMap();
@@ -5453,6 +5931,20 @@ export class App implements AfterViewInit, OnDestroy {
 
     // Add scale bar
     L.control.scale({ position: 'bottomleft', imperial: false }).addTo(this.satelliteMap);
+
+    // Force Leaflet to recalculate container size immediately and after transitions
+    // This fixes the white/blank map issue when rendering inside @if blocks
+    this.satelliteMap.invalidateSize(false);
+    setTimeout(() => {
+      if (this.satelliteMap) {
+        this.satelliteMap.invalidateSize(true);
+      }
+    }, 250);
+    setTimeout(() => {
+      if (this.satelliteMap) {
+        this.satelliteMap.invalidateSize(true);
+      }
+    }, 600);
 
     this.updateSatelliteMarkers();
   }
@@ -5590,31 +6082,42 @@ export class App implements AfterViewInit, OnDestroy {
     if (trailPoints && trailPoints.length > 0) {
       const latLngs = trailPoints
         .map((pt: any) => {
-          const lat = pt.latitude !== undefined ? pt.latitude : pt.Latitude;
-          const lon = pt.longitude !== undefined ? pt.longitude : pt.Longitude;
-          return (lat && lon) ? [lat, lon] : null;
+          const latRaw = pt.lat !== undefined ? pt.lat : (pt.Lat !== undefined ? pt.Lat : (pt.latitude !== undefined ? pt.latitude : pt.Latitude));
+          const lonRaw = pt.lon !== undefined ? pt.lon : (pt.Lon !== undefined ? pt.Lon : (pt.longitude !== undefined ? pt.longitude : pt.Longitude));
+          const lat = parseFloat(latRaw);
+          const lon = parseFloat(lonRaw);
+          return (latRaw !== undefined && lonRaw !== undefined && !isNaN(lat) && !isNaN(lon)) ? [lat, lon] : null;
         })
-        .filter((pt: any) => pt !== null);
+        .filter((pt: any): pt is [number, number] => pt !== null);
 
       if (latLngs.length > 0) {
-        // Draw route trail with gradient-like segments
+        // Draw route trail with thick visible polyline
         this.satelliteTrailPolyline = L.polyline(latLngs, {
-          color: '#3b82f6',
-          weight: 4,
-          opacity: 0.75,
-          dashArray: '6, 5',
-          lineCap: 'round'
+          color: '#2563eb',
+          weight: 5,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round'
         }).addTo(this.satelliteMap);
 
         // Start marker (first point)
         if (latLngs.length > 1) {
           const startIcon = L.divIcon({
-            html: `<div style="width:10px;height:10px;border-radius:50%;background:#10b981;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.4);"></div>`,
+            html: `<div style="width:12px;height:12px;border-radius:50%;background:#10b981;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.4);"></div>`,
             className: '',
-            iconSize: [10, 10],
-            iconAnchor: [5, 5]
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
           });
-          L.marker(latLngs[0] as any, { icon: startIcon, interactive: false }).addTo(this.satelliteMap);
+          L.marker(latLngs[0], { icon: startIcon, interactive: false }).addTo(this.satelliteMap);
+        }
+
+        // Fit map bounds to encompass the full GPS route
+        if (latLngs.length > 1) {
+          try {
+            this.satelliteMap.fitBounds(this.satelliteTrailPolyline.getBounds(), { padding: [50, 50], maxZoom: 17 });
+          } catch (e) {
+            console.warn('fitBounds warning:', e);
+          }
         }
       }
     }
@@ -5671,6 +6174,19 @@ export class App implements AfterViewInit, OnDestroy {
             estimatedDowntime: 'Under 1 Hour',
             notes: ''
           })));
+
+          const notifs = list.map(a => {
+            const dt = a.timestamp || a.createdOn ? new Date(a.timestamp || a.createdOn) : new Date();
+            const timeStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            return {
+              id: a.id,
+              text: a.message || a.title || `${a.severity || 'System'} alert triggered`,
+              time: timeStr,
+              read: a.isResolved || false,
+              type: (a.severity?.toLowerCase() === 'high' || a.severity?.toLowerCase() === 'critical') ? 'danger' : ((a.severity?.toLowerCase() === 'medium' || a.severity?.toLowerCase() === 'warning') ? 'warning' : 'info')
+            };
+          });
+          this.notifications.set(notifs);
         }
       },
       error: (err) => console.error('Failed to load alerts from database', err)

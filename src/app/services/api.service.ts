@@ -203,7 +203,7 @@ export class ApiService {
     return this.http.get<any>(`${this.baseUrl}/Gps/vehicle-android-location/${deviceNum}`);
   }
   getGPSLocation(vehicleId: string): Observable<any> {
-    return this.http.get<any>(`https://api.prosperassettracking.com/api/Gps/vehicle-location/${vehicleId}`);
+    return this.http.get<any>(`${this.baseUrl}/Gps/vehicle-location/${vehicleId}`);
   }
   getGPSHistory(vehicleId: string, beginTime: string, endTime: string): Observable<any> {
     const params = new HttpParams()
