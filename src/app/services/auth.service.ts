@@ -3,12 +3,14 @@ import { HttpClient } from '@angular/common/http';
 import { tap, catchError } from 'rxjs/operators';
 import { Observable, throwError } from 'rxjs';
 
+import { environment } from '../../environments/environment';
+
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = 'http://localhost:5025/api/auth';
+  private readonly baseUrl = `${environment.apiUrl}/auth`;
 
   readonly token = signal<string | null>(localStorage.getItem('jwt_token'));
   readonly refreshToken = signal<string | null>(localStorage.getItem('refresh_token'));
