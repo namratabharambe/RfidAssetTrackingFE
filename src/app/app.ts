@@ -234,6 +234,41 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly loginErrorMessage = signal<string>('');
   protected readonly showPassword = signal<boolean>(false);
 
+  protected readonly isDevamUser = computed(() => {
+    const user = this.authService.currentUser();
+    const email = (user?.email || user?.username || '').toLowerCase();
+    return email.includes('devam');
+  });
+
+  protected readonly filteredNavItems = computed(() => {
+    const isDevam = this.isDevamUser();
+    if (isDevam) {
+      const allowedNames = ['Dashboard', 'Assets', 'Inventory', 'Reports & Analytics', 'Settings'];
+      const devamHiddenSubmenus = ['Asset Categories'];
+      return this.navItems
+        .map(item => {
+          if (item.name === 'Admin') {
+            return {
+              name: 'Settings',
+              icon: 'settings',
+              badge: null,
+              submenus: ['System Settings']
+            };
+          }
+          // Strip hidden submenus for devam
+          if (item.submenus) {
+            return {
+              ...item,
+              submenus: item.submenus.filter((s: string) => !devamHiddenSubmenus.includes(s))
+            };
+          }
+          return item;
+        })
+        .filter(item => allowedNames.includes(item.name));
+    }
+    return this.navItems;
+  });
+
   protected readonly selectedSite = signal<string>('Pune DC');
   protected readonly activeOperation = signal<string>('All Operations');
   protected readonly activeNav = signal<string>('Dashboard');
@@ -660,7 +695,16 @@ export class App implements AfterViewInit, OnDestroy {
     const search = this.inventorySearchQuery().toLowerCase().trim();
     const status = this.inventoryStatusFilter();
     const zone = this.inventoryZoneFilter();
+    const globalSite = this.selectedSite();
+    const isDevam = this.isDevamUser();
     let list = this.inventoryItems();
+
+    if (isDevam || globalSite !== 'All Sites') {
+      list = list.filter(item => {
+        if (!item.zone) return false;
+        return item.zone.toLowerCase().includes(globalSite.toLowerCase());
+      });
+    }
 
     if (search) {
       list = list.filter(item => 
@@ -683,7 +727,7 @@ export class App implements AfterViewInit, OnDestroy {
   });
 
   protected readonly inventoryStats = computed(() => {
-    const list = this.inventoryItems();
+    const list = this.filteredInventoryItems();
     const totalItems = list.length;
     const discrepancies = list.filter(item => item.status === 'Discrepancy' || item.status === 'Missing').length;
     const lowStock = list.filter(item => item.status === 'Low Stock').length;
@@ -1657,6 +1701,72 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly availableAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'Available').length);
   protected readonly checkedOutAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'Checked Out' || a.status === 'Assigned' || a.status === 'In Use').length);
   protected readonly underMaintenanceAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'Under Maintenance').length);
+  protected readonly overdueAssetsCount = computed(() => this.siteFilteredAssets().filter(a => a.status === 'Overdue' || (a.nextMaintenance && new Date(a.nextMaintenance) < new Date())).length);
+
+  // Devam dashboard — category breakdown
+  protected readonly devamCategoryBreakdown = computed(() => {
+    const assets = this.siteFilteredAssets();
+    const total = assets.length;
+    const catMap = new Map<string, number>();
+    assets.forEach(a => {
+      const cat = a.category || a.assetType || 'Others';
+      catMap.set(cat, (catMap.get(cat) || 0) + 1);
+    });
+    const sorted = Array.from(catMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => ({
+        name,
+        count,
+        pct: total > 0 ? Math.round((count / total) * 100) : 0
+      }));
+    const colors = ['#3b82f6','#22c55e','#a855f7','#f59e0b','#ef4444'];
+    return sorted.map((item, i) => ({ ...item, color: colors[i] || '#64748b' }));
+  });
+
+  // Devam dashboard — top 5 assets list
+  protected readonly devamTopAssets = computed(() =>
+    this.siteFilteredAssets().slice(0, 5)
+  );
+
+  // Devam dashboard — recent transactions from checkoutRecords
+  protected readonly devamRecentTransactions = computed(() => {
+    const records = this.checkoutRecords();
+    return records.slice(0, 5).map(r => ({
+      type: r.operation || (r.status === 'Active' ? 'Check Out' : 'Check In'),
+      assetName: r.assetName || r.asset || '—',
+      person: r.entity || r.custodian || '—',
+      time: r.date || r.timestamp || '—'
+    }));
+  });
+
+  // Devam Inventory View — filter signals
+  protected readonly devamInvSearch = signal<string>('');
+  protected readonly devamInvCategoryFilter = signal<string>('All Categories');
+  protected readonly devamInvStatusFilter = signal<string>('All Status');
+
+  protected readonly devamInvCategories = computed(() => {
+    const cats = new Set<string>();
+    this.siteFilteredAssets().forEach(a => {
+      if (a.category || a.assetType) cats.add((a.category || a.assetType)!);
+    });
+    return ['All Categories', ...Array.from(cats)];
+  });
+
+  protected readonly devamFilteredAssets = computed(() => {
+    const search = this.devamInvSearch().toLowerCase().trim();
+    const cat = this.devamInvCategoryFilter();
+    const status = this.devamInvStatusFilter();
+    let list = this.siteFilteredAssets();
+    if (cat !== 'All Categories') list = list.filter(a => (a.category || a.assetType) === cat);
+    if (status !== 'All Status') list = list.filter(a => a.status === status);
+    if (search) list = list.filter(a =>
+      (a.name || '').toLowerCase().includes(search) ||
+      (a.assetNumber || a.id || '').toLowerCase().includes(search) ||
+      (a.category || a.assetType || '').toLowerCase().includes(search)
+    );
+    return list;
+  });
 
   // Modal / Form state signals
   protected readonly isModalOpen = signal<boolean>(false);
@@ -3664,6 +3774,38 @@ export class App implements AfterViewInit, OnDestroy {
   protected loadAllApiData() {
     if (!this.isLoggedIn()) return;
 
+    const currentUser = this.authService.currentUser();
+    const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
+
+    // Automatic Site Isolation: If user is devam@gmail.com (or newly provisioned user), isolate to clean new site
+    if (userEmail.includes('devam')) {
+      const devamSiteName = currentUser?.siteName && currentUser.siteName !== 'Global / All Sites' ? currentUser.siteName : 'Devam Site';
+      if (!this.siteData[devamSiteName]) {
+        this.siteData[devamSiteName] = {
+          totalAssets: 0, activeAssets: 0, activePct: '0%',
+          assetsInUse: 0, inUsePct: '0%', checkedOut: 0,
+          underMaintenance: 0, maintenancePct: '0%', lowBatteryGps: 0,
+          rfidReadsToday: 0, gpsPingsToday: 0, exceptionAlerts: 0, complianceTasks: 0,
+          utilizationSpark: [0, 0, 0, 0, 0, 0, 0],
+          accuracySpark: [0, 0, 0, 0, 0, 0, 0],
+          savingsSpark: [0, 0, 0, 0, 0, 0, 0],
+          turnaroundSpark: [0, 0, 0, 0, 0, 0, 0],
+          utilizationOverTime: [0, 0, 0, 0, 0, 0, 0],
+          statusCategory: [0, 0, 0, 0, 0],
+          movementInbound: [0, 0, 0, 0, 0, 0],
+          movementOutbound: [0, 0, 0, 0, 0, 0],
+          movementUtilization: [0, 0, 0, 0, 0, 0],
+          topCategories: [0, 0, 0, 0, 0, 0]
+        };
+      }
+      this.selectedSite.set(devamSiteName);
+    } else {
+      // For master admin trackit@prosper.com, restore main site if needed
+      if (this.selectedSite() === 'Devam Site') {
+        this.selectedSite.set('Pune DC');
+      }
+    }
+
     this.apiService.getUsers().subscribe({
       next: (res) => {
         const list = res.body || res;
@@ -3692,23 +3834,28 @@ export class App implements AfterViewInit, OnDestroy {
             id: r.id || r.name,
             model: r.model || 'Zebra FX9600',
             location: r.name,
-            antennas: r.antennas || 4,
+            antennas: r.antennaCount !== undefined ? r.antennaCount : (r.antennas || 4),
             powerDbm: r.powerDbm || 30,
             ipAddress: r.ipAddress,
-            status: r.status || 'Online'
+            status: r.status || 'Online',
+            siteId: r.siteId,
+            port: r.port
           })));
 
-          this.fixedReadersList.set(list.map(r => ({
-            id: r.id,
-            name: r.name,
-            model: r.model || 'Zebra FX9600',
-            status: r.status || 'Online',
-            ipAddress: r.ipAddress,
-            macAddress: r.macAddress || '00:11:22:33:44:55',
-            powerLevel: (r.powerDbm || 30) + ' dBm',
-            lastActive: 'Just now',
-            antennas: Array.from({ length: r.antennas || 4 }, (_, i) => `Antenna ${i + 1}: OK`)
-          })));
+          this.fixedReadersList.set(list.map(r => {
+            const antCount = r.antennaCount !== undefined ? r.antennaCount : (r.antennas || 4);
+            return {
+              id: r.id,
+              name: r.name,
+              model: r.model || 'Zebra FX9600',
+              status: r.status || 'Online',
+              ipAddress: r.ipAddress,
+              macAddress: r.macAddress || '00:11:22:33:44:55',
+              powerLevel: (r.powerDbm || 30) + ' dBm',
+              lastActive: 'Just now',
+              antennas: Array.from({ length: antCount }, (_, i) => `Antenna ${i + 1}: OK`)
+            };
+          }));
         }
       }
     });
@@ -3863,7 +4010,17 @@ export class App implements AfterViewInit, OnDestroy {
     this.apiService.getSites(1, 200).subscribe({
       next: (res) => { 
         const data = res?.body || res;
-        const sites = (Array.isArray(data) && data.length > 0) ? data : defaultSites;
+        let sites = (Array.isArray(data) && data.length > 0) ? data : defaultSites;
+        
+        const currentUser = this.authService.currentUser();
+        const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
+        if (userEmail.includes('devam')) {
+          const devamSiteName = currentUser?.siteName && currentUser.siteName !== 'Global / All Sites' ? currentUser.siteName : 'Devam Site';
+          if (!sites.some((s: any) => s.name === devamSiteName)) {
+            sites = [...sites, { id: 'devam-site-id', name: devamSiteName, location: 'Devam Logistics Site' }];
+          }
+        }
+
         this.apiSites.set(sites);
         sites.forEach(s => {
           if (s && s.name && !this.siteData[s.name]) {
@@ -4312,7 +4469,7 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected selectNav(nav: string) {
-    const item = this.navItems.find(n => n.name === nav);
+    const item = this.filteredNavItems().find(n => n.name === nav);
     if (item?.submenus) {
       this.toggleExpanded(nav);
       this.activeNav.set(nav);
@@ -6412,7 +6569,7 @@ export class App implements AfterViewInit, OnDestroy {
     this.formReaderModel = reader.model;
     this.formReaderIpAddress = reader.ipAddress;
     this.formReaderPort = reader.port || 5084;
-    this.formReaderAntennaCount = reader.antennas;
+    this.formReaderAntennaCount = reader.antennas || reader.antennaCount || 4;
     this.formReaderPowerDbm = reader.powerDbm;
     this.formReaderSiteId = reader.siteId || 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91';
     this.formReaderStatus = reader.status;

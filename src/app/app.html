@@ -18,7 +18,7 @@
 
     <nav class="sidebar-nav">
       <ul>
-        @for (item of navItems; track item.name) {
+        @for (item of filteredNavItems(); track item.name) {
         <li [class.has-sub]="item.submenus && item.submenus.length > 0">
           <!-- Parent Menu Item -->
           <div class="nav-item-row" [class.active]="activeNav() === item.name" (click)="selectNav(item.name)"
@@ -405,6 +405,290 @@
     <!-- Main Content Container -->
     <div class="dashboard-viewport">
       @if (activeNav() === 'Dashboard') {
+
+      @if (isDevamUser()) {
+      <!-- ============================================================ -->
+      <!-- DEVAM CUSTOM DASHBOARD                                       -->
+      <!-- ============================================================ -->
+      <div class="devam-dashboard" style="padding: 1rem; display: flex; flex-direction: column; gap: 1rem; font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;">
+
+        <!-- KPI Cards Row -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem;">
+
+          <!-- Total Assets -->
+          <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.2rem; display: flex; align-items: center; gap: 0.9rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg,#3b82f6,#2563eb); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <span class="material-symbols-outlined" style="color:#fff; font-size:1.35rem;">inventory_2</span>
+            </div>
+            <div>
+              <div style="font-size:0.7rem; color:#64748b; font-weight:600; letter-spacing:0.03em; text-transform:uppercase;">Total Assets</div>
+              <div style="font-size:1.7rem; font-weight:800; color:#0f172a; line-height:1.2;">{{ totalInventoryCount() }}</div>
+              <div style="font-size:0.68rem; color:#94a3b8;">All Registered Assets</div>
+            </div>
+          </div>
+
+          <!-- Available Assets -->
+          <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.2rem; display: flex; align-items: center; gap: 0.9rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg,#22c55e,#16a34a); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <span class="material-symbols-outlined" style="color:#fff; font-size:1.35rem;">check_circle</span>
+            </div>
+            <div>
+              <div style="font-size:0.7rem; color:#64748b; font-weight:600; letter-spacing:0.03em; text-transform:uppercase;">Available Assets</div>
+              <div style="font-size:1.7rem; font-weight:800; color:#0f172a; line-height:1.2;">{{ availableAssetsCount() }}</div>
+              <div style="font-size:0.68rem; color:#94a3b8;">Ready to be assigned</div>
+            </div>
+          </div>
+
+          <!-- Checked Out -->
+          <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.2rem; display: flex; align-items: center; gap: 0.9rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg,#f59e0b,#d97706); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <span class="material-symbols-outlined" style="color:#fff; font-size:1.35rem;">output</span>
+            </div>
+            <div>
+              <div style="font-size:0.7rem; color:#64748b; font-weight:600; letter-spacing:0.03em; text-transform:uppercase;">Checked Out</div>
+              <div style="font-size:1.7rem; font-weight:800; color:#0f172a; line-height:1.2;">{{ checkedOutAssetsCount() }}</div>
+              <div style="font-size:0.68rem; color:#94a3b8;">Currently in use</div>
+            </div>
+          </div>
+
+          <!-- Overdue / Maintenance -->
+          <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.2rem; display: flex; align-items: center; gap: 0.9rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg,#ef4444,#dc2626); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <span class="material-symbols-outlined" style="color:#fff; font-size:1.35rem;">warning</span>
+            </div>
+            <div>
+              <div style="font-size:0.7rem; color:#64748b; font-weight:600; letter-spacing:0.03em; text-transform:uppercase;">Maintenance</div>
+              <div style="font-size:1.7rem; font-weight:800; color:#0f172a; line-height:1.2;">{{ underMaintenanceAssetsCount() }}</div>
+              <div style="font-size:0.68rem; color:#94a3b8;">Under maintenance</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Middle Row: Donut Chart + Line Chart + Recent Transactions -->
+        <div style="display: grid; grid-template-columns: 280px 1fr 300px; gap: 0.75rem; align-items: start;">
+
+          <!-- Assets Status Overview (Donut) -->
+          <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.2rem; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+            <div style="font-size:0.82rem; font-weight:700; color:#0f172a; margin-bottom:1rem;">Assets Status Overview</div>
+            <!-- SVG Donut -->
+            <div style="display:flex; justify-content:center; margin-bottom:1rem;">
+              <svg width="140" height="140" viewBox="0 0 140 140">
+                <circle cx="70" cy="70" r="54" fill="none" stroke="#e2e8f0" stroke-width="20"/>
+                <!-- Available slice (green) -->
+                <circle cx="70" cy="70" r="54" fill="none" stroke="#22c55e" stroke-width="20"
+                  [attr.stroke-dasharray]="(availableAssetsCount() / (totalInventoryCount() || 1)) * 339.29 + ' ' + 339.29"
+                  stroke-dashoffset="84.82" transform="rotate(-90 70 70)"/>
+                <!-- Checked Out slice (orange) -->
+                <circle cx="70" cy="70" r="54" fill="none" stroke="#f59e0b" stroke-width="20"
+                  [attr.stroke-dasharray]="(checkedOutAssetsCount() / (totalInventoryCount() || 1)) * 339.29 + ' ' + 339.29"
+                  [attr.stroke-dashoffset]="339.29 - (availableAssetsCount() / (totalInventoryCount() || 1)) * 339.29 + 84.82"
+                  transform="rotate(-90 70 70)"/>
+                <!-- Maintenance slice (red) -->
+                <circle cx="70" cy="70" r="54" fill="none" stroke="#ef4444" stroke-width="20"
+                  [attr.stroke-dasharray]="(underMaintenanceAssetsCount() / (totalInventoryCount() || 1)) * 339.29 + ' ' + 339.29"
+                  [attr.stroke-dashoffset]="339.29 - ((availableAssetsCount() + checkedOutAssetsCount()) / (totalInventoryCount() || 1)) * 339.29 + 84.82"
+                  transform="rotate(-90 70 70)"/>
+                <text x="70" y="66" text-anchor="middle" font-size="18" font-weight="800" fill="#0f172a">{{ totalInventoryCount() }}</text>
+                <text x="70" y="82" text-anchor="middle" font-size="9" fill="#94a3b8">TOTAL</text>
+              </svg>
+            </div>
+            <!-- Legend -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <div style="display:flex; align-items:center; gap:6px;"><div style="width:10px;height:10px;border-radius:50%;background:#22c55e;"></div><span style="font-size:0.75rem;color:#475569;">Available</span></div>
+                <span style="font-size:0.78rem;font-weight:700;color:#0f172a;">{{ availableAssetsCount() }}</span>
+              </div>
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <div style="display:flex; align-items:center; gap:6px;"><div style="width:10px;height:10px;border-radius:50%;background:#f59e0b;"></div><span style="font-size:0.75rem;color:#475569;">Checked Out</span></div>
+                <span style="font-size:0.78rem;font-weight:700;color:#0f172a;">{{ checkedOutAssetsCount() }}</span>
+              </div>
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <div style="display:flex; align-items:center; gap:6px;"><div style="width:10px;height:10px;border-radius:50%;background:#ef4444;"></div><span style="font-size:0.75rem;color:#475569;">Maintenance</span></div>
+                <span style="font-size:0.78rem;font-weight:700;color:#0f172a;">{{ underMaintenanceAssetsCount() }}</span>
+              </div>
+              <div style="border-top:1px solid #e2e8f0; margin-top:6px; padding-top:6px; display:flex; align-items:center; justify-content:space-between;">
+                <span style="font-size:0.75rem;color:#475569;font-weight:600;">Total Assets</span>
+                <span style="font-size:0.82rem;font-weight:800;color:#0f172a;">{{ totalInventoryCount() }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Check Out vs Check In Line Chart -->
+          <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.2rem; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.8rem;">
+              <div style="font-size:0.82rem; font-weight:700; color:#0f172a;">Check Out vs Check In (This Month)</div>
+              <div style="display:flex; align-items:center; gap:1rem;">
+                <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px;height:2px;background:#3b82f6;"></div><span style="font-size:0.7rem;color:#64748b;">Check Out</span></div>
+                <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px;height:2px;background:#22c55e;"></div><span style="font-size:0.7rem;color:#64748b;">Check In</span></div>
+              </div>
+            </div>
+            <!-- Simple SVG line chart -->
+            <svg width="100%" height="160" viewBox="0 0 500 160" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.15"/>
+                  <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+                </linearGradient>
+                <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#22c55e" stop-opacity="0.12"/>
+                  <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <!-- Grid lines -->
+              <line x1="0" y1="130" x2="500" y2="130" stroke="#e2e8f0" stroke-width="1"/>
+              <line x1="0" y1="97" x2="500" y2="97" stroke="#e2e8f0" stroke-width="1"/>
+              <line x1="0" y1="64" x2="500" y2="64" stroke="#e2e8f0" stroke-width="1"/>
+              <line x1="0" y1="31" x2="500" y2="31" stroke="#e2e8f0" stroke-width="1"/>
+              <!-- Y labels -->
+              <text x="4" y="133" font-size="9" fill="#94a3b8">0</text>
+              <text x="4" y="100" font-size="9" fill="#94a3b8">10</text>
+              <text x="4" y="67" font-size="9" fill="#94a3b8">20</text>
+              <text x="4" y="34" font-size="9" fill="#94a3b8">30</text>
+              <!-- X labels -->
+              <text x="40" y="150" font-size="9" fill="#94a3b8" text-anchor="middle">May 1</text>
+              <text x="155" y="150" font-size="9" fill="#94a3b8" text-anchor="middle">May 8</text>
+              <text x="270" y="150" font-size="9" fill="#94a3b8" text-anchor="middle">May 15</text>
+              <text x="385" y="150" font-size="9" fill="#94a3b8" text-anchor="middle">May 22</text>
+              <text x="480" y="150" font-size="9" fill="#94a3b8" text-anchor="middle">May 31</text>
+              <!-- Checkout area fill -->
+              <polygon points="40,100 155,84 270,70 385,53 480,37 480,130 40,130" fill="url(#blueGrad)"/>
+              <!-- Checkout line -->
+              <polyline points="40,100 155,84 270,70 385,53 480,37" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+              <!-- Checkout dots -->
+              <circle cx="40" cy="100" r="4" fill="#3b82f6"/>
+              <circle cx="155" cy="84" r="4" fill="#3b82f6"/>
+              <circle cx="270" cy="70" r="4" fill="#3b82f6"/>
+              <circle cx="385" cy="53" r="4" fill="#3b82f6"/>
+              <circle cx="480" cy="37" r="4" fill="#3b82f6"/>
+              <!-- Checkin area fill -->
+              <polygon points="40,115 155,107 270,100 385,97 480,94 480,130 40,130" fill="url(#greenGrad)"/>
+              <!-- Checkin line -->
+              <polyline points="40,115 155,107 270,100 385,97 480,94" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+              <!-- Checkin dots -->
+              <circle cx="40" cy="115" r="4" fill="#22c55e"/>
+              <circle cx="155" cy="107" r="4" fill="#22c55e"/>
+              <circle cx="270" cy="100" r="4" fill="#22c55e"/>
+              <circle cx="385" cy="97" r="4" fill="#22c55e"/>
+              <circle cx="480" cy="94" r="4" fill="#22c55e"/>
+            </svg>
+          </div>
+
+          <!-- Recent Transactions -->
+          <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.2rem; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.9rem;">
+              <div style="font-size:0.82rem; font-weight:700; color:#0f172a;">Recent Transactions</div>
+              <button (click)="selectSubNav('Asset Master &amp; Inventory', 'Assets')" style="background:none; border:none; color:#3b82f6; font-size:0.72rem; font-weight:600; cursor:pointer;">View All</button>
+            </div>
+            @if (devamRecentTransactions().length === 0) {
+            <div style="text-align:center; padding:1.5rem 0; color:#94a3b8; font-size:0.78rem;">No recent transactions</div>
+            }
+            @for (tx of devamRecentTransactions(); track tx.assetName) {
+            <div style="display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+              <div [style.background]="tx.type === 'Check Out' || tx.type === 'Checkout' ? '#eff6ff' : '#f0fdf4'"
+                style="width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <span class="material-symbols-outlined"
+                  [style.color]="tx.type === 'Check Out' || tx.type === 'Checkout' ? '#3b82f6' : '#22c55e'"
+                  style="font-size:1rem;">{{ tx.type === 'Check Out' || tx.type === 'Checkout' ? 'arrow_outward' : 'arrow_back' }}</span>
+              </div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:0.73rem; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ tx.type === 'Check Out' || tx.type === 'Checkout' ? 'Asset Checked Out' : 'Asset Checked In' }}</div>
+                <div style="font-size:0.68rem; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ tx.assetName }}</div>
+              </div>
+              <div style="text-align:right; flex-shrink:0;">
+                <div style="font-size:0.68rem; font-weight:600; color:#0f172a;">{{ tx.person }}</div>
+                <div style="font-size:0.62rem; color:#94a3b8;">{{ tx.time }}</div>
+              </div>
+            </div>
+            }
+          </div>
+
+        </div>
+
+        <!-- Bottom Row: Top Assets + Assets by Category -->
+        <div style="display: grid; grid-template-columns: 1fr 360px; gap: 0.75rem; align-items: start;">
+
+          <!-- Top Assets Table -->
+          <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.2rem; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.9rem;">
+              <div style="font-size:0.82rem; font-weight:700; color:#0f172a;">Top Assets</div>
+              <button (click)="selectSubNav('Asset Master &amp; Inventory', 'Assets')" style="background:none; border:none; color:#3b82f6; font-size:0.72rem; font-weight:600; cursor:pointer;">View All</button>
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+              <thead>
+                <tr style="border-bottom:2px solid #f1f5f9;">
+                  <th style="text-align:left; padding:6px 8px; color:#64748b; font-weight:600; font-size:0.7rem;">Asset ID</th>
+                  <th style="text-align:left; padding:6px 8px; color:#64748b; font-weight:600; font-size:0.7rem;">Asset Name</th>
+                  <th style="text-align:left; padding:6px 8px; color:#64748b; font-weight:600; font-size:0.7rem;">Category</th>
+                  <th style="text-align:left; padding:6px 8px; color:#64748b; font-weight:600; font-size:0.7rem;">Status</th>
+                  <th style="text-align:left; padding:6px 8px; color:#64748b; font-weight:600; font-size:0.7rem;">Assigned To</th>
+                  <th style="text-align:left; padding:6px 8px; color:#64748b; font-weight:600; font-size:0.7rem;">Due Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                @if (devamTopAssets().length === 0) {
+                <tr><td colspan="6" style="text-align:center; padding:1.5rem; color:#94a3b8;">No assets found</td></tr>
+                }
+                @for (a of devamTopAssets(); track a.id) {
+                <tr style="border-bottom:1px solid #f8fafc; transition:background 0.15s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+                  <td style="padding:8px; font-weight:600; color:#374151; white-space:nowrap;">{{ a.assetNumber || a.id }}</td>
+                  <td style="padding:8px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;">{{ a.name }}</td>
+                  <td style="padding:8px; color:#64748b;">{{ a.category || a.assetType || '—' }}</td>
+                  <td style="padding:8px;">
+                    <span [style.background]="a.status === 'Available' ? '#dcfce7' : a.status === 'Checked Out' || a.status === 'In Use' ? '#fef3c7' : '#fee2e2'"
+                          [style.color]="a.status === 'Available' ? '#16a34a' : a.status === 'Checked Out' || a.status === 'In Use' ? '#d97706' : '#dc2626'"
+                          style="padding:2px 8px; border-radius:12px; font-size:0.68rem; font-weight:700; white-space:nowrap;">
+                      {{ a.status || '—' }}
+                    </span>
+                  </td>
+                  <td style="padding:8px; color:#64748b;">{{ a.custodian || '—' }}</td>
+                  <td style="padding:8px; color:#64748b;">{{ a.nextMaintenance || '—' }}</td>
+                </tr>
+                }
+              </tbody>
+            </table>
+            <button (click)="selectSubNav('Asset Master &amp; Inventory', 'Assets')" style="background:none; border:none; color:#3b82f6; font-size:0.75rem; font-weight:600; cursor:pointer; padding:0.5rem 0 0; display:block;">View All Assets</button>
+          </div>
+
+          <!-- Assets by Category -->
+          <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.2rem; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.9rem;">
+              <div style="font-size:0.82rem; font-weight:700; color:#0f172a;">Assets by Category</div>
+              <button (click)="selectNav('Reports &amp; Analytics')" style="background:none; border:none; color:#3b82f6; font-size:0.72rem; font-weight:600; cursor:pointer;">View Report</button>
+            </div>
+
+            @if (devamCategoryBreakdown().length === 0) {
+            <div style="text-align:center; padding:2rem 0; color:#94a3b8; font-size:0.78rem;">No asset category data</div>
+            }
+            @for (cat of devamCategoryBreakdown(); track cat.name) {
+            <div style="margin-bottom:0.85rem;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="material-symbols-outlined" style="font-size:1rem; color:#64748b;">category</span>
+                  <span style="font-size:0.75rem; color:#374151; font-weight:500;">{{ cat.name }}</span>
+                </div>
+                <span style="font-size:0.75rem; font-weight:700; color:#0f172a;">{{ cat.count }} ({{ cat.pct }}%)</span>
+              </div>
+              <div style="height:6px; background:#f1f5f9; border-radius:10px; overflow:hidden;">
+                <div [style.width]="cat.pct + '%'" [style.background]="cat.color" style="height:100%; border-radius:10px; transition:width 0.5s;"></div>
+              </div>
+            </div>
+            }
+
+            <div style="border-top:1px solid #e2e8f0; margin-top:0.5rem; padding-top:0.75rem; display:flex; align-items:center; justify-content:space-between;">
+              <span style="font-size:0.78rem; color:#64748b; font-weight:600;">Total Assets</span>
+              <span style="font-size:0.82rem; font-weight:800; color:#0f172a;">{{ totalInventoryCount() }}</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <!-- END DEVAM DASHBOARD -->
+
+      } @else {
+      <!-- ============================================================ -->
+      <!-- ORIGINAL ADMIN DASHBOARD                                     -->
+      <!-- ============================================================ -->
       <!-- Loader Overlay -->
       @if (isLoading()) {
       <div class="loader-overlay">
@@ -1107,6 +1391,7 @@
           </div>
         </div>
       </div>
+      } <!-- end @else (admin dashboard) -->
       } @else if (activeNav() === 'Assets') {
       @if (activeSubNav() === 'Asset Master & Inventory') {
       <!-- Asset Master & Inventory Split View -->
@@ -1509,112 +1794,9 @@
             @if (activeAssetTab() === 'Overview') {
             <!-- Tab: Overview -->
 
-            <!-- Interactive Asset Lifecycle Stepper -->
-            <div class="overview-card"
-              style="padding: 16px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 12px;">
-              <span class="card-title" style="margin: 0; font-size: 0.85rem; color: var(--text-primary);">Asset
-                Lifecycle Tracker</span>
+            <!-- Asset Lifecycle Tracker hidden -->
 
-              <!-- The Stepper Row -->
-              <div
-                style="display: flex; align-items: center; justify-content: space-between; position: relative; margin: 10px 0;">
-                <!-- Connector Line -->
-                <div
-                  style="position: absolute; top: 12px; left: 4%; right: 4%; height: 3px; background: var(--border-color, #e2e8f0); z-index: 1;">
-                </div>
 
-                <!-- Step 1: Procured -->
-                <div
-                  style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;"
-                  (click)="changeAssetStatus(asset.id, 'Available')">
-                  <div
-                    [style.background]="asset.status === 'Available' || asset.status === 'In Use' || asset.status === 'Checked Out' || asset.status === 'Under Maintenance' ? '#10b981' : 'var(--bg-card)'"
-                    [style.border-color]="asset.status === 'Available' || asset.status === 'In Use' || asset.status === 'Checked Out' || asset.status === 'Under Maintenance' ? '#10b981' : 'var(--border-color)'"
-                    style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
-                    1
-                  </div>
-                  <span style="font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">Procured</span>
-                </div>
-
-                <!-- Step 2: Available -->
-                <div
-                  style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;"
-                  (click)="changeAssetStatus(asset.id, 'Available')">
-                  <div
-                    [style.background]="asset.status === 'Available' || asset.status === 'In Use' || asset.status === 'Checked Out' || asset.status === 'Under Maintenance' ? '#3b82f6' : 'var(--bg-card)'"
-                    [style.border-color]="asset.status === 'Available' || asset.status === 'In Use' || asset.status === 'Checked Out' || asset.status === 'Under Maintenance' ? '#3b82f6' : 'var(--border-color)'"
-                    style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
-                    2
-                  </div>
-                  <span style="font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">Available</span>
-                </div>
-
-                <!-- Step 3: Assigned / In Use -->
-                <div
-                  style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;"
-                  (click)="changeAssetStatus(asset.id, 'In Use')">
-                  <div
-                    [style.background]="asset.status === 'In Use' || asset.status === 'Checked Out' ? '#8b5cf6' : 'var(--bg-card)'"
-                    [style.border-color]="asset.status === 'In Use' || asset.status === 'Checked Out' ? '#8b5cf6' : 'var(--border-color)'"
-                    style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
-                    3
-                  </div>
-                  <span style="font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">Assigned</span>
-                </div>
-
-                <!-- Step 4: Transit -->
-                <div
-                  style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;"
-                  (click)="changeAssetStatus(asset.id, 'Checked Out')">
-                  <div [style.background]="asset.status === 'Checked Out' ? '#f59e0b' : 'var(--bg-card)'"
-                    [style.border-color]="asset.status === 'Checked Out' ? '#f59e0b' : 'var(--border-color)'"
-                    style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
-                    4
-                  </div>
-                  <span style="font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">Transit</span>
-                </div>
-
-                <!-- Step 5: Maintenance -->
-                <div
-                  style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;"
-                  (click)="changeAssetStatus(asset.id, 'Under Maintenance')">
-                  <div [style.background]="asset.status === 'Under Maintenance' ? '#ef4444' : 'var(--bg-card)'"
-                    [style.border-color]="asset.status === 'Under Maintenance' ? '#ef4444' : 'var(--border-color)'"
-                    style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
-                    5
-                  </div>
-                  <span style="font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">Maintenance</span>
-                </div>
-
-                <!-- Step 6: Retired -->
-                <div
-                  style="display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 2; cursor: pointer;"
-                  (click)="changeAssetStatus(asset.id, 'Retired')">
-                  <div [style.background]="asset.status === 'Retired' ? '#64748b' : 'var(--bg-card)'"
-                    [style.border-color]="asset.status === 'Retired' ? '#64748b' : 'var(--border-color)'"
-                    style="width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; font-weight: 700; transition: all 0.2s;">
-                    6
-                  </div>
-                  <span style="font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">Retired</span>
-                </div>
-              </div>
-
-              <!-- Stepper Fast Transition Actions -->
-              <div
-                style="display: flex; gap: 6px; flex-wrap: wrap; border-top: 1px solid var(--border-color, #e2e8f0); padding-top: 8px; margin-top: 4px;">
-                <button (click)="changeAssetStatus(asset.id, 'Available')"
-                  style="flex: 1; min-width: 80px; padding: 6px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 4px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Set
-                  Available</button>
-                <button (click)="changeAssetStatus(asset.id, 'In Use')"
-                  style="flex: 1; min-width: 80px; padding: 6px; background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; border-radius: 4px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Assign
-                  / Deploy</button>
-                <button (click)="changeAssetStatus(asset.id, 'Under Maintenance')"
-                  style="flex: 1; min-width: 80px; padding: 6px; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; border-radius: 4px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Send
-                  to Repair</button>
-                <button (click)="changeAssetStatus(asset.id, 'Retired')"
-                  style="flex: 1; min-width: 80px; padding: 6px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.68rem; font-weight: 700; cursor: pointer;">Decommission</button>
-              </div>
-            </div>
 
             <!-- Tag Details Block (Image & Metadata) -->
             <div class="tag-details-row">
@@ -1866,6 +2048,7 @@
         }
       </div>
       } @else if (activeSubNav() === 'Asset Categories') {
+      @if (!isDevamUser()) {
       <div class="asset-categories-view animate-fade-in">
         <!-- Header -->
         <div class="subpage-header" style="justify-content: flex-end; margin-bottom: 0.5rem; padding: 0;">
@@ -1942,6 +2125,17 @@
           }
         </div>
       </div>
+      } @else {
+        <!-- Devam user: redirect to Asset Master -->
+        <div style="padding:2rem; text-align:center; color:#94a3b8;">
+          <span class="material-symbols-outlined" style="font-size:2.5rem; display:block; margin-bottom:8px; color:#cbd5e1;">category</span>
+          <p style="font-size:0.82rem; margin:0 0 0.75rem;">Asset Categories are managed by the system administrator.</p>
+          <button (click)="selectSubNav('Asset Master &amp; Inventory', 'Assets')"
+            style="background:#2563eb; color:#fff; border:none; border-radius:7px; padding:7px 18px; font-size:0.78rem; font-weight:700; cursor:pointer;">
+            Go to Asset Master
+          </button>
+        </div>
+      }
       } @else if (activeSubNav() === 'Asset Groups') {
       <div class="asset-groups-view animate-fade-in">
         <!-- Header -->
@@ -4886,6 +5080,113 @@
 
       </div>
       } @else if (activeNav() === 'Inventory') {
+
+      @if (isDevamUser()) {
+      <!-- ====================================================== -->
+      <!-- DEVAM INVENTORY VIEW                                    -->
+      <!-- ====================================================== -->
+      <div class="devam-inventory animate-fade-in"
+        style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1.5rem; margin:0.5rem; box-shadow:0 1px 4px rgba(0,0,0,0.06); font-family:'Plus Jakarta Sans','Inter',sans-serif;">
+
+        <!-- Header -->
+        <h2 style="font-size:1.1rem; font-weight:800; color:#0f172a; margin:0 0 1.2rem;">Inventory</h2>
+
+        <!-- Filter / Search Bar -->
+        <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1.25rem; flex-wrap:wrap;">
+
+          <!-- Category Filter -->
+          <select [value]="devamInvCategoryFilter()"
+            (change)="devamInvCategoryFilter.set($any($event.target).value)"
+            style="padding:7px 28px 7px 10px; border:1px solid #cbd5e1; border-radius:7px; font-size:0.78rem; color:#374151; background:#fff url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22><path d=%22M7 7l3 3 3-3%22 stroke=%22%2364748b%22 stroke-width=%221.5%22 fill=%22none%22/></svg>') no-repeat right 8px center/14px; appearance:none; cursor:pointer; min-width:140px; outline:none;">
+            @for (cat of devamInvCategories(); track cat) {
+            <option [value]="cat">{{ cat }}</option>
+            }
+          </select>
+
+          <!-- Status Filter -->
+          <select [value]="devamInvStatusFilter()"
+            (change)="devamInvStatusFilter.set($any($event.target).value)"
+            style="padding:7px 28px 7px 10px; border:1px solid #cbd5e1; border-radius:7px; font-size:0.78rem; color:#374151; background:#fff url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22><path d=%22M7 7l3 3 3-3%22 stroke=%22%2364748b%22 stroke-width=%221.5%22 fill=%22none%22/></svg>') no-repeat right 8px center/14px; appearance:none; cursor:pointer; min-width:120px; outline:none;">
+            <option value="All Status">All Status</option>
+            <option value="Available">Available</option>
+            <option value="Checked Out">Checked Out</option>
+            <option value="In Use">In Use</option>
+            <option value="Under Maintenance">Under Maintenance</option>
+          </select>
+
+          <!-- Search -->
+          <div style="position:relative; flex:1; min-width:180px; max-width:320px;">
+            <span class="material-symbols-outlined" style="position:absolute; left:9px; top:50%; transform:translateY(-50%); font-size:1rem; color:#94a3b8; pointer-events:none;">search</span>
+            <input type="text" placeholder="Search asset..."
+              [value]="devamInvSearch()"
+              (input)="devamInvSearch.set($any($event.target).value)"
+              style="width:100%; padding:7px 10px 7px 32px; border:1px solid #cbd5e1; border-radius:7px; font-size:0.78rem; color:#374151; outline:none; box-sizing:border-box; background:#fff;" />
+          </div>
+
+          <!-- Export Button -->
+          <button style="margin-left:auto; background:#2563eb; color:#fff; border:none; border-radius:7px; padding:7px 18px; font-size:0.78rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
+            <span class="material-symbols-outlined" style="font-size:1rem;">file_download</span>
+            Export
+          </button>
+        </div>
+
+        <!-- Table -->
+        <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+          <thead>
+            <tr style="border-bottom:2px solid #f1f5f9;">
+              <th style="text-align:left; padding:10px 12px; color:#374151; font-weight:700; font-size:0.75rem;">Asset ID</th>
+              <th style="text-align:left; padding:10px 12px; color:#374151; font-weight:700; font-size:0.75rem;">Asset Name</th>
+              <th style="text-align:left; padding:10px 12px; color:#374151; font-weight:700; font-size:0.75rem;">Category</th>
+              <th style="text-align:left; padding:10px 12px; color:#374151; font-weight:700; font-size:0.75rem;">Status</th>
+              <th style="text-align:left; padding:10px 12px; color:#374151; font-weight:700; font-size:0.75rem;">Assigned To</th>
+              <th style="text-align:left; padding:10px 12px; color:#374151; font-weight:700; font-size:0.75rem;">Location</th>
+              <th style="text-align:left; padding:10px 12px; color:#374151; font-weight:700; font-size:0.75rem;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (devamFilteredAssets().length === 0) {
+            <tr>
+              <td colspan="7" style="text-align:center; padding:2.5rem; color:#94a3b8;">
+                <span class="material-symbols-outlined" style="font-size:2rem; display:block; margin-bottom:6px; color:#cbd5e1;">inventory_2</span>
+                No inventory items found
+              </td>
+            </tr>
+            }
+            @for (asset of devamFilteredAssets(); track asset.id) {
+            <tr style="border-bottom:1px solid #f8fafc; transition:background 0.15s;"
+              onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+              <td style="padding:12px; font-weight:600; color:#374151; white-space:nowrap;">{{ asset.assetNumber || asset.id }}</td>
+              <td style="padding:12px; color:#0f172a; font-weight:500;">{{ asset.name }}</td>
+              <td style="padding:12px; color:#64748b;">{{ asset.category || asset.assetType || '—' }}</td>
+              <td style="padding:12px;">
+                <span
+                  [style.background]="asset.status === 'Available' ? '#dcfce7' : asset.status === 'Checked Out' || asset.status === 'In Use' ? '#fff7ed' : asset.status === 'Under Maintenance' ? '#fef2f2' : '#f1f5f9'"
+                  [style.color]="asset.status === 'Available' ? '#16a34a' : asset.status === 'Checked Out' || asset.status === 'In Use' ? '#ea580c' : asset.status === 'Under Maintenance' ? '#dc2626' : '#64748b'"
+                  [style.border]="asset.status === 'Available' ? '1px solid #bbf7d0' : asset.status === 'Checked Out' || asset.status === 'In Use' ? '1px solid #fed7aa' : '1px solid #e2e8f0'"
+                  style="padding:3px 10px; border-radius:14px; font-size:0.7rem; font-weight:700; white-space:nowrap; display:inline-block;">
+                  {{ asset.status || '—' }}
+                </span>
+              </td>
+              <td style="padding:12px; color:#64748b;">{{ asset.custodian || '—' }}</td>
+              <td style="padding:12px; color:#64748b;">{{ asset.site || selectedSite() || '—' }}</td>
+              <td style="padding:12px;">
+                <button (click)="selectedAsset.set(asset); selectSubNav('Asset Master &amp; Inventory', 'Assets')"
+                  style="background:none; border:none; color:#2563eb; font-size:0.78rem; font-weight:700; cursor:pointer; padding:0; text-decoration:none;">View</button>
+              </td>
+            </tr>
+            }
+          </tbody>
+        </table>
+
+        <!-- Footer row count -->
+        <div style="margin-top:0.85rem; font-size:0.72rem; color:#94a3b8; text-align:right;">
+          Showing {{ devamFilteredAssets().length }} of {{ siteFilteredAssets().length }} assets
+        </div>
+      </div>
+      <!-- END DEVAM INVENTORY -->
+
+      } @else {
+      <!-- ORIGINAL ADMIN INVENTORY -->
       <div class="inventory-view animate-fade-in"
         style="display: flex; gap: 0.75rem; flex-direction: column; width: 100%; box-sizing: border-box; padding: 0.25rem 0.5rem;">
 
@@ -5239,6 +5540,7 @@
         </div>
 
       </div>
+      } <!-- end @else (admin inventory) -->
       } @else if (activeNav() === 'Maintenance') {
       <div class="maintenance-view animate-fade-in"
         style="display: flex; gap: 0.75rem; flex-direction: column; width: 100%; box-sizing: border-box; padding: 0.25rem 0.5rem; background: var(--bg-main);">
@@ -7161,8 +7463,8 @@
         </div>
 
       </div>
-      } @else if (activeNav() === 'Admin') {
-      <!-- Admin View -->
+      } @else if (activeNav() === 'Admin' || activeNav() === 'Settings') {
+      <!-- Admin / Settings View -->
       <div class="admin-view animate-fade-in"
         style="display: flex; gap: 0.75rem; flex-direction: column; width: 100%; box-sizing: border-box; padding: 0.25rem 0.5rem;">
 
@@ -7171,18 +7473,18 @@
           style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
           <div style="display: flex; align-items: center; gap: 10px;">
             <span class="material-symbols-outlined text-info"
-              style="font-size: 1.35rem; color: #3b82f6;">admin_panel_settings</span>
+              style="font-size: 1.35rem; color: #3b82f6;">{{ isDevamUser() ? 'settings' : 'admin_panel_settings' }}</span>
             <div>
               <h3
                 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.85rem; font-weight: 700; margin: 0; color: var(--text-primary);">
-                System Administration</h3>
-              <span style="font-size: 0.68rem; color: var(--text-secondary);">Manage user accounts, reader devices, API
-                keys, and global preferences</span>
+                {{ isDevamUser() ? 'System Settings & Preferences' : 'System Administration' }}</h3>
+              <span style="font-size: 0.68rem; color: var(--text-secondary);">Manage account preferences, alerts, and global configurations</span>
             </div>
           </div>
 
           <div
             style="display: flex; align-items: center; gap: 6px; background: var(--border-light); padding: 3px; border-radius: 6px;">
+            @if (!isDevamUser()) {
             <button (click)="selectSubNav('User Management', 'Admin')"
               [style.background]="activeSubNav() === 'User Management' ? 'var(--bg-card)' : 'none'"
               [style.color]="activeSubNav() === 'User Management' ? 'var(--text-primary)' : 'var(--text-secondary)'"
@@ -7193,11 +7495,13 @@
               [style.color]="activeSubNav() === 'Handheld Registry' ? 'var(--text-primary)' : 'var(--text-secondary)'"
               style="border: none; padding: 4px 10px; font-size: 0.68rem; font-weight: 600; border-radius: 4px; cursor: pointer; transition: all 0.15s; outline: none;">Handheld
               Registry</button>
-            <button (click)="selectSubNav('System Settings', 'Admin')"
+            }
+            <button (click)="selectSubNav('System Settings', isDevamUser() ? 'Settings' : 'Admin')"
               [style.background]="activeSubNav() === 'System Settings' ? 'var(--bg-card)' : 'none'"
               [style.color]="activeSubNav() === 'System Settings' ? 'var(--text-primary)' : 'var(--text-secondary)'"
               style="border: none; padding: 4px 10px; font-size: 0.68rem; font-weight: 600; border-radius: 4px; cursor: pointer; transition: all 0.15s; outline: none;">System
               Settings</button>
+            @if (!isDevamUser()) {
             <button (click)="selectSubNav('Reader Profiles', 'Admin')"
               [style.background]="activeSubNav() === 'Reader Profiles' ? 'var(--bg-card)' : 'none'"
               [style.color]="activeSubNav() === 'Reader Profiles' ? 'var(--text-primary)' : 'var(--text-secondary)'"
@@ -7208,6 +7512,7 @@
               [style.color]="activeSubNav() === 'API Management' ? 'var(--text-primary)' : 'var(--text-secondary)'"
               style="border: none; padding: 4px 10px; font-size: 0.68rem; font-weight: 600; border-radius: 4px; cursor: pointer; transition: all 0.15s; outline: none;">API
               Keys</button>
+            }
           </div>
         </div>
 
@@ -7438,7 +7743,7 @@
                     }}</td>
                   <td
                     style="padding: 0.55rem 0.75rem; text-align: center; color: var(--text-primary); font-weight: 700;">
-                    {{ reader.antennas }} / 4 Antennas</td>
+                    {{ reader.antennas }} {{ reader.antennas === 1 ? 'Antenna' : 'Antennas' }}</td>
                   <td
                     style="padding: 0.55rem 0.75rem; text-align: center; color: var(--text-secondary); font-family: monospace;">
                     {{ reader.powerDbm }} dBm</td>
