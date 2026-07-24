@@ -854,9 +854,9 @@ export class App implements AfterViewInit, OnDestroy {
     if (!this.isLoggedIn()) return;
     import('rxjs').then(({ forkJoin }) => {
       forkJoin({
-        rfid: this.http.get<any>('${environment.apiUrl}/rfidtags?page=1&size=200'),
-        barcode: this.http.get<any>('${environment.apiUrl}/barcodes?page=1&size=200'),
-        gps: this.http.get<any>('${environment.apiUrl}/gpsdevices?page=1&size=200')
+        rfid: this.http.get<any>(`${environment.apiUrl}/rfidtags?page=1&size=200`),
+        barcode: this.http.get<any>(`${environment.apiUrl}/barcodes?page=1&size=200`),
+        gps: this.http.get<any>(`${environment.apiUrl}/gpsdevices?page=1&size=200`)
       }).subscribe({
         next: (res) => {
           const list: any[] = [];
@@ -953,7 +953,7 @@ export class App implements AfterViewInit, OnDestroy {
     }
 
     const type = this.newTagType();
-    let url = '${environment.apiUrl}/rfidtags';
+    let url = `${environment.apiUrl}/rfidtags`;
     let payload: any = {};
 
     if (type === 'RFID') {
@@ -964,7 +964,7 @@ export class App implements AfterViewInit, OnDestroy {
         status: this.newTagStatus()
       };
     } else if (type === 'Barcode') {
-      url = '${environment.apiUrl}/barcodes';
+      url = `${environment.apiUrl}/barcodes`;
       payload = {
         barcodeValue: epc,
         format: 'Code128',
@@ -972,7 +972,7 @@ export class App implements AfterViewInit, OnDestroy {
         isActive: this.newTagStatus() === 'Active'
       };
     } else if (type === 'GPS') {
-      url = '${environment.apiUrl}/gpsdevices';
+      url = `${environment.apiUrl}/gpsdevices`;
       payload = {
         imei: epc,
         simNumber: null,
@@ -1000,9 +1000,9 @@ export class App implements AfterViewInit, OnDestroy {
     if (confirm(`Are you sure you want to decommission tag ${epc}?`)) {
       const tag = this.tagsList().find(t => t.epc === epc);
       if (tag && tag.id) {
-        let url = '${environment.apiUrl}/rfidtags';
-        if (tag.rawType === 'Barcode') url = '${environment.apiUrl}/barcodes';
-        else if (tag.rawType === 'GPS') url = '${environment.apiUrl}/gpsdevices';
+        let url = `${environment.apiUrl}/rfidtags`;
+        if (tag.rawType === 'Barcode') url = `${environment.apiUrl}/barcodes`;
+        else if (tag.rawType === 'GPS') url = `${environment.apiUrl}/gpsdevices`;
 
         this.http.delete(`${url}/${tag.id}`).subscribe({
           next: () => this.fetchTags(),
@@ -1169,7 +1169,7 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected fetchRfidEvents() {
     if (!this.isLoggedIn()) return;
-    this.http.get<any>('${environment.apiUrl}/movements?page=1&size=200').subscribe({
+    this.http.get<any>(`${environment.apiUrl}/movements?page=1&size=200`).subscribe({
       next: (res) => {
         const body = res.body || res || [];
         const movements = Array.isArray(body) ? body : (body.items ?? []);
@@ -2311,7 +2311,7 @@ export class App implements AfterViewInit, OnDestroy {
     });
 
     // Call API Bulk Create endpoint
-    this.http.post('${environment.apiUrl}/assets/bulk', commands).subscribe({
+    this.http.post(`${environment.apiUrl}/assets/bulk`, commands).subscribe({
       next: (res: any) => {
         alert(`Successfully imported ${res.count} assets into the database!`);
         this.isBulkFileUploaded.set(false);
@@ -2718,7 +2718,7 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected fetchCategories(callback?: () => void) {
     if (!this.isLoggedIn()) return;
-    this.http.get<any[]>('${environment.apiUrl}/categories?page=1&size=200').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/categories?page=1&size=200`).subscribe({
       next: (data) => {
         if (Array.isArray(data)) {
           this.apiCategories.set(data);
@@ -2732,7 +2732,7 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected fetchAssets() {
     if (!this.isLoggedIn()) return;
-    this.http.get<any[]>('${environment.apiUrl}/assets?page=1&size=1000').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/assets?page=1&size=1000`).subscribe({
       next: (data) => {
         const rfidPool = this.rfidTagsPool();
         const bcPool = this.barcodesPool();
@@ -3110,7 +3110,7 @@ export class App implements AfterViewInit, OnDestroy {
     };
 
     if (this.modalMode() === 'add') {
-      this.http.post('${environment.apiUrl}/assets', payload).subscribe({
+      this.http.post(`${environment.apiUrl}/assets`, payload).subscribe({
         next: (guid: any) => {
           const assetId = guid && guid.id ? guid.id : guid;
           if (assetId) {
@@ -3166,10 +3166,10 @@ export class App implements AfterViewInit, OnDestroy {
     }
 
     const type = this.formBulkTagsType();
-    let url = '${environment.apiUrl}/rfidtags';
-    if (type === 'RFID') url = '${environment.apiUrl}/rfidtags';
-    else if (type === 'Barcode') url = '${environment.apiUrl}/barcodes';
-    else if (type === 'GPS') url = '${environment.apiUrl}/gpsdevices';
+    let url = `${environment.apiUrl}/rfidtags`;
+    if (type === 'RFID') url = `${environment.apiUrl}/rfidtags`;
+    else if (type === 'Barcode') url = `${environment.apiUrl}/barcodes`;
+    else if (type === 'GPS') url = `${environment.apiUrl}/gpsdevices`;
 
     const requests = lines.map(code => {
       let body: any = {};
@@ -3335,7 +3335,7 @@ export class App implements AfterViewInit, OnDestroy {
       name: this.formCategoryName(),
       description: this.formCategoryDescription() || 'Custom Category'
     };
-    this.http.post('${environment.apiUrl}/categories', payload).subscribe({
+    this.http.post(`${environment.apiUrl}/categories`, payload).subscribe({
       next: () => {
         this.isCategoryModalOpen.set(false);
         alert('Category created successfully in PostgreSQL database!');
@@ -4079,9 +4079,9 @@ export class App implements AfterViewInit, OnDestroy {
     if (!this.isLoggedIn()) return;
     import('rxjs').then(({ forkJoin }) => {
       forkJoin({
-        rfid: this.http.get<any>('${environment.apiUrl}/rfidtags?page=1&size=200'),
-        barcode: this.http.get<any>('${environment.apiUrl}/barcodes?page=1&size=200'),
-        gps: this.http.get<any>('${environment.apiUrl}/gpsdevices?page=1&size=200')
+        rfid: this.http.get<any>(`${environment.apiUrl}/rfidtags?page=1&size=200`),
+        barcode: this.http.get<any>(`${environment.apiUrl}/barcodes?page=1&size=200`),
+        gps: this.http.get<any>(`${environment.apiUrl}/gpsdevices?page=1&size=200`)
       }).subscribe({
         next: (res) => {
           const rfidList: any[] = Array.isArray(res.rfid) ? res.rfid : (res.rfid?.body ?? []);
@@ -4125,7 +4125,7 @@ export class App implements AfterViewInit, OnDestroy {
     import('rxjs').then(({ forkJoin }) => {
       forkJoin({
         assignments: this.apiService.getAssignments(),
-        truckStatus: this.http.get<any>('${environment.apiUrl}/Trucks/complete-status')
+        truckStatus: this.http.get<any>(`${environment.apiUrl}/Trucks/complete-status`)
       }).subscribe({
         next: (res) => {
           const list = res.assignments.body || res.assignments;
