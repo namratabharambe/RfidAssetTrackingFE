@@ -15,7 +15,47 @@ export class AuthService {
   readonly token = signal<string | null>(localStorage.getItem('jwt_token'));
   readonly refreshToken = signal<string | null>(localStorage.getItem('refresh_token'));
   readonly currentUser = signal<any | null>(JSON.parse(localStorage.getItem('current_user') || 'null'));
-  readonly isLoggedIn = signal<boolean>(!!this.token());
+  
+  readonly isSessionExpired = signal<boolean>(false);
+  readonly sessionExpiredReason = signal<string>('Your session has expired. Please log in again to continue.');
+  readonly isLoggedIn = signal<boolean>(!!this.token() && !this.isTokenExpired(this.token()));
+
+  constructor() {
+    const currentToken = this.token();
+    if (currentToken && this.isTokenExpired(currentToken)) {
+      this.handleSessionExpired('Your token has expired. Please log in again.');
+    }
+  }
+
+  isTokenExpired(token: string | null): boolean {
+    if (!token) return true;
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return true;
+      const payloadBase64 = parts[1];
+      const decodedJson = atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/'));
+      const payload = JSON.parse(decodedJson);
+      if (!payload.exp) return false;
+      const currentTime = Math.floor(Date.now() / 1000);
+      return payload.exp < currentTime;
+    } catch {
+      return true;
+    }
+  }
+
+  handleSessionExpired(reason?: string) {
+    this.clearStorage();
+    if (reason) {
+      this.sessionExpiredReason.set(reason);
+    } else {
+      this.sessionExpiredReason.set('Your session has expired. Please log in again to continue.');
+    }
+    this.isSessionExpired.set(true);
+  }
+
+  closeSessionExpiredModal() {
+    this.isSessionExpired.set(false);
+  }
 
   login(credentials: any): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/login`, credentials).pipe(
@@ -28,6 +68,7 @@ export class AuthService {
         this.refreshToken.set(res.refreshToken);
         this.currentUser.set(res.user);
         this.isLoggedIn.set(true);
+        this.isSessionExpired.set(false);
       })
     );
   }
@@ -54,6 +95,8 @@ export class AuthService {
         this.token.set(res.token);
         this.refreshToken.set(res.refreshToken);
         this.currentUser.set(res.user);
+        this.isLoggedIn.set(true);
+        this.isSessionExpired.set(false);
       })
     );
   }

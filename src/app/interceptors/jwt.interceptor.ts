@@ -8,6 +8,29 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
   const token = authService.token();
 
+  if (token && authService.isTokenExpired(token)) {
+    if (authService.refreshToken()) {
+      return authService.refresh().pipe(
+        switchMap(() => {
+          const newToken = authService.token();
+          const authReq = req.clone({
+            setHeaders: {
+              Authorization: `Bearer ${newToken}`
+            }
+          });
+          return next(authReq);
+        }),
+        catchError((err) => {
+          authService.handleSessionExpired('Session Expired: Your session has expired. Please log in again.');
+          return throwError(() => err);
+        })
+      );
+    } else {
+      authService.handleSessionExpired('Session Expired: Your session has expired. Please log in again.');
+      return throwError(() => new Error('Token expired'));
+    }
+  }
+
   let authReq = req;
   if (token) {
     authReq = req.clone({
@@ -31,8 +54,7 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
             return next(retryReq);
           }),
           catchError((refreshErr) => {
-            authService.clearStorage();
-            alert('Session expired');
+            authService.handleSessionExpired('Session Expired: Your session has expired. Please log in again.');
             return throwError(() => refreshErr);
           })
         );
