@@ -2529,9 +2529,11 @@
                     </td>
                     <td>{{ rec.equipment }}</td>
                     <td>
-                      <span class="reader-badge-handheld">
+                      <span [class]="(rec.type && rec.type.includes('Handheld')) ? 'reader-badge-handheld' : 'reader-badge-fixed'">
                         <span class="material-symbols-outlined"
-                          style="font-size: 0.9rem; font-variation-settings: 'FILL' 1; vertical-align: middle; margin-right: 4px;">contactless</span>
+                          style="font-size: 0.9rem; font-variation-settings: 'FILL' 1; vertical-align: middle; margin-right: 4px;">
+                          {{ (rec.type && rec.type.includes('Handheld')) ? 'phone_android' : 'contactless' }}
+                        </span>
                         {{ rec.type }}
                       </span>
                     </td>
@@ -2590,6 +2592,7 @@
                     <th>CheckIn Entity</th>
                     <th>Equipment</th>
                     <th>Type</th>
+                    <th>EPC</th>
                     <th>Gate Status</th>
                     <th>CheckInTime</th>
                   </tr>
@@ -2601,12 +2604,19 @@
                     </td>
                     <td>{{ rec.equipment }}</td>
                     <td>
-                      <span class="reader-badge-handheld">
+                      <span [class]="(rec.type && (rec.type.includes('Handheld') || rec.type.includes('OPERATOR'))) ? 'reader-badge-handheld' : 'reader-badge-fixed'"
+                        [style.background]="(rec.type && (rec.type.includes('Handheld') || rec.type.includes('OPERATOR'))) ? 'rgba(13, 148, 136, 0.08)' : 'rgba(59, 130, 246, 0.12)'"
+                        [style.color]="(rec.type && (rec.type.includes('Handheld') || rec.type.includes('OPERATOR'))) ? '#0d9488' : '#2563eb'"
+                        [style.borderColor]="(rec.type && (rec.type.includes('Handheld') || rec.type.includes('OPERATOR'))) ? 'rgba(13, 148, 136, 0.15)' : 'rgba(59, 130, 246, 0.3)'"
+                        style="padding: 0.2rem 0.45rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600; display: inline-flex; align-items: center; border-width: 1px; border-style: solid;">
                         <span class="material-symbols-outlined"
-                          style="font-size: 0.9rem; font-variation-settings: 'FILL' 1; vertical-align: middle; margin-right: 4px;">contactless</span>
+                          style="font-size: 0.9rem; font-variation-settings: 'FILL' 1; vertical-align: middle; margin-right: 4px;">
+                          {{ (rec.type && (rec.type.includes('Handheld') || rec.type.includes('OPERATOR'))) ? 'phone_android' : 'contactless' }}
+                        </span>
                         {{ rec.type }}
                       </span>
                     </td>
+                    <td style="font-family: monospace; font-size: 0.78rem; color: var(--text-secondary);">{{ rec.epc || '—' }}</td>
                     <td>
                       @if (rec.gateStatus === 'COMPLETED' || rec.gateStatus === 'Completed') {
                       <span style="background: #dcfce7; color: #166534; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; display: inline-block; text-transform: uppercase; letter-spacing: 0.4px;">COMPLETED</span>
@@ -2622,7 +2632,7 @@
                   </tr>
                   } @empty {
                   <tr>
-                    <td colspan="5" style="text-align: center; padding: 4rem 1rem;">
+                    <td colspan="6" style="text-align: center; padding: 4rem 1rem;">
                       <div class="no-data-placeholder"
                         style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted);">
                         <span class="material-symbols-outlined no-data-icon"
@@ -2720,6 +2730,11 @@
                 <span style="font-size: 0.65rem; font-weight: 800; color: #10b981;">A4</span>
                 <span style="font-size: 0.55rem; color: #10b981;">-59 dB</span>
               </div>
+              <div class="antenna-badge"
+                style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 4px; padding: 2px 6px; min-width: 28px;">
+                <span style="font-size: 0.65rem; font-weight: 800; color: #10b981;">A5</span>
+                <span style="font-size: 0.55rem; color: #10b981;">-60 dB</span>
+              </div>
             </div>
           </div>
 
@@ -2799,7 +2814,7 @@
               <div>
                 <span
                   style="font-size: 0.65rem; color: var(--text-muted, #64748b); display: block; text-transform: uppercase;">Antennas</span>
-                <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-main, #0f172a);">4 / 4</span>
+                <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-main, #0f172a);">5 / 5</span>
               </div>
             </div>
           </div>
@@ -3268,9 +3283,84 @@
               </div>
             </div>
           </div>
-
         </div>
 
+        <!-- Scan Sessions Table Card (Database Recorded Sessions) -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-top: 16px; box-shadow: var(--shadow-sm);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 8px;">
+              <span class="material-symbols-outlined" style="color: #3b82f6;">sensors_krx</span>
+              Recorded Scan Sessions (Database)
+            </h3>
+            <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted);">{{ filteredHandheldSessionsList().length }} Sessions Logged</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table-modern" style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-weight: 600; text-align: left;">
+                  <th style="padding: 8px;">Session ID</th>
+                  <th style="padding: 8px;">Operator / Auditor</th>
+                  <th style="padding: 8px;">Device Model</th>
+                  <th style="padding: 8px;">Audit Type</th>
+                  <th style="padding: 8px;">Start Time</th>
+                  <th style="padding: 8px; text-align: center;">Scanned Tags</th>
+                  <th style="padding: 8px; text-align: center;">Discrepancies</th>
+                  <th style="padding: 8px;">Status</th>
+                  <th style="padding: 8px; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (sess of filteredHandheldSessionsList(); track sess.id) {
+                <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s;">
+                  <td style="padding: 8px; font-family: monospace; font-weight: 600;">{{ sess.id }}</td>
+                  <td style="padding: 8px;">
+                    <div style="font-weight: 600; color: var(--text-main);">{{ sess.operator }}</div>
+                  </td>
+                  <td style="padding: 8px;">{{ sess.model }}</td>
+                  <td style="padding: 8px; font-weight: 500;">{{ sess.type }}</td>
+                  <td style="padding: 8px;">
+                    <div>{{ sess.startTime }}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted);">Duration: {{ sess.duration }}</div>
+                  </td>
+                  <td style="padding: 8px; text-align: center; font-weight: 700; font-family: monospace; color: var(--color-primary);">
+                    {{ sess.scannedTags | number }}
+                  </td>
+                  <td style="padding: 8px; text-align: center;">
+                    <span style="font-weight: 700;" [style.color]="sess.discrepancies > 0 ? '#ef4444' : 'var(--text-secondary)'">
+                      {{ sess.discrepancies }}
+                    </span>
+                  </td>
+                  <td style="padding: 8px;">
+                    <span class="status-pill" [class.active]="sess.status === 'In Progress'"
+                      [class.available]="sess.status === 'Synced' || sess.status === 'Completed'"
+                      [class.danger]="sess.status === 'Failed'"
+                      style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
+                      {{ sess.status }}
+                    </span>
+                  </td>
+                  <td style="padding: 8px; text-align: right;">
+                    @if (sess.status === 'In Progress') {
+                    <button (click)="stopHandheldSession(sess.id)" class="action-btn-outline sm-btn text-danger"
+                      style="padding: 3px 6px; border-color: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: 600; border-radius: 4px;">
+                      End Session
+                    </button>
+                    } @else {
+                    <span style="color: var(--text-muted); font-size: 0.75rem;">Locked &amp; Synced</span>
+                    }
+                  </td>
+                </tr>
+                } @empty {
+                <tr>
+                  <td colspan="9" style="padding: 16px; text-align: center; color: var(--text-muted); font-style: italic;">
+                    No scan sessions logged in database.
+                  </td>
+                </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
       } @else if (activeSubNav() === 'Tag Management') {
       <div class="tag-management-view animate-fade-in"
@@ -3744,9 +3834,9 @@
               <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                 @for (ant of reader.antennas; track ant) {
                 <span
-                  style="font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 500;
-                      background: {{ ant.includes('OK') ? 'rgba(16, 185, 129, 0.08)' : (ant.includes('Degraded') ? 'rgba(245, 158, 11, 0.08)' : 'rgba(239, 68, 68, 0.08)') }};
-                      color: {{ ant.includes('OK') ? '#10b981' : (ant.includes('Degraded') ? '#f59e0b' : '#ef4444') }};">
+                  style="font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 500;"
+                  [style.background]="ant.includes('OK') ? 'rgba(16, 185, 129, 0.08)' : (ant.includes('Degraded') ? 'rgba(245, 158, 11, 0.08)' : 'rgba(239, 68, 68, 0.08)')"
+                  [style.color]="ant.includes('OK') ? '#10b981' : (ant.includes('Degraded') ? '#f59e0b' : '#ef4444')">
                   {{ ant }}
                 </span>
                 }
@@ -3897,7 +3987,7 @@
                   </td>
                   <td style="padding: 8px; text-align: center;">
                     <span
-                      style="font-weight: 700; color: {{ sess.discrepancies > 0 ? '#ef4444' : 'var(--text-secondary)' }}">
+                      style="font-weight: 700;" [style.color]="sess.discrepancies > 0 ? '#ef4444' : 'var(--text-secondary)'">
                       {{ sess.discrepancies }}
                     </span>
                   </td>
@@ -3988,12 +4078,13 @@
             style="display: flex; flex-direction: column; gap: 6px; max-height: 500px; overflow-y: auto; padding-right: 4px;">
             @for (evt of filteredRfidEventsList(); track evt.id) {
             <div
-              style="display: flex; gap: 12px; padding: 10px; border-radius: 6px; background: var(--bg-body); border-left: 3px solid {{ evt.severity === 'Error' ? '#ef4444' : (evt.severity === 'Warning' ? '#f59e0b' : '#3b82f6') }}; font-size: 0.82rem; align-items: center;">
+              style="display: flex; gap: 12px; padding: 10px; border-radius: 6px; background: var(--bg-body); font-size: 0.82rem; align-items: center;"
+              [style.border-left]="'3px solid ' + (evt.severity === 'Error' ? '#ef4444' : (evt.severity === 'Warning' ? '#f59e0b' : '#3b82f6'))">
 
               <!-- Severity Icon -->
               <span class="material-symbols-outlined"
-                style="font-size: 1.2rem;
-                  color: {{ evt.severity === 'Error' ? '#ef4444' : (evt.severity === 'Warning' ? '#f59e0b' : '#3b82f6') }};">
+                style="font-size: 1.2rem;"
+                [style.color]="evt.severity === 'Error' ? '#ef4444' : (evt.severity === 'Warning' ? '#f59e0b' : '#3b82f6')">
                 {{ evt.severity === 'Error' ? 'error_med' : (evt.severity === 'Warning' ? 'warning' : 'info') }}
               </span>
 
@@ -8074,7 +8165,9 @@
             style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;">
             <option [ngValue]="1">1</option>
             <option [ngValue]="2">2</option>
+            <option [ngValue]="3">3</option>
             <option [ngValue]="4">4</option>
+            <option [ngValue]="5">5</option>
             <option [ngValue]="8">8</option>
           </select>
         </div>
@@ -8979,4 +9072,32 @@
   </div>
 </div>
 }
-<!-- Rebuild trigger -->
+
+<!-- Session Expired WebUI Modal Overlay -->
+@if (isSessionExpired()) {
+<div class="session-expired-overlay" (click)="closeSessionExpiredModal()">
+  <div class="session-expired-card" (click)="$event.stopPropagation()">
+    <div class="session-expired-header">
+      <div class="session-expired-icon-wrapper">
+        <span class="material-symbols-outlined">lock_clock</span>
+      </div>
+      <h3 class="session-expired-title">Session Expired</h3>
+      <p class="session-expired-subtitle">{{ sessionExpiredReason() }}</p>
+    </div>
+
+    <div class="session-expired-body">
+      <div class="session-expired-info-box">
+        <span class="material-symbols-outlined info-icon">info</span>
+        <span>For security reasons, your active login session has expired. You have been automatically logged out.</span>
+      </div>
+    </div>
+
+    <div class="session-expired-footer">
+      <button type="button" class="session-expired-btn" (click)="closeSessionExpiredModal()">
+        <span>Log In Again</span>
+        <span class="material-symbols-outlined">login</span>
+      </button>
+    </div>
+  </div>
+</div>
+}

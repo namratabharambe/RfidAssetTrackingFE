@@ -1,6 +1,9 @@
+import { environment } from '../environments/environment';
 import { Component, signal, computed, effect, ElementRef, ViewChild, AfterViewInit, OnDestroy, PLATFORM_ID, inject, NgZone } from '@angular/core';
 import { isPlatformBrowser, DecimalPipe, UpperCasePipe } from '@angular/common';
+import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+
 import { FormsModule } from '@angular/forms';
 import { Chart, registerables } from 'chart.js';
 import { jsPDF } from 'jspdf';
@@ -169,7 +172,7 @@ export interface MaintenanceAlert {
 
 @Component({
   selector: 'app-root',
-  imports: [DecimalPipe, UpperCasePipe, FormsModule],
+  imports: [DecimalPipe, UpperCasePipe, FormsModule, RouterOutlet, RouterLink, RouterLinkActive],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
@@ -228,11 +231,18 @@ export class App implements AfterViewInit, OnDestroy {
 
   // State Signals
   protected readonly isLoggedIn = signal<boolean>(false);
+  protected readonly isSessionExpired = computed(() => this.authService.isSessionExpired());
+  protected readonly sessionExpiredReason = computed(() => this.authService.sessionExpiredReason());
   protected readonly loginUsername = signal<string>('');
   protected readonly loginPassword = signal<string>('');
   protected readonly loginRememberMe = signal<boolean>(true);
   protected readonly loginErrorMessage = signal<string>('');
   protected readonly showPassword = signal<boolean>(false);
+
+  protected closeSessionExpiredModal() {
+    this.authService.closeSessionExpiredModal();
+    this.isLoggedIn.set(false);
+  }
 
   protected readonly isDevamUser = computed(() => {
     const user = this.authService.currentUser();
@@ -574,7 +584,8 @@ export class App implements AfterViewInit, OnDestroy {
     const op = this.activeOperation();
     let list = this.checkoutRecords();
     if (site !== 'All Sites') {
-      list = list.filter(r => r.site === site);
+      const match = list.filter(r => r.site === site || !r.site || site === 'Devam Site');
+      if (match.length > 0) list = match;
     }
     if (op !== 'All Operations') {
       list = list.filter(r => {
@@ -595,7 +606,8 @@ export class App implements AfterViewInit, OnDestroy {
     const op = this.activeOperation();
     let list = this.checkinRecords();
     if (site !== 'All Sites') {
-      list = list.filter(r => r.site === site);
+      const match = list.filter(r => r.site === site || !r.site || site === 'Devam Site');
+      if (match.length > 0) list = match;
     }
     if (op !== 'All Operations') {
       list = list.filter(r => {
@@ -615,7 +627,8 @@ export class App implements AfterViewInit, OnDestroy {
     const op = this.activeOperation();
     let list = this.checkoutRecords();
     if (site !== 'All Sites') {
-      list = list.filter(r => r.site === site);
+      const match = list.filter(r => r.site === site || !r.site || site === 'Devam Site');
+      if (match.length > 0) list = match;
     }
     if (op !== 'All Operations') {
       list = list.filter(r => {
@@ -853,9 +866,9 @@ export class App implements AfterViewInit, OnDestroy {
     if (!this.isLoggedIn()) return;
     import('rxjs').then(({ forkJoin }) => {
       forkJoin({
-        rfid: this.http.get<any>('http://localhost:5025/api/rfidtags?page=1&size=200'),
-        barcode: this.http.get<any>('http://localhost:5025/api/barcodes?page=1&size=200'),
-        gps: this.http.get<any>('http://localhost:5025/api/gpsdevices?page=1&size=200')
+        rfid: this.http.get<any>(`${environment.apiUrl}/rfidtags?page=1&size=200`),
+        barcode: this.http.get<any>(`${environment.apiUrl}/barcodes?page=1&size=200`),
+        gps: this.http.get<any>(`${environment.apiUrl}/gpsdevices?page=1&size=200`)
       }).subscribe({
         next: (res) => {
           const list: any[] = [];
@@ -952,7 +965,7 @@ export class App implements AfterViewInit, OnDestroy {
     }
 
     const type = this.newTagType();
-    let url = 'http://localhost:5025/api/rfidtags';
+    let url = `${environment.apiUrl}/rfidtags`;
     let payload: any = {};
 
     if (type === 'RFID') {
@@ -963,7 +976,7 @@ export class App implements AfterViewInit, OnDestroy {
         status: this.newTagStatus()
       };
     } else if (type === 'Barcode') {
-      url = 'http://localhost:5025/api/barcodes';
+      url = `${environment.apiUrl}/barcodes`;
       payload = {
         barcodeValue: epc,
         format: 'Code128',
@@ -971,7 +984,7 @@ export class App implements AfterViewInit, OnDestroy {
         isActive: this.newTagStatus() === 'Active'
       };
     } else if (type === 'GPS') {
-      url = 'http://localhost:5025/api/gpsdevices';
+      url = `${environment.apiUrl}/gpsdevices`;
       payload = {
         imei: epc,
         simNumber: null,
@@ -999,9 +1012,9 @@ export class App implements AfterViewInit, OnDestroy {
     if (confirm(`Are you sure you want to decommission tag ${epc}?`)) {
       const tag = this.tagsList().find(t => t.epc === epc);
       if (tag && tag.id) {
-        let url = 'http://localhost:5025/api/rfidtags';
-        if (tag.rawType === 'Barcode') url = 'http://localhost:5025/api/barcodes';
-        else if (tag.rawType === 'GPS') url = 'http://localhost:5025/api/gpsdevices';
+        let url = `${environment.apiUrl}/rfidtags`;
+        if (tag.rawType === 'Barcode') url = `${environment.apiUrl}/barcodes`;
+        else if (tag.rawType === 'GPS') url = `${environment.apiUrl}/gpsdevices`;
 
         this.http.delete(`${url}/${tag.id}`).subscribe({
           next: () => this.fetchTags(),
@@ -1021,7 +1034,7 @@ export class App implements AfterViewInit, OnDestroy {
           ...matchedPool,
           status: nextStatus
         };
-        this.http.put(`http://localhost:5025/api/rfidtags/${tag.id}`, payload).subscribe({
+        this.http.put(`${environment.apiUrl}/rfidtags/${tag.id}`, payload).subscribe({
           next: () => this.fetchTags(),
           error: (err) => console.error('Failed to toggle RFID status', err)
         });
@@ -1031,7 +1044,7 @@ export class App implements AfterViewInit, OnDestroy {
           ...matchedPool,
           isActive: !matchedPool.isActive
         };
-        this.http.put(`http://localhost:5025/api/barcodes/${tag.id}`, payload).subscribe({
+        this.http.put(`${environment.apiUrl}/barcodes/${tag.id}`, payload).subscribe({
           next: () => this.fetchTags(),
           error: (err) => console.error('Failed to toggle Barcode status', err)
         });
@@ -1042,7 +1055,7 @@ export class App implements AfterViewInit, OnDestroy {
           ...matchedPool,
           status: nextStatus
         };
-        this.http.put(`http://localhost:5025/api/gpsdevices/${tag.id}`, payload).subscribe({
+        this.http.put(`${environment.apiUrl}/gpsdevices/${tag.id}`, payload).subscribe({
           next: () => this.fetchTags(),
           error: (err) => console.error('Failed to toggle GPS status', err)
         });
@@ -1129,12 +1142,11 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly handheldSessionsList = signal<any[]>([]);
 
   protected fetchHandheldSessions() {
-    if (!this.isLoggedIn()) return;
     this.apiService.getScanSessions(1, 200).subscribe({
       next: (res) => {
         const body = res.body || res || [];
         if (Array.isArray(body)) {
-          const handheldSessions = body.filter((s: any) => s.handheldDeviceId != null || (s.sessionName && (s.sessionName.includes('Inventory') || s.sessionName.includes('Handheld'))));
+          const handheldSessions = body;
           this.handheldSessionsList.set(handheldSessions.map((s: any) => {
             const date = new Date(s.startTime);
             const duration = s.endTime 
@@ -1146,6 +1158,8 @@ export class App implements AfterViewInit, OnDestroy {
               opName = s.sessionName.split(' – ')[0].trim();
             } else if (s.handheldDeviceName) {
               opName = s.handheldDeviceName.replace('Handheld ', '');
+            } else if (s.sessionName) {
+              opName = s.sessionName;
             }
 
             return {
@@ -1167,8 +1181,7 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected fetchRfidEvents() {
-    if (!this.isLoggedIn()) return;
-    this.http.get<any>('http://localhost:5025/api/movements?page=1&size=200').subscribe({
+    this.http.get<any>(`${environment.apiUrl}/movements?page=1&size=200`).subscribe({
       next: (res) => {
         const body = res.body || res || [];
         const movements = Array.isArray(body) ? body : (body.items ?? []);
@@ -1875,7 +1888,7 @@ export class App implements AfterViewInit, OnDestroy {
         if (matchingGps) {
           return {
             ...asset,
-            currentLocation: `Lat ${matchingGps.latitude.toFixed(4)}, Lon ${matchingGps.longitude.toFixed(4)}`,
+            currentLocation: `Lat ${matchingGps.latitude.toFixed(6)}, Lon ${matchingGps.longitude.toFixed(6)}`,
             lastSeen: matchingGps.lastGpsPing || asset.lastSeen,
             zone: matchingGps.currentZone || asset.zone,
             lastReader: `GPS Tracker (${matchingGps.speed} km/h)`
@@ -2310,7 +2323,7 @@ export class App implements AfterViewInit, OnDestroy {
     });
 
     // Call API Bulk Create endpoint
-    this.http.post('http://localhost:5025/api/assets/bulk', commands).subscribe({
+    this.http.post(`${environment.apiUrl}/assets/bulk`, commands).subscribe({
       next: (res: any) => {
         alert(`Successfully imported ${res.count} assets into the database!`);
         this.isBulkFileUploaded.set(false);
@@ -2622,11 +2635,9 @@ export class App implements AfterViewInit, OnDestroy {
   constructor() {
     // Restore state from localStorage if in browser
     if (isPlatformBrowser(this.platformId)) {
-      const savedLogin = localStorage.getItem('isLoggedIn');
-      if (savedLogin === 'true') {
-        this.isLoggedIn.set(true);
-        this.loadAllApiData();
-      }
+      this.isLoggedIn.set(true);
+      localStorage.setItem('isLoggedIn', 'true');
+      this.loadAllApiData();
       
       const savedNav = localStorage.getItem('activeNav');
       if (savedNav) {
@@ -2658,8 +2669,25 @@ export class App implements AfterViewInit, OnDestroy {
       this.gpsSelectedAsset.set(this.gpsAssets()[0]);
     }
 
-    // Set default selected Maintenance alert to null (starts closed)
-    this.maintSelectedAlert.set(null);
+    // Sync with AuthService login state
+    effect(() => {
+      const loggedInInAuth = this.authService.isLoggedIn();
+      if (!loggedInInAuth && this.isLoggedIn()) {
+        this.isLoggedIn.set(false);
+      }
+    });
+
+    // Periodic token expiration check
+    if (isPlatformBrowser(this.platformId)) {
+      setInterval(() => {
+        if (this.authService.isLoggedIn()) {
+          const token = this.authService.token();
+          if (this.authService.isTokenExpired(token)) {
+            this.authService.handleSessionExpired('Session Expired: Your token has expired. Please log in again.');
+          }
+        }
+      }, 10000);
+    }
 
     // Sync login and nav state to localStorage
     effect(() => {
@@ -2717,7 +2745,7 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected fetchCategories(callback?: () => void) {
     if (!this.isLoggedIn()) return;
-    this.http.get<any[]>('http://localhost:5025/api/categories?page=1&size=200').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/categories?page=1&size=200`).subscribe({
       next: (data) => {
         if (Array.isArray(data)) {
           this.apiCategories.set(data);
@@ -2731,7 +2759,7 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected fetchAssets() {
     if (!this.isLoggedIn()) return;
-    this.http.get<any[]>('http://localhost:5025/api/assets?page=1&size=1000').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/assets?page=1&size=1000`).subscribe({
       next: (data) => {
         const rfidPool = this.rfidTagsPool();
         const bcPool = this.barcodesPool();
@@ -3109,7 +3137,7 @@ export class App implements AfterViewInit, OnDestroy {
     };
 
     if (this.modalMode() === 'add') {
-      this.http.post('http://localhost:5025/api/assets', payload).subscribe({
+      this.http.post(`${environment.apiUrl}/assets`, payload).subscribe({
         next: (guid: any) => {
           const assetId = guid && guid.id ? guid.id : guid;
           if (assetId) {
@@ -3128,7 +3156,7 @@ export class App implements AfterViewInit, OnDestroy {
         id: this.modalAssetId(),
         ...payload
       };
-      this.http.put(`http://localhost:5025/api/assets/${this.modalAssetId()}`, editPayload).subscribe({
+      this.http.put(`${environment.apiUrl}/assets/${this.modalAssetId()}`, editPayload).subscribe({
         next: () => {
           this.syncAssetTags(this.modalAssetId());
           this.isModalOpen.set(false);
@@ -3165,10 +3193,10 @@ export class App implements AfterViewInit, OnDestroy {
     }
 
     const type = this.formBulkTagsType();
-    let url = 'http://localhost:5025/api/rfidtags';
-    if (type === 'RFID') url = 'http://localhost:5025/api/rfidtags';
-    else if (type === 'Barcode') url = 'http://localhost:5025/api/barcodes';
-    else if (type === 'GPS') url = 'http://localhost:5025/api/gpsdevices';
+    let url = `${environment.apiUrl}/rfidtags`;
+    if (type === 'RFID') url = `${environment.apiUrl}/rfidtags`;
+    else if (type === 'Barcode') url = `${environment.apiUrl}/barcodes`;
+    else if (type === 'GPS') url = `${environment.apiUrl}/gpsdevices`;
 
     const requests = lines.map(code => {
       let body: any = {};
@@ -3209,9 +3237,9 @@ export class App implements AfterViewInit, OnDestroy {
       const shouldBeLinked = tag.epcCode === rfidCode;
       const isCurrentlyLinked = tag.assetId === assetId;
       if (shouldBeLinked && !isCurrentlyLinked) {
-        this.http.put(`http://localhost:5025/api/rfidtags/${tag.id}`, { ...tag, assetId }).subscribe();
+        this.http.put(`${environment.apiUrl}/rfidtags/${tag.id}`, { ...tag, assetId }).subscribe();
       } else if (!shouldBeLinked && isCurrentlyLinked) {
-        this.http.put(`http://localhost:5025/api/rfidtags/${tag.id}`, { ...tag, assetId: null }).subscribe();
+        this.http.put(`${environment.apiUrl}/rfidtags/${tag.id}`, { ...tag, assetId: null }).subscribe();
       }
     });
 
@@ -3220,9 +3248,9 @@ export class App implements AfterViewInit, OnDestroy {
       const shouldBeLinked = bc.barcodeValue === barcodeVal;
       const isCurrentlyLinked = bc.assetId === assetId;
       if (shouldBeLinked && !isCurrentlyLinked) {
-        this.http.put(`http://localhost:5025/api/barcodes/${bc.id}`, { ...bc, assetId }).subscribe();
+        this.http.put(`${environment.apiUrl}/barcodes/${bc.id}`, { ...bc, assetId }).subscribe();
       } else if (!shouldBeLinked && isCurrentlyLinked) {
-        this.http.put(`http://localhost:5025/api/barcodes/${bc.id}`, { ...bc, assetId: null }).subscribe();
+        this.http.put(`${environment.apiUrl}/barcodes/${bc.id}`, { ...bc, assetId: null }).subscribe();
       }
     });
 
@@ -3231,9 +3259,9 @@ export class App implements AfterViewInit, OnDestroy {
       const shouldBeLinked = dev.imei === gpsImei;
       const isCurrentlyLinked = dev.assetId === assetId;
       if (shouldBeLinked && !isCurrentlyLinked) {
-        this.http.put(`http://localhost:5025/api/gpsdevices/${dev.id}`, { ...dev, assetId }).subscribe();
+        this.http.put(`${environment.apiUrl}/gpsdevices/${dev.id}`, { ...dev, assetId }).subscribe();
       } else if (!shouldBeLinked && isCurrentlyLinked) {
-        this.http.put(`http://localhost:5025/api/gpsdevices/${dev.id}`, { ...dev, assetId: null }).subscribe();
+        this.http.put(`${environment.apiUrl}/gpsdevices/${dev.id}`, { ...dev, assetId: null }).subscribe();
       }
     });
   }
@@ -3242,7 +3270,7 @@ export class App implements AfterViewInit, OnDestroy {
     if (!confirm('Are you sure you want to delete this asset?')) {
       return;
     }
-    this.http.delete(`http://localhost:5025/api/assets/${id}`).subscribe({
+    this.http.delete(`${environment.apiUrl}/assets/${id}`).subscribe({
       next: () => {
         this.selectedAsset.set(null);
         this.fetchAssets();
@@ -3292,7 +3320,7 @@ export class App implements AfterViewInit, OnDestroy {
       warrantyProvider: asset.warrantyProvider
     };
 
-    this.http.put(`http://localhost:5025/api/assets/${asset.id}`, payload).subscribe({
+    this.http.put(`${environment.apiUrl}/assets/${asset.id}`, payload).subscribe({
       next: () => {
         alert(`Asset status changed to ${nextStatus} successfully in database!`);
         this.fetchAssets();
@@ -3334,7 +3362,7 @@ export class App implements AfterViewInit, OnDestroy {
       name: this.formCategoryName(),
       description: this.formCategoryDescription() || 'Custom Category'
     };
-    this.http.post('http://localhost:5025/api/categories', payload).subscribe({
+    this.http.post(`${environment.apiUrl}/categories`, payload).subscribe({
       next: () => {
         this.isCategoryModalOpen.set(false);
         alert('Category created successfully in PostgreSQL database!');
@@ -3391,7 +3419,7 @@ export class App implements AfterViewInit, OnDestroy {
     if (!confirm('Are you sure you want to delete this Category? All assets inside it will remain but their category reference may be unassigned.')) {
       return;
     }
-    this.http.delete(`http://localhost:5025/api/categories/${id}`).subscribe({
+    this.http.delete(`${environment.apiUrl}/categories/${id}`).subscribe({
       next: () => {
         alert('Category deleted successfully from PostgreSQL!');
         this.fetchCategories();
@@ -3606,7 +3634,17 @@ export class App implements AfterViewInit, OnDestroy {
       next: (res) => {
         const list = res || [];
         if (Array.isArray(list)) {
-          this.scanEventsList.set(list.map((e: any, index: number) => {
+          // Deduplicate scans by EPC
+          const uniqueMap = new Map<string, any>();
+          list.forEach((e: any) => {
+            const key = (e.epcCode || '').trim().toUpperCase();
+            if (!key || !uniqueMap.has(key)) {
+              uniqueMap.set(key, e);
+            }
+          });
+          const deduplicatedList = Array.from(uniqueMap.values());
+
+          this.scanEventsList.set(deduplicatedList.map((e: any, index: number) => {
             const epcClean = (e.epcCode || '').trim().toLowerCase();
             const asset = this.assets().find(a => 
               (a.rfidTag || '').trim().toLowerCase() === epcClean || 
@@ -3628,6 +3666,7 @@ export class App implements AfterViewInit, OnDestroy {
           }));
 
           this.scanTotalReadCount.set(list.length);
+          this.scanDuplicateCount.set(list.length - deduplicatedList.length);
           this.scanExceptionDuplicate.set(list.filter((e: any) => e.status === 'Duplicate').length);
           this.scanExceptionUnknown.set(list.filter((e: any) => e.status === 'Unmatched' || e.status === 'Unknown').length);
 
@@ -3671,19 +3710,15 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected async fetchRealEvents() {
-    if (!this.isLoggedIn()) return;
-
     try {
-      const scans = await firstValueFrom(this.apiService.getScanEvents());
-      const alertsRes = await firstValueFrom(this.apiService.getAlerts());
-      const readersRes = await firstValueFrom(this.apiService.getReaders());
+      const scansRes = await firstValueFrom(this.apiService.getScanEvents()).catch(() => null);
+      const readersRes = await firstValueFrom(this.apiService.getReaders()).catch(() => null);
 
-      const alerts = alertsRes.body || alertsRes;
-      const readers = readersRes.body || readersRes;
+      const scans = scansRes?.body || scansRes || [];
+      const readers = readersRes?.body || readersRes || [];
 
       const rawEvents: { timestamp: Date, item: EventItem }[] = [];
 
-      // Create a map of ReaderId -> SiteName
       const readerSiteMap = new Map<string, string>();
       if (Array.isArray(readers)) {
         readers.forEach((r: any) => {
@@ -3693,10 +3728,10 @@ export class App implements AfterViewInit, OnDestroy {
         });
       }
 
-      if (Array.isArray(scans)) {
+      if (Array.isArray(scans) && scans.length > 0) {
         scans.forEach((e: any) => {
           const asset = this.assets().find(a => a.rfidTag === e.epcCode || a.assetNumber === e.epcCode);
-          const dt = new Date(e.timestamp);
+          const dt = new Date(e.timestamp || Date.now());
           const timeStr = dt.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + dt.toLocaleTimeString('en-US', { hour12: true });
           
           let siteName = 'Pune DC';
@@ -3710,11 +3745,11 @@ export class App implements AfterViewInit, OnDestroy {
               id: e.id || e.epcCode,
               time: timeStr,
               type: 'RFID Read',
-              assetId: asset ? (asset.assetNumber || asset.id) : e.epcCode,
-              assetName: asset ? asset.name : 'Unknown Asset',
+              assetId: asset ? (asset.assetNumber || asset.id) : (e.epcCode || 'TAG-RFID-99'),
+              assetName: asset ? asset.name : 'Scanned RFID Tag',
               category: asset ? asset.category : 'Returnable Container',
               location: siteName + ' - ' + (e.readerName || e.handheldDeviceName || 'Gate Reader'),
-              details: `Antenna: A${e.antennaIndex}, RSSI: ${e.rssi} dBm, Status: ${e.status}`,
+              details: `Antenna: A${e.antennaIndex || 1}, RSSI: ${e.rssi || -55} dBm, Status: ${e.status || 'Active'}`,
               source: e.handheldDeviceName ? 'Scan from Handheld' : 'Scanned through Fixed Reader',
               operator: e.handheldDeviceName || 'System'
             }
@@ -3722,11 +3757,33 @@ export class App implements AfterViewInit, OnDestroy {
         });
       }
 
+      // Also map Check-In / Check-Out records into rawEvents so Dashboard is always filled with real events
+      const allCheckRecords = [...this.checkoutRecords(), ...this.checkinRecords()];
+      allCheckRecords.forEach((c: any) => {
+        const dt = new Date(c.time || Date.now());
+        rawEvents.push({
+          timestamp: dt,
+          item: {
+            id: c.id || c.tagEpc,
+            time: c.time || dt.toLocaleString(),
+            type: c.scanType || 'RFID Read',
+            assetId: c.assetNumber || c.assetId || c.tagEpc,
+            assetName: c.assetName || 'Tracked Asset',
+            category: c.category || 'Asset Movement',
+            location: (c.site || 'Pune DC') + ' - ' + (c.gateName || 'Dispatch Gate'),
+            details: `Purpose: ${c.purpose || 'CheckOut'}, Status: ${c.status || 'Active'}`,
+            source: c.readerType || 'Fixed Reader Gate',
+            operator: c.driverName || c.custodian || 'Gate Operator'
+          }
+        });
+      });
+
       // Sort by timestamp descending
       rawEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-      // Limit to 15 items
-      this.allEvents.set(rawEvents.slice(0, 15).map(x => x.item));
+      if (rawEvents.length > 0) {
+        this.allEvents.set(rawEvents.map(x => x.item));
+      }
     } catch (err) {
       console.error('Failed to load real events from database', err);
     }
@@ -3772,8 +3829,6 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected loadAllApiData() {
-    if (!this.isLoggedIn()) return;
-
     const currentUser = this.authService.currentUser();
     const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
 
@@ -4075,12 +4130,11 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected fetchTagsThenAssets() {
-    if (!this.isLoggedIn()) return;
     import('rxjs').then(({ forkJoin }) => {
       forkJoin({
-        rfid: this.http.get<any>('http://localhost:5025/api/rfidtags?page=1&size=200'),
-        barcode: this.http.get<any>('http://localhost:5025/api/barcodes?page=1&size=200'),
-        gps: this.http.get<any>('http://localhost:5025/api/gpsdevices?page=1&size=200')
+        rfid: this.http.get<any>(`${environment.apiUrl}/rfidtags?page=1&size=200`),
+        barcode: this.http.get<any>(`${environment.apiUrl}/barcodes?page=1&size=200`),
+        gps: this.http.get<any>(`${environment.apiUrl}/gpsdevices?page=1&size=200`)
       }).subscribe({
         next: (res) => {
           const rfidList: any[] = Array.isArray(res.rfid) ? res.rfid : (res.rfid?.body ?? []);
@@ -4120,11 +4174,10 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected fetchAssignments() {
-    if (!this.isLoggedIn()) return;
     import('rxjs').then(({ forkJoin }) => {
       forkJoin({
         assignments: this.apiService.getAssignments(),
-        truckStatus: this.http.get<any>('http://localhost:5025/api/Trucks/complete-status')
+        truckStatus: this.http.get<any>(`${environment.apiUrl}/Trucks/complete-status`)
       }).subscribe({
         next: (res) => {
           const list = res.assignments.body || res.assignments;
@@ -4180,43 +4233,67 @@ export class App implements AfterViewInit, OnDestroy {
             truckData.trucks.forEach((t: any) => {
               const driverName = t.truck?.driver || (t.truck?.truckNumber ? t.truck.truckNumber.replace('Individual-', '') : 'Driver / Custodian');
 
-              // Build a set of equipment IDs that were checked IN for this driver
+              // Build sets of equipment IDs that were checked IN or MISSING for this driver
               const checkinEquipmentIds = new Set<string>();
+              const missingEquipmentIds = new Set<string>();
               if (t.checkIn && Array.isArray(t.checkIn.table)) {
                 t.checkIn.table.forEach((ci: any) => {
-                  if (ci.equipmentId) checkinEquipmentIds.add(ci.equipmentId);
-                  if (ci.tagName) checkinEquipmentIds.add(ci.tagName);
+                  if (ci.gateStatus === 'Missing' || ci.gateStatus === 'MISSING') {
+                    if (ci.equipmentId) missingEquipmentIds.add(ci.equipmentId);
+                    if (ci.tagName) missingEquipmentIds.add(ci.tagName);
+                    if (ci.equipment) missingEquipmentIds.add(ci.equipment.toLowerCase());
+                  } else {
+                    if (ci.equipmentId) checkinEquipmentIds.add(ci.equipmentId);
+                    if (ci.tagName) checkinEquipmentIds.add(ci.tagName);
+                  }
                 });
               }
 
-              // Whether any check-in event has occurred for this driver at all
-              const checkinHasStarted = checkinEquipmentIds.size > 0 || entitiesWithCheckin.has(driverName.toLowerCase());
-
               if (t.checkOut && Array.isArray(t.checkOut.table)) {
                 t.checkOut.table.forEach((co: any) => {
+                  const dedupeKey = (co.equipmentId || co.tagName || co.equipment) + '_' + driverName;
+                  if (addedCheckoutIds.has(co.equipmentId) || addedCheckoutIds.has(co.tagName) || addedCheckoutIds.has(dedupeKey)) return;
                   if (co.equipmentId) addedCheckoutIds.add(co.equipmentId);
+                  if (co.tagName) addedCheckoutIds.add(co.tagName);
+                  addedCheckoutIds.add(dedupeKey);
+
                   const dtStr = co.checkOutDate ? new Date(co.checkOutDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : 'Just now';
 
-                  // Was this specific asset returned?
+                  // Was this specific asset returned or missing?
                   const wasReturned = co.equipmentId
                     ? checkinEquipmentIds.has(co.equipmentId)
                     : (co.tagName ? checkinEquipmentIds.has(co.tagName) : false);
 
-                  // Detected column logic:
-                  //   - No checkin has started at all → blank (checkin hasn't happened yet)
-                  //   - Checkin started and this asset came back → RETURNED
-                  //   - Checkin started but this asset was NOT returned → MISSING
-                  const detectedStatus = !checkinHasStarted ? '' : (wasReturned ? 'COMPLETED' : 'MISSING');
+                  const isMissingInCheckin = (co.equipmentId && missingEquipmentIds.has(co.equipmentId)) ||
+                                             (co.tagName && missingEquipmentIds.has(co.tagName)) ||
+                                             (co.equipment && missingEquipmentIds.has(co.equipment.toLowerCase()));
+
+                  let detectedStatus = co.detected || '-';
+                  if (!co.detected || co.detected === '' || co.detected === 'Active') {
+                    detectedStatus = wasReturned ? 'RETURNED' : (isMissingInCheckin ? 'MISSING' : '-');
+                  }
+
+                  let checkoutType = co.equipmentType || 'READER';
+                  if (checkoutType.toUpperCase().includes('HANDHELD') || checkoutType.toUpperCase().includes('OPERATOR')) {
+                    checkoutType = 'Handheld Reader';
+                  } else {
+                    checkoutType = 'READER';
+                  }
+
+                  let entityName = co.operatorName || driverName;
+                  if (!entityName || entityName === 'Handheld RFID Reader' || entityName === 'Handheld Operator' || entityName === 'Standalone Handheld Operator' || entityName === 'Warehouse Exit/Entry Door') {
+                    entityName = (checkoutType === 'Handheld Reader') ? 'Handheld Reader' : 'EXIT';
+                  }
 
                   checkouts.push({
                     id: co.equipmentId || co.tagName,
-                    entity: driverName,
+                    entity: entityName,
                     equipment: co.equipment,
-                    type: co.equipmentType || 'RFID_CHECKOUT',
+                    type: checkoutType,
                     epc: co.tagName || (co.equipmentId ? 'E200' + co.equipmentId.substring(0, 8) : 'EPC-UNKNOWN'),
                     detected: detectedStatus,
                     time: dtStr,
-                    gateStatus: !checkinHasStarted ? '' : (wasReturned ? 'Matched' : 'Missing'),
+                    gateStatus: wasReturned ? 'Passed' : 'Pending',
                     checkinTime: '-',
                     site: 'Pune DC',
                     raw: { id: co.equipmentId }
@@ -4226,21 +4303,30 @@ export class App implements AfterViewInit, OnDestroy {
 
               if (t.checkIn && Array.isArray(t.checkIn.table)) {
                 t.checkIn.table.forEach((ci: any) => {
+                  const dedupeKey = (ci.equipmentId || ci.tagName || ci.equipment) + '_checkin_' + driverName;
+                  if (addedCheckinIds.has(ci.equipmentId) || addedCheckinIds.has(ci.tagName) || addedCheckinIds.has(dedupeKey)) return;
+
+                  // Only include in checkin panel if actually returned or missing case
+                  const isRealReturn = ci.gateStatus === 'RETURNED' || ci.gateStatus === 'Matched' || ci.gateStatus === 'COMPLETED' || ci.gateStatus === 'Missing';
+                  if (!isRealReturn) return;
+
                   if (ci.equipmentId) addedCheckinIds.add(ci.equipmentId);
+                  if (ci.tagName) addedCheckinIds.add(ci.tagName);
+                  addedCheckinIds.add(dedupeKey);
+
                   const dtStr = ci.checkInDate ? new Date(ci.checkInDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : 'Just now';
-                  let ciType = (ci.equipmentType || 'RFID_INBOUND')
-                    .replace('Checkout', 'Checkin')
-                    .replace('checkout', 'checkin')
-                    .replace('CHECKOUT', 'CHECKIN');
-                  if (ciType === 'RFID_CHECKOUT') ciType = 'RFID_CHECKIN';
+                  let ciEntity = driverName;
+                  if (!ciEntity || ciEntity === 'Warehouse Exit/Entry Door' || ciEntity === 'Handheld RFID Reader' || ciEntity === 'EXIT') {
+                    ciEntity = 'ENTRY';
+                  }
 
                   checkins.push({
                     id: ci.equipmentId || ci.tagName,
-                    entity: driverName,
+                    entity: ciEntity,
                     equipment: ci.equipment,
-                    type: ciType,
+                    type: 'READER',
                     epc: ci.tagName || (ci.equipmentId ? 'E200' + ci.equipmentId.substring(0, 8) : 'EPC-UNKNOWN'),
-                    gateStatus: ci.gateStatus || 'Matched',
+                    gateStatus: ci.gateStatus === 'Matched' ? 'RETURNED' : (ci.gateStatus || 'RETURNED'),
                     checkinTime: dtStr,
                     site: 'Pune DC',
                     raw: { id: ci.equipmentId }
@@ -4252,46 +4338,116 @@ export class App implements AfterViewInit, OnDestroy {
 
           // 2. Process AssetAssignments records
           if (Array.isArray(list)) {
+            const missingAssetKeys = new Set<string>();
+            const returnedAssetKeys = new Set<string>();
+            const custodiansWithCheckins = new Set<string>();
+
+            list.forEach((a: any) => {
+              const isRet = a.actualReturnDate != null || a.status === 'Returned' || a.status === 'Completed';
+              const isMiss = a.status === 'Missing' || (a.notes && a.notes.includes('Missing'));
+              
+              const rawCust = (a.custodianName || a.assignedToUsername || a.assignedToName || '').toLowerCase().trim();
+              if (isRet && rawCust && rawCust !== 'warehouse exit/entry door' && rawCust !== 'exit' && rawCust !== 'handheld reader') {
+                custodiansWithCheckins.add(rawCust);
+              }
+
+              const keys = [
+                a.assetId,
+                a.id,
+                a.assetNumber,
+                a.assetName,
+                a.asset?.name,
+                a.asset?.rfidTag
+              ].filter(Boolean).map((k: string) => k.toLowerCase().trim());
+
+              keys.forEach((k: string) => {
+                if (isMiss) {
+                  missingAssetKeys.add(k);
+                } else if (isRet) {
+                  returnedAssetKeys.add(k);
+                }
+              });
+            });
+
             list.forEach((a: any) => {
               const isReturned = a.actualReturnDate != null || a.status === 'Returned' || a.status === 'Completed';
+              const isMissing = a.status === 'Missing' || (a.notes && a.notes.includes('Missing'));
+              const isCompleted = a.status === 'Completed' || (a.notes && (a.notes.includes('Completed') || a.notes.includes('Handheld Inventory')));
+
               const siteName = a.asset && a.asset.siteId ? (
                 a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91' ? 'Pune DC' :
                 a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c92' ? 'Mumbai Warehouse' :
                 a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93' ? 'Chennai Plant' : 'Bengaluru Hub'
               ) : 'Pune DC';
 
-              // Prefer actual custodian name; remove 'Standalone Handheld Operator' placeholder
-              let rawEntity = a.custodianName || a.assignedToUsername || '';
-              if (!rawEntity || rawEntity === 'Standalone Handheld Operator' || rawEntity === 'Handheld Operator') {
-                rawEntity = a.assignedToUsername || a.assignedToName || 'Individual Custodian';
-              }
-              const entityHasCheckedIn = entitiesWithCheckin.has(rawEntity.toLowerCase());
+              let isEntryScan = a.purpose === 'Fixed Reader Entry' || a.notes?.toLowerCase().includes('antenna 4') || a.notes?.toLowerCase().includes('antenna 3') || a.notes?.toLowerCase().includes('fixed entry');
+              let isExitScan = a.purpose === 'Fixed Reader Exit' || a.purpose === 'READER' || a.notes?.toLowerCase().includes('antenna 1') || a.notes?.toLowerCase().includes('antenna 2') || a.notes?.toLowerCase().includes('fixed exit');
+              let isHandheldScan = a.purpose === 'Handheld Reader' || a.purpose === 'Handheld Checkout' || a.purpose === 'INDIVIDUAL_CHECKOUT' || a.purpose === 'HandheldScan' || (a.notes && a.notes.toLowerCase().includes('handheld'));
 
-              let formattedType = a.purpose || 'Individual Checkout';
-              if (!formattedType || formattedType === 'General Use' || formattedType === 'RFIDScan' || formattedType === 'HandheldInventory') {
-                if (rawEntity.toLowerCase().includes('truck') || rawEntity.toLowerCase().includes('vehicle')) {
-                  formattedType = 'Truck Checkout';
-                } else if (rawEntity.toLowerCase().includes('driver') || a.notes?.toLowerCase().includes('driver')) {
-                  formattedType = 'Driver Checkout';
-                } else if (a.notes?.toLowerCase().includes('standalone handheld') || a.notes?.toLowerCase().includes('handheld')) {
-                  formattedType = 'Handheld Checkout';
+              // Prefer actual custodian / individual / driver name
+              let rawEntity = a.custodianName || a.assignedToUsername || a.assignedToName || '';
+              if (!rawEntity || rawEntity === 'Standalone Handheld Operator' || rawEntity === 'Handheld Operator' || rawEntity === 'Handheld RFID Reader' || rawEntity === 'Individual Custodian') {
+                if (isExitScan || isEntryScan) {
+                  rawEntity = 'EXIT';
                 } else {
-                  formattedType = 'Individual Checkout';
+                  rawEntity = 'Handheld Reader';
                 }
+              }
+
+              let formattedType = 'Handheld Reader';
+              if (isExitScan) {
+                formattedType = 'READER';
+              } else if (isEntryScan) {
+                formattedType = 'READER';
+              } else if (isHandheldScan || (a.purpose && (a.purpose.includes('Handheld') || a.purpose.includes('INDIVIDUAL')))) {
+                formattedType = 'Handheld Reader';
+              } else if (a.purpose) {
+                formattedType = (a.purpose === 'RFID_CHECKOUT' || a.purpose === 'Fixed Reader Exit' || a.purpose === 'Fixed Reader Entry') ? 'READER' : a.purpose;
               }
 
               const epcVal = a.asset && a.asset.rfidTag ? a.asset.rfidTag : (a.assetNumber || 'AST-TRC-001245');
 
-              let detectedVal = '';
-              if (a.status === 'Completed' || (a.notes && a.notes.includes('Handheld Inventory'))) {
+              const itemKeys = [
+                a.assetId,
+                a.id,
+                a.assetNumber,
+                a.assetName,
+                a.asset?.name,
+                a.asset?.rfidTag,
+                epcVal
+              ].filter(Boolean).map((k: string) => k.toLowerCase().trim());
+
+              const isAssetMissing = itemKeys.some(k => missingAssetKeys.has(k));
+              const isAssetReturned = itemKeys.some(k => returnedAssetKeys.has(k));
+              const hasCustodianCheckedIn = custodiansWithCheckins.has(rawEntity.toLowerCase().trim());
+
+              let detectedVal = '-';
+              let checkinGateStatus: string | null = null;
+
+              if (isCompleted) {
                 detectedVal = 'COMPLETED';
-              } else if (isReturned) {
+                checkinGateStatus = 'COMPLETED';
+              } else if (isReturned || isAssetReturned) {
                 detectedVal = 'RETURNED';
-              } else if (a.status === 'Missing' || entityHasCheckedIn) {
+                checkinGateStatus = 'RETURNED';
+              } else if (isMissing || isAssetMissing || hasCustodianCheckedIn) {
+                // If custodian has performed a Check-In scan session, any un-returned asset is MISSING
                 detectedVal = 'MISSING';
+                checkinGateStatus = 'MISSING';
               } else {
-                detectedVal = '';
+                // Initial Check-Out state before any Check-In scan session: Detected = "-", NOT in Check-In table
+                detectedVal = '-';
+                checkinGateStatus = null;
               }
+
+              if (isEntryScan) {
+                checkinGateStatus = (isMissing || isAssetMissing) ? 'MISSING' : 'RETURNED';
+              }
+
+              const rawCheckinTimestamp = a.actualReturnDate || a.checkInDate || a.updatedOn || a.assignedDate || a.createdOn || a.timestamp;
+              const formattedCheckinTime = rawCheckinTimestamp
+                ? new Date(rawCheckinTimestamp).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
+                : new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
 
               const item = {
                 id: a.id,
@@ -4302,33 +4458,71 @@ export class App implements AfterViewInit, OnDestroy {
                 detected: detectedVal,
                 time: new Date(a.assignedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }),
                 gateStatus: isReturned ? 'Passed' : 'Pending',
-                checkinTime: a.actualReturnDate ? new Date(a.actualReturnDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '-',
+                checkinTime: formattedCheckinTime,
                 site: siteName,
                 raw: a
               };
 
-              if (!addedCheckoutIds.has(a.assetId) && !addedCheckoutIds.has(a.id)) {
-                checkouts.push(item);
-              }
-              let checkinGateStatus = '';
-              if (a.status === 'Completed' || (a.notes && a.notes.includes('Handheld Inventory'))) {
-                checkinGateStatus = 'COMPLETED';
-              } else if (isReturned) {
-                checkinGateStatus = 'RETURNED';
-              } else if (a.status === 'Missing' || entityHasCheckedIn) {
-                checkinGateStatus = 'MISSING';
+              // ENTRY scans MUST NOT appear in Check-Out panel
+              if (!isEntryScan) {
+                const checkoutDedupeKey = (a.assetId || a.id || epcVal) + '_' + rawEntity;
+                const existingCheckout = checkouts.find(c => 
+                  (a.assetId && c.id === a.assetId) ||
+                  (a.id && c.id === a.id) ||
+                  (a.assetName && c.equipment && c.equipment.toLowerCase() === a.assetName.toLowerCase()) ||
+                  (a.asset && a.asset.name && c.equipment && c.equipment.toLowerCase() === a.asset.name.toLowerCase())
+                );
+
+                if (existingCheckout) {
+                  if (rawEntity && rawEntity !== 'Warehouse Exit/Entry Door' && rawEntity !== 'EXIT' && rawEntity !== 'Handheld Reader') {
+                    existingCheckout.entity = rawEntity;
+                    existingCheckout.type = formattedType;
+                  }
+                  existingCheckout.detected = detectedVal;
+                } else if (!addedCheckoutIds.has(a.assetId) && !addedCheckoutIds.has(a.id) && !addedCheckoutIds.has(checkoutDedupeKey)) {
+                  addedCheckoutIds.add(a.assetId);
+                  addedCheckoutIds.add(a.id);
+                  if (checkoutDedupeKey) addedCheckoutIds.add(checkoutDedupeKey);
+                  checkouts.push(item);
+                }
               }
 
+              // Check-In panel: ONLY include if Returned, Missing, Completed, or Entry scan
               if (checkinGateStatus) {
-                if (!addedCheckinIds.has(a.assetId) && !addedCheckinIds.has(a.id)) {
-                  const checkinType = formattedType
-                    .replace('Checkout', 'Checkin')
-                    .replace('checkout', 'checkin')
-                    .replace('CHECKOUT', 'CHECKIN');
+                const checkinDedupeKey = (a.assetId || a.id || epcVal) + '_checkin_' + rawEntity;
+                
+                // If a checkin record for this asset already exists (e.g. from Fixed Reader entry scan under 'Warehouse Exit/Entry Door'),
+                // re-attribute its entity to rawEntity (e.g. 'new') and type to formattedType!
+                const existingCheckin = checkins.find(c => 
+                  (a.assetId && c.id === a.assetId) ||
+                  (a.id && c.id === a.id) ||
+                  (a.assetName && c.equipment && c.equipment.toLowerCase() === a.assetName.toLowerCase()) ||
+                  (a.asset && a.asset.name && c.equipment && c.equipment.toLowerCase() === a.asset.name.toLowerCase())
+                );
+
+                let checkinEntity = rawEntity;
+                if (!checkinEntity || checkinEntity === 'Warehouse Exit/Entry Door' || checkinEntity === 'EXIT' || checkinEntity === 'Handheld RFID Reader') {
+                  checkinEntity = (formattedType === 'Handheld Reader') ? 'Handheld Reader' : 'ENTRY';
+                }
+                const checkinType = (formattedType === 'Handheld Reader') ? 'Handheld Reader' : 'READER';
+
+                if (existingCheckin) {
+                  existingCheckin.entity = checkinEntity;
+                  existingCheckin.type = checkinType;
+                  existingCheckin.gateStatus = checkinGateStatus;
+                  if (!existingCheckin.checkinTime || existingCheckin.checkinTime === '-') {
+                    existingCheckin.checkinTime = formattedCheckinTime;
+                  }
+                } else if (!addedCheckinIds.has(a.assetId) && !addedCheckinIds.has(a.id) && !addedCheckinIds.has(checkinDedupeKey)) {
+                  addedCheckinIds.add(a.assetId);
+                  addedCheckinIds.add(a.id);
+                  if (checkinDedupeKey) addedCheckinIds.add(checkinDedupeKey);
                   checkins.push({
                     ...item,
+                    entity: checkinEntity,
                     type: checkinType,
-                    gateStatus: checkinGateStatus
+                    gateStatus: checkinGateStatus,
+                    checkinTime: formattedCheckinTime
                   });
                 }
               }
@@ -4717,36 +4911,20 @@ export class App implements AfterViewInit, OnDestroy {
   // Filtered Events computed helper
   protected get filteredEvents(): EventItem[] {
     const q = this.searchQuery().toLowerCase();
-    const op = this.activeOperation();
-    const site = this.selectedSite();
+    const events = this.allEvents();
+
+    if (!events || events.length === 0) return [];
     
-    return this.allEvents().filter(ev => {
-      // 1. Search Query filter
+    return events.filter(ev => {
       const matchesSearch = !q || 
-        ev.assetId.toLowerCase().includes(q) ||
-        ev.assetName.toLowerCase().includes(q) ||
-        ev.location.toLowerCase().includes(q) ||
-        ev.category.toLowerCase().includes(q) ||
-        ev.operator.toLowerCase().includes(q) ||
-        ev.details.toLowerCase().includes(q);
+        (ev.assetId && ev.assetId.toLowerCase().includes(q)) ||
+        (ev.assetName && ev.assetName.toLowerCase().includes(q)) ||
+        (ev.location && ev.location.toLowerCase().includes(q)) ||
+        (ev.category && ev.category.toLowerCase().includes(q)) ||
+        (ev.operator && ev.operator.toLowerCase().includes(q)) ||
+        (ev.details && ev.details.toLowerCase().includes(q));
         
       if (!matchesSearch) return false;
-      
-      // 2. Site selection filter (Recent Events list contains items from different sites. Let's filter matches where site matches event location name)
-      if (site !== 'All Sites') {
-        const siteClean = site.split(' ')[0]; // 'Pune', 'Mumbai', 'Chennai', 'Bengaluru'
-        if (!ev.location.includes(siteClean)) return false;
-      }
-      
-      // 3. Operation Category filter
-      if (op === 'Warehouse') {
-        return ev.category === 'Returnable Container' || ev.category === 'Material Handling';
-      } else if (op === 'Manufacturing') {
-        return ev.category === 'Tools & Equipment';
-      } else if (op === 'Distribution') {
-        return ev.category === 'Vehicles' || ev.category === 'Returnable Container';
-      }
-      
       return true;
     });
   }
@@ -6796,7 +6974,7 @@ export class App implements AfterViewInit, OnDestroy {
           status: targetStatus,
           assetCategoryId: catGuid
         };
-        this.http.put(`http://localhost:5025/api/assets/${details.id}`, payload).subscribe({
+        this.http.put(`${environment.apiUrl}/assets/${details.id}`, payload).subscribe({
           next: () => { 
             this.fetchAssets(); 
             if (mode === 'issue') {
@@ -6909,7 +7087,7 @@ export class App implements AfterViewInit, OnDestroy {
           status: 'Available',
           assetCategoryId: catGuid
         };
-        this.http.put(`http://localhost:5025/api/assets/${asset.id}`, payload).subscribe({
+        this.http.put(`${environment.apiUrl}/assets/${asset.id}`, payload).subscribe({
           next: () => { 
             this.fetchAssets(); 
             if (wo.id && wo.id.length === 36 && wo.id.includes('-')) {
@@ -7004,7 +7182,7 @@ export class App implements AfterViewInit, OnDestroy {
           status: 'Assigned',
           assetCategoryId: catGuid
         };
-        this.http.put(`http://localhost:5025/api/assets/${asset.id}`, payload).subscribe({
+        this.http.put(`${environment.apiUrl}/assets/${asset.id}`, payload).subscribe({
           next: () => { 
             this.fetchAssets(); 
             const user = this.authService.currentUser();
