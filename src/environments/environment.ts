@@ -4,4 +4,3 @@ export const environment = {
   loginUrl: 'http://localhost:5025/api/admin/users/login',
   serverUrl: 'http://localhost:5025'
 };
-
