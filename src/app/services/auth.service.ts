@@ -105,10 +105,14 @@ export class AuthService {
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('current_user');
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('activeNav');
+    localStorage.removeItem('activeSubNav');
     
     this.token.set(null);
     this.refreshToken.set(null);
     this.currentUser.set(null);
     this.isLoggedIn.set(false);
   }
+
 }

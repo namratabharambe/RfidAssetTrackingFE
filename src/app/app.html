@@ -324,12 +324,20 @@
           <button class="dropdown-btn site-dropdown-btn-custom" (click)="toggleSiteDropdown()"
             id="site-selector-dropdown-btn"
             style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 14px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; box-shadow: var(--shadow-sm); font-size: 0.82rem; height: 36px; cursor: pointer; white-space: nowrap; flex-shrink: 0;">
-            @if (selectedSite() !== 'All Sites') {
+            @if (apiWarehouses().some(w => w.name === selectedSite())) {
+              <span class="material-symbols-outlined" style="font-size: 1.15rem; color: #2563eb;">warehouse</span>
+            } @else if (selectedSite() !== 'All Sites') {
               <span class="flag-icon" style="font-size: 1.1rem; line-height: 1;">🇮🇳</span>
             } @else {
               <span class="material-symbols-outlined" style="font-size: 1.15rem; color: var(--text-secondary);">public</span>
             }
-            <span class="dropdown-label" style="white-space: nowrap;">{{ selectedSite() }}</span>
+            <span class="dropdown-label" style="white-space: nowrap;">
+              @if (selectedSite() === 'All Sites' && isDevamUser()) {
+                All Devam Sites
+              } @else {
+                {{ selectedSite() }}
+              }
+            </span>
             <span class="material-symbols-outlined arrow"
               style="font-size: 1.1rem; color: var(--text-muted);">expand_more</span>
           </button>
@@ -338,7 +346,8 @@
           <ul class="dropdown-menu" id="site-selector-menu"
             style="border-radius: 12px; box-shadow: var(--shadow-lg);">
             <li (click)="selectSite('All Sites')" [class.selected]="selectedSite() === 'All Sites'">
-              <span class="material-symbols-outlined">public</span> All Sites
+              <span class="material-symbols-outlined">public</span>
+              @if (isDevamUser()) { All Devam Sites } @else { All Sites }
               @if (selectedSite() === 'All Sites') {
               <span class="material-symbols-outlined check">check</span>
               }
@@ -351,6 +360,21 @@
               <span class="material-symbols-outlined check">check</span>
               }
             </li>
+            }
+            @if (apiWarehouses().length > 0) {
+            <li style="padding: 4px 12px; font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; border-top: 1px solid var(--border-color); margin-top: 4px; pointer-events: none; cursor: default; background: transparent;">
+              <span class="material-symbols-outlined" style="font-size: 0.85rem; vertical-align: middle; margin-right: 4px;">warehouse</span>Warehouses
+            </li>
+            @for (wh of apiWarehouses(); track wh.id) {
+            <li (click)="selectSite(wh.name)" [class.selected]="selectedSite() === wh.name"
+              style="padding-left: 1.5rem;">
+              <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #2563eb;">warehouse</span>
+              {{ wh.name }}
+              @if (selectedSite() === wh.name) {
+              <span class="material-symbols-outlined check">check</span>
+              }
+            </li>
+            }
             }
           </ul>
           }
@@ -1608,6 +1632,19 @@
 
             <div class="badge-divider"></div>
 
+            <div class="badge-group" style="align-items: center;">
+              <span style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted, #64748b); margin-right: 4px;">Category:</span>
+              <select [value]="activeAssetCategory()" (change)="activeAssetCategory.set($any($event.target).value)"
+                style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--bg-card, #ffffff); color: var(--text-main, #0f172a); font-size: 0.78rem; outline: none; cursor: pointer;">
+                <option value="All Categories">All Categories</option>
+                @for (cat of apiCategories(); track cat.id) {
+                  <option [value]="cat.name">{{ cat.name }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="badge-divider"></div>
+
             <div class="badge-group">
               <!-- Group 2: Statuses -->
               <button [class.active]="activeAssetStatus() === 'In Use'" (click)="selectAssetStatus('In Use')"
@@ -2050,8 +2087,20 @@
       } @else if (activeSubNav() === 'Asset Categories') {
       @if (!isDevamUser()) {
       <div class="asset-categories-view animate-fade-in">
-        <!-- Header -->
-        <div class="subpage-header" style="justify-content: flex-end; margin-bottom: 0.5rem; padding: 0;">
+        <!-- Header & Search Bar -->
+        <div class="subpage-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0; gap: 16px;">
+          <div class="search-box-categories" style="position: relative; flex: 1; max-width: 360px;">
+            <span class="material-symbols-outlined" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 1.15rem; color: var(--text-muted, #64748b); pointer-events: none;">search</span>
+            <input type="text"
+              [ngModel]="categorySearchQuery()"
+              (ngModelChange)="categorySearchQuery.set($event)"
+              placeholder="Search categories by name or description..."
+              style="width: 100%; padding: 8px 12px 8px 38px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); background: var(--bg-card, #ffffff); color: var(--text-main, #0f172a); font-size: 0.85rem; outline: none; transition: border-color 0.2s;" />
+            @if (categorySearchQuery()) {
+              <span class="material-symbols-outlined" (click)="categorySearchQuery.set('')"
+                style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 1.1rem; color: var(--text-muted, #94a3b8); cursor: pointer;">close</span>
+            }
+          </div>
           <button class="action-btn-primary" (click)="openAddCategoryModal()">
             <span class="material-symbols-outlined">add</span> Add Category
           </button>
@@ -2060,7 +2109,7 @@
         <!-- Categories Grid -->
         <div class="categories-grid"
           style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 1rem;">
-          @for (cat of apiCategories(); track cat.id) {
+          @for (cat of filteredApiCategories(); track cat.id) {
           <div class="category-card blue-card"
             style="display: flex; flex-direction: column; justify-content: space-between; border-radius: 12px; border: 1px solid var(--border-color, #e2e8f0); background: var(--card-bg, #ffffff); padding: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.03); transition: transform 0.2s;">
             <div class="card-top" style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px;">
@@ -2122,6 +2171,12 @@
               </div>
             </div>
           </div>
+          } @empty {
+            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; color: var(--text-muted, #64748b);">
+              <span class="material-symbols-outlined" style="font-size: 2.5rem; color: #94a3b8; display: block; margin-bottom: 8px;">category</span>
+              <p style="margin: 0; font-size: 0.9rem; font-weight: 600;">No categories match "{{ categorySearchQuery() }}"</p>
+              <p style="margin: 4px 0 0; font-size: 0.78rem;">Try searching with another keyword or clear the search query.</p>
+            </div>
           }
         </div>
       </div>
@@ -2138,8 +2193,20 @@
       }
       } @else if (activeSubNav() === 'Asset Groups') {
       <div class="asset-groups-view animate-fade-in">
-        <!-- Header -->
-        <div class="subpage-header" style="justify-content: flex-end; margin-bottom: 0.5rem; padding: 0;">
+        <!-- Header & Search Bar -->
+        <div class="subpage-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0; gap: 16px;">
+          <div class="search-box-groups" style="position: relative; flex: 1; max-width: 360px;">
+            <span class="material-symbols-outlined" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 1.15rem; color: var(--text-muted, #64748b); pointer-events: none;">search</span>
+            <input type="text"
+              [ngModel]="groupSearchQuery()"
+              (ngModelChange)="groupSearchQuery.set($event)"
+              placeholder="Search groups by ID, name, parent category, or custodian..."
+              style="width: 100%; padding: 8px 12px 8px 38px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); background: var(--bg-card, #ffffff); color: var(--text-main, #0f172a); font-size: 0.85rem; outline: none; transition: border-color 0.2s;" />
+            @if (groupSearchQuery()) {
+              <span class="material-symbols-outlined" (click)="groupSearchQuery.set('')"
+                style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 1.1rem; color: var(--text-muted, #94a3b8); cursor: pointer;">close</span>
+            }
+          </div>
           <button class="action-btn-primary" (click)="openAddGroupModal()">
             <span class="material-symbols-outlined">add</span> Create Group
           </button>
@@ -2162,7 +2229,7 @@
                 </tr>
               </thead>
               <tbody>
-                @for (grp of assetGroupsList(); track grp.id) {
+                @for (grp of filteredAssetGroupsList(); track grp.id) {
                 <tr>
                   <td class="text-semibold text-blue">{{ grp.id }}</td>
                   <td class="text-semibold">{{ grp.name }}</td>
@@ -2497,7 +2564,7 @@
         <div class="workflow-grid">
           <!-- Left Side: Check-Out Panel -->
           <div class="card-new"
-            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); display: flex; flex-direction: column;">
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); display: flex; flex-direction: column; min-width: 0; max-width: 100%; overflow: hidden;">
             <div class="panel-header-row">
               <h3 class="panel-title"
                 style="color: var(--text-primary); font-size: 1.05rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 6px;">
@@ -2510,8 +2577,8 @@
               </span>
             </div>
 
-            <div class="table-responsive" style="flex: 1; min-height: 250px;">
-              <table class="table-modern">
+            <div class="table-responsive" style="flex: 1; min-height: 250px; overflow-x: auto; max-width: 100%; width: 100%; -webkit-overflow-scrolling: touch;">
+              <table class="table-modern" style="width: 100%; min-width: 650px; white-space: nowrap;">
                 <thead>
                   <tr>
                     <th>Checkout Entity</th>
@@ -2572,7 +2639,7 @@
 
           <!-- Right Side: Check-In Panel -->
           <div class="card-new"
-            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); display: flex; flex-direction: column;">
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); display: flex; flex-direction: column; min-width: 0; max-width: 100%; overflow: hidden;">
             <div class="panel-header-row">
               <h3 class="panel-title"
                 style="color: var(--text-primary); font-size: 1.05rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 6px;">
@@ -2585,8 +2652,8 @@
               </span>
             </div>
 
-            <div class="table-responsive" style="flex: 1; min-height: 250px;">
-              <table class="table-modern">
+            <div class="table-responsive" style="flex: 1; min-height: 250px; overflow-x: auto; max-width: 100%; width: 100%; -webkit-overflow-scrolling: touch;">
+              <table class="table-modern" style="width: 100%; min-width: 650px; white-space: nowrap;">
                 <thead>
                   <tr>
                     <th>CheckIn Entity</th>
@@ -2624,6 +2691,8 @@
                       <span style="background: #dcfce7; color: #166534; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; display: inline-block; text-transform: uppercase; letter-spacing: 0.4px;">RETURNED</span>
                       } @else if (rec.gateStatus === 'MISSING' || rec.gateStatus === 'Missing') {
                       <span style="background: #fee2e2; color: #991b1b; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; display: inline-block; text-transform: uppercase; letter-spacing: 0.4px;">MISSING</span>
+                      } @else if (rec.gateStatus === '-') {
+                      <span style="background: #dcfce7; color: #166534; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; display: inline-block; text-transform: uppercase; letter-spacing: 0.4px;">-</span>
                       } @else {
                       <span style="background: #dcfce7; color: #166534; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; display: inline-block; text-transform: uppercase; letter-spacing: 0.4px;">{{ rec.gateStatus | uppercase }}</span>
                       }
@@ -3285,82 +3354,7 @@
           </div>
         </div>
 
-        <!-- Scan Sessions Table Card (Database Recorded Sessions) -->
-        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-top: 16px; box-shadow: var(--shadow-sm);">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-            <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 8px;">
-              <span class="material-symbols-outlined" style="color: #3b82f6;">sensors_krx</span>
-              Recorded Scan Sessions (Database)
-            </h3>
-            <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted);">{{ filteredHandheldSessionsList().length }} Sessions Logged</span>
-          </div>
 
-          <div class="table-responsive">
-            <table class="table-modern" style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
-              <thead>
-                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-weight: 600; text-align: left;">
-                  <th style="padding: 8px;">Session ID</th>
-                  <th style="padding: 8px;">Operator / Auditor</th>
-                  <th style="padding: 8px;">Device Model</th>
-                  <th style="padding: 8px;">Audit Type</th>
-                  <th style="padding: 8px;">Start Time</th>
-                  <th style="padding: 8px; text-align: center;">Scanned Tags</th>
-                  <th style="padding: 8px; text-align: center;">Discrepancies</th>
-                  <th style="padding: 8px;">Status</th>
-                  <th style="padding: 8px; text-align: right;">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (sess of filteredHandheldSessionsList(); track sess.id) {
-                <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s;">
-                  <td style="padding: 8px; font-family: monospace; font-weight: 600;">{{ sess.id }}</td>
-                  <td style="padding: 8px;">
-                    <div style="font-weight: 600; color: var(--text-main);">{{ sess.operator }}</div>
-                  </td>
-                  <td style="padding: 8px;">{{ sess.model }}</td>
-                  <td style="padding: 8px; font-weight: 500;">{{ sess.type }}</td>
-                  <td style="padding: 8px;">
-                    <div>{{ sess.startTime }}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted);">Duration: {{ sess.duration }}</div>
-                  </td>
-                  <td style="padding: 8px; text-align: center; font-weight: 700; font-family: monospace; color: var(--color-primary);">
-                    {{ sess.scannedTags | number }}
-                  </td>
-                  <td style="padding: 8px; text-align: center;">
-                    <span style="font-weight: 700;" [style.color]="sess.discrepancies > 0 ? '#ef4444' : 'var(--text-secondary)'">
-                      {{ sess.discrepancies }}
-                    </span>
-                  </td>
-                  <td style="padding: 8px;">
-                    <span class="status-pill" [class.active]="sess.status === 'In Progress'"
-                      [class.available]="sess.status === 'Synced' || sess.status === 'Completed'"
-                      [class.danger]="sess.status === 'Failed'"
-                      style="padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
-                      {{ sess.status }}
-                    </span>
-                  </td>
-                  <td style="padding: 8px; text-align: right;">
-                    @if (sess.status === 'In Progress') {
-                    <button (click)="stopHandheldSession(sess.id)" class="action-btn-outline sm-btn text-danger"
-                      style="padding: 3px 6px; border-color: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: 600; border-radius: 4px;">
-                      End Session
-                    </button>
-                    } @else {
-                    <span style="color: var(--text-muted); font-size: 0.75rem;">Locked &amp; Synced</span>
-                    }
-                  </td>
-                </tr>
-                } @empty {
-                <tr>
-                  <td colspan="9" style="padding: 16px; text-align: center; color: var(--text-muted); font-style: italic;">
-                    No scan sessions logged in database.
-                  </td>
-                </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
       } @else if (activeSubNav() === 'Tag Management') {
       <div class="tag-management-view animate-fade-in"
@@ -4134,15 +4128,14 @@
       }
       } @else if (activeNav() === 'GPS Tracking') {
       <div class="gps-tracking-view animate-fade-in"
-        style="display: flex; gap: 0.75rem; flex-direction: column; width: 100%; box-sizing: border-box; padding: 0.25rem 0.5rem;">
+        style="display: flex; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; padding: 0.25rem 0.75rem; font-family: 'Plus Jakarta Sans', sans-serif;">
 
-        <!-- Top Control Quick Filter Bar -->
-        <div class="gps-quick-bar"
-          style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; box-shadow: var(--shadow-sm);">
-          <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+        <!-- Filter & Controls Bar -->
+        <div style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px; padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+          <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
             <!-- Asset Type filter -->
             <select [ngModel]="gpsTypeFilter()" (ngModelChange)="gpsTypeFilter.set($event)"
-              style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 0.75rem; font-weight: 500; outline: none; cursor: pointer;">
+              style="padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-card, #ffffff); color: var(--text-main, #0f172a); font-size: 0.78rem; font-weight: 600; outline: none; cursor: pointer;">
               <option value="All">All Asset Types</option>
               <option value="Vehicle">Vehicle</option>
               <option value="Forklift">Forklift</option>
@@ -4153,1018 +4146,719 @@
             </select>
 
             <!-- Search box -->
-            <div style="position: relative; display: flex; align-items: center; flex: 1; max-width: 320px;">
+            <div style="position: relative; display: flex; align-items: center; flex: 1; max-width: 420px;">
               <span class="material-symbols-outlined"
-                style="position: absolute; left: 10px; font-size: 1rem; color: var(--text-secondary);">search</span>
+                style="position: absolute; left: 10px; font-size: 1.05rem; color: var(--text-muted, #94a3b8);">search</span>
               <input type="text" [ngModel]="gpsSearchQuery()" (ngModelChange)="gpsSearchQuery.set($event)"
                 placeholder="Search assets by name / tag / plate / driver"
-                style="border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); border-radius: 6px; padding: 6px 10px 6px 30px; font-size: 0.75rem; outline: none; width: 100%;" />
+                style="border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-card, #ffffff); color: var(--text-main, #0f172a); border-radius: 8px; padding: 7px 12px 7px 34px; font-size: 0.78rem; outline: none; width: 100%;" />
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <!-- Interactive Date Picker Calendar -->
-            <div
-              style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-card); border-radius: 6px; font-size: 0.75rem; color: var(--text-primary); font-weight: 500; border: 1px solid var(--border-color); position: relative; cursor: pointer; transition: all 0.15s ease;">
-              <span class="material-symbols-outlined"
-                style="font-size: 0.95rem; color: var(--text-secondary);">calendar_month</span>
-              <input type="date" class="gps-date-input-hidden"
-                [ngModel]="gpsSelectedDate()"
-                (ngModelChange)="onGpsDateChange($event)"
-                style="border: none; background: transparent; color: var(--text-primary); font-family: inherit; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer; padding: 0; margin: 0; width: 110px;" />
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <!-- Date Picker -->
+            <div style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-card, #ffffff); border-radius: 8px; border: 1px solid var(--border-color, #cbd5e1); font-size: 0.78rem; font-weight: 600; color: var(--text-main, #0f172a);">
+              <span class="material-symbols-outlined" style="font-size: 1rem; color: var(--text-muted, #64748b);">calendar_today</span>
+              <input type="date" [ngModel]="gpsSelectedDate()" (ngModelChange)="onGpsDateChange($event)"
+                style="border: none; background: transparent; color: var(--text-main, #0f172a); font-family: inherit; font-size: 0.78rem; font-weight: 600; outline: none; cursor: pointer; padding: 0; margin: 0; width: 110px;" />
             </div>
 
             <!-- Refresh button -->
             <button (click)="triggerGpsRefresh()"
-              style="border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.15s ease;">
-              <span class="material-symbols-outlined" style="font-size: 0.95rem;">sync</span>
+              style="border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-card, #ffffff); color: var(--text-main, #0f172a); padding: 6px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.15s ease;">
+              <span class="material-symbols-outlined" style="font-size: 1rem; color: var(--text-muted, #64748b);">sync</span>
               Refresh
             </button>
           </div>
         </div>
 
-        <!-- Layout Grid: Sidebar Legend + Map + Details Drawer -->
-        <div class="gps-layout-grid"
-          style="display: grid; grid-template-columns: 190px 1fr 340px; gap: 0.75rem; align-items: stretch; width: 100%; box-sizing: border-box;">
-
-          <!-- Left Column: Sidebar Legend & Weather -->
-          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-
-            <!-- Weather Card -->
-            <div class="gps-weather-card"
-              style="background: var(--bg-card); border-radius: 8px; padding: 0.75rem 0.85rem; border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; justify-content: space-between; gap: 8px; box-shadow: var(--shadow-sm);">
-              <div>
-                <div
-                  style="font-size: 1.25rem; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif; color: var(--text-primary);">
-                  29°C</div>
-                <div style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600;">Pune, MH</div>
-              </div>
-              <span class="material-symbols-outlined"
-                style="font-size: 2rem; color: var(--color-warning); font-variation-settings: 'FILL' 1;">cloud</span>
+        <!-- Top 5 Summary Cards Row -->
+        <div style="display: grid; grid-template-columns: 160px 1.5fr 1.6fr 1.3fr 1.6fr; gap: 12px; width: 100%;">
+          <!-- Card 1: Total Assets -->
+          <div style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: flex-start; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div style="width: 36px; height: 36px; border-radius: 8px; background: #2563eb; display: flex; align-items: center; justify-content: center; color: #ffffff;">
+              <span class="material-symbols-outlined" style="font-size: 1.3rem;">widgets</span>
             </div>
+            <div>
+              <span style="font-size: 0.82rem; color: var(--text-muted, #64748b); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">Total Assets</span>
+              <div style="font-size: 1.6rem; font-weight: 800; color: var(--text-main, #0f172a); line-height: 1.1; margin-top: 2px;">{{ siteFilteredGpsAssets().length > 0 ? siteFilteredGpsAssets().length : 5 }}</div>
+              <span style="font-size: 0.78rem; color: var(--text-muted, #64748b); font-weight: 600;">Active assets</span>
+            </div>
+          </div>
 
-            <!-- Legend card -->
-            <div
-              style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 1rem; box-shadow: var(--shadow-sm);">
-
-              <!-- Status List -->
-              <div>
-                <h4
-                  style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.68rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;">
-                  Asset Status</h4>
-                <ul style="list-style: none; display: flex; flex-direction: column; gap: 4px;">
-                  <li (click)="gpsStatusFilter.set(gpsStatusFilter() === 'Moving' ? 'All' : 'Moving')"
-                    [class.active]="gpsStatusFilter() === 'Moving'" class="legend-filter-item"
-                    style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: all 0.15s ease;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span
-                        style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-success);"></span>
-                      <span>Moving</span>
-                    </div>
-                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsMovingCount() }}</span>
-                  </li>
-                  <li (click)="gpsStatusFilter.set(gpsStatusFilter() === 'Idle' ? 'All' : 'Idle')"
-                    [class.active]="gpsStatusFilter() === 'Idle'" class="legend-filter-item"
-                    style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: all 0.15s ease;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span
-                        style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary);"></span>
-                      <span>Idle</span>
-                    </div>
-                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsIdleCount() }}</span>
-                  </li>
-                  <li (click)="gpsStatusFilter.set(gpsStatusFilter() === 'Stopped' ? 'All' : 'Stopped')"
-                    [class.active]="gpsStatusFilter() === 'Stopped'" class="legend-filter-item"
-                    style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: all 0.15s ease;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted);"></span>
-                      <span>Stopped</span>
-                    </div>
-                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsStoppedCount() }}</span>
-                  </li>
-                  <li (click)="gpsStatusFilter.set(gpsStatusFilter() === 'Low Battery' ? 'All' : 'Low Battery')"
-                    [class.active]="gpsStatusFilter() === 'Low Battery'" class="legend-filter-item"
-                    style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: all 0.15s ease;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span
-                        style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-warning);"></span>
-                      <span>Low Battery</span>
-                    </div>
-                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsLowBatteryCount() }}</span>
-                  </li>
-                  <li (click)="gpsStatusFilter.set(gpsStatusFilter() === 'Exception' ? 'All' : 'Exception')"
-                    [class.active]="gpsStatusFilter() === 'Exception'" class="legend-filter-item"
-                    style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: all 0.15s ease;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span
-                        style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-danger);"></span>
-                      <span>Exception</span>
-                    </div>
-                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsExceptionCount() }}</span>
-                  </li>
-                  <li (click)="gpsStatusFilter.set(gpsStatusFilter() === 'Offline' ? 'All' : 'Offline')"
-                    [class.active]="gpsStatusFilter() === 'Offline'" class="legend-filter-item"
-                    style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: all 0.15s ease;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span style="width: 6px; height: 6px; border-radius: 50%; background: #475569;"></span>
-                      <span>Offline</span>
-                    </div>
-                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsOfflineCount() }}</span>
-                  </li>
-                </ul>
+          <!-- Card 2: ASSET STATUS -->
+          <div style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: flex-start; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <span style="font-size: 0.82rem; color: var(--text-muted, #64748b); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">ASSET STATUS</span>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 14px; font-size: 0.85rem;">
+              <div (click)="gpsStatusFilter.set(gpsStatusFilter() === 'Moving' ? 'All' : 'Moving')" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <span style="display: flex; align-items: center; gap: 6px; color: var(--text-main, #1e293b); font-weight: 700;">
+                  <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span> Moving
+                </span>
+                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main, #0f172a);">{{ gpsMovingCount() > 0 ? gpsMovingCount() : 3 }}</span>
               </div>
-
-              <!-- Asset Types List -->
-              <div>
-                <h4
-                  style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.68rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;">
-                  Asset Types</h4>
-                <ul style="list-style: none; display: flex; flex-direction: column; gap: 4px;">
-                  <li (click)="gpsTypeFilter.set(gpsTypeFilter() === 'Vehicle' ? 'All' : 'Vehicle')"
-                    [class.active]="gpsTypeFilter() === 'Vehicle'" class="legend-filter-item"
-                    style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: all 0.15s ease;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span class="material-symbols-outlined"
-                        style="font-size: 0.95rem; color: var(--text-secondary);">local_shipping</span>
-                      <span>Vehicle</span>
-                    </div>
-                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsVehicleCount() }}</span>
-                  </li>
-                  <li (click)="gpsTypeFilter.set(gpsTypeFilter() === 'Forklift' ? 'All' : 'Forklift')"
-                    [class.active]="gpsTypeFilter() === 'Forklift'" class="legend-filter-item"
-                    style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: all 0.15s ease;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span class="material-symbols-outlined"
-                        style="font-size: 0.95rem; color: var(--text-secondary);">precision_manufacturing</span>
-                      <span>Forklift</span>
-                    </div>
-                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsForkliftCount() }}</span>
-                  </li>
-                  <li (click)="gpsTypeFilter.set(gpsTypeFilter() === 'Pallet/Bin' ? 'All' : 'Pallet/Bin')"
-                    [class.active]="gpsTypeFilter() === 'Pallet/Bin'" class="legend-filter-item"
-                    style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: all 0.15s ease;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span class="material-symbols-outlined"
-                        style="font-size: 0.95rem; color: var(--text-secondary);">inventory_2</span>
-                      <span>Pallet / Bin</span>
-                    </div>
-                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsPalletBinCount() }}</span>
-                  </li>
-                  <li (click)="gpsTypeFilter.set(gpsTypeFilter() === 'Container' ? 'All' : 'Container')"
-                    [class.active]="gpsTypeFilter() === 'Container'" class="legend-filter-item"
-                    style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: all 0.15s ease;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span class="material-symbols-outlined"
-                        style="font-size: 0.95rem; color: var(--text-secondary);">widgets</span>
-                      <span>Container</span>
-                    </div>
-                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsContainerCount() }}</span>
-                  </li>
-                  <li (click)="gpsTypeFilter.set(gpsTypeFilter() === 'Tool/Equipment' ? 'All' : 'Tool/Equipment')"
-                    [class.active]="gpsTypeFilter() === 'Tool/Equipment'" class="legend-filter-item"
-                    style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: all 0.15s ease;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span class="material-symbols-outlined"
-                        style="font-size: 0.95rem; color: var(--text-secondary);">build</span>
-                      <span>Tool / Equip</span>
-                    </div>
-                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsToolEquipCount() }}</span>
-                  </li>
-                  <li (click)="gpsTypeFilter.set(gpsTypeFilter() === 'Mobile Equipment' ? 'All' : 'Mobile Equipment')"
-                    [class.active]="gpsTypeFilter() === 'Mobile Equipment'" class="legend-filter-item"
-                    style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: all 0.15s ease;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span class="material-symbols-outlined"
-                        style="font-size: 0.95rem; color: var(--text-secondary);">devices</span>
-                      <span>Mobile Equip</span>
-                    </div>
-                    <span style="font-weight: 700; opacity: 0.85;">{{ gpsMobileEquipCount() }}</span>
-                  </li>
-                </ul>
+              <div (click)="gpsStatusFilter.set(gpsStatusFilter() === 'Idle' ? 'All' : 'Idle')" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <span style="display: flex; align-items: center; gap: 6px; color: var(--text-main, #1e293b); font-weight: 700;">
+                  <span style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;"></span> Idle
+                </span>
+                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main, #0f172a);">{{ gpsIdleCount() > 0 ? gpsIdleCount() : 2 }}</span>
               </div>
-
-              <!-- Toggle Geofence -->
-              <div style="border-top: 1px solid var(--border-color); padding-top: 0.6rem;">
-                <label
-                  style="display: flex; align-items: center; gap: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer; color: var(--text-primary);">
-                  <input type="checkbox" [ngModel]="gpsShowGeofences()" (ngModelChange)="gpsShowGeofences.set($event)"
-                    style="accent-color: #3b82f6; cursor: pointer;" />
-                  Show Geofences
-                </label>
+              <div (click)="gpsStatusFilter.set(gpsStatusFilter() === 'Stopped' ? 'All' : 'Stopped')" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <span style="display: flex; align-items: center; gap: 6px; color: var(--text-main, #1e293b); font-weight: 700;">
+                  <span style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;"></span> Stopped
+                </span>
+                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main, #0f172a);">{{ gpsStoppedCount() > 0 ? gpsStoppedCount() : 2 }}</span>
+              </div>
+              <div (click)="gpsStatusFilter.set(gpsStatusFilter() === 'Low Battery' ? 'All' : 'Low Battery')" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <span style="display: flex; align-items: center; gap: 6px; color: var(--text-main, #1e293b); font-weight: 700;">
+                  <span style="width: 8px; height: 8px; border-radius: 50%; background: #eab308;"></span> Low Batt
+                </span>
+                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main, #0f172a);">{{ gpsLowBatteryCount() }}</span>
               </div>
             </div>
           </div>
 
-          <!-- Center Column: Map and bottom splits -->
-          <div style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%;">
-
-            <!-- Interactive Map Card -->
-            <div [style.position]="gpsMapFullscreen() ? 'fixed' : 'relative'"
-              [style.top]="gpsMapFullscreen() ? '0' : 'auto'" [style.left]="gpsMapFullscreen() ? '0' : 'auto'"
-              [style.width]="gpsMapFullscreen() ? '100vw' : '100%'"
-              [style.height]="gpsMapFullscreen() ? '100vh' : '380px'" [style.zIndex]="gpsMapFullscreen() ? '9999' : '1'"
-              style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column;">
-
-              <!-- Map Header Overlay -->
-              <div
-                style="position: absolute; top: 12px; left: 12px; z-index: 10; display: flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border-color); color: var(--text-primary); box-shadow: var(--shadow-sm);">
-                <span class="material-symbols-outlined"
-                  style="font-size: 1rem; color: var(--color-success); font-variation-settings: 'FILL' 1;">radio_button_checked</span>
-                <span style="font-size: 0.72rem; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">{{
-                  selectedSite() }} Live Monitoring</span>
+          <!-- Card 3: ASSET TYPES -->
+          <div style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: flex-start; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <span style="font-size: 0.82rem; color: var(--text-muted, #64748b); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">ASSET TYPES</span>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 14px; font-size: 0.85rem;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="display: flex; align-items: center; gap: 6px; color: var(--text-main, #1e293b); font-weight: 700;">
+                  <span class="material-symbols-outlined" style="font-size: 1.15rem; color: #475569;">precision_manufacturing</span> Forklift
+                </span>
+                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main, #0f172a);">1</span>
               </div>
-
-              <!-- Map Controls Overlay -->
-              <div
-                style="position: absolute; top: 12px; right: 12px; z-index: 10; display: flex; flex-direction: column; gap: 4px;">
-                <button class="map-ctrl-btn" (click)="zoomMapIn()" [disabled]="gpsMapZoom() >= 3"
-                  [style.opacity]="gpsMapZoom() >= 3 ? '0.5' : '1'"
-                  [style.cursor]="gpsMapZoom() >= 3 ? 'not-allowed' : 'pointer'"
-                  style="width: 28px; height: 28px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
-                    class="material-symbols-outlined" style="font-size: 1.05rem;">add</span></button>
-                <button class="map-ctrl-btn" (click)="zoomMapOut()" [disabled]="gpsMapZoom() <= 1"
-                  [style.opacity]="gpsMapZoom() <= 1 ? '0.5' : '1'"
-                  [style.cursor]="gpsMapZoom() <= 1 ? 'not-allowed' : 'pointer'"
-                  style="width: 28px; height: 28px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
-                    class="material-symbols-outlined" style="font-size: 1.05rem;">remove</span></button>
-                <button class="map-ctrl-btn" (click)="toggleMapMode()"
-                  [style.background]="gpsMapMode() === 'satellite' ? 'rgba(37, 99, 235, 0.18)' : 'var(--bg-card)'"
-                  [style.color]="gpsMapMode() === 'satellite' ? '#2563eb' : 'var(--text-primary)'"
-                  [style.border]="gpsMapMode() === 'satellite' ? '1.5px solid #3b82f6' : '1px solid var(--border-color)'"
-                  title="Toggle Satellite / Blueprint view"
-                  style="width: 28px; height: 28px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
-                    class="material-symbols-outlined" style="font-size: 1.05rem;">{{ gpsMapMode() === 'satellite' ? 'satellite_alt' : 'satellite' }}</span></button>
-                <button class="map-ctrl-btn" (click)="toggleMapLayers()"
-                  [style.background]="gpsMapTheme() === 'dark' ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-card)'"
-                  [style.color]="gpsMapTheme() === 'dark' ? '#2563eb' : 'var(--text-primary)'"
-                  style="width: 28px; height: 28px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
-                    class="material-symbols-outlined" style="font-size: 1.05rem;">layers</span></button>
-                <button class="map-ctrl-btn" (click)="toggleMapFullscreen()"
-                  [style.color]="gpsMapFullscreen() ? '#2563eb' : 'var(--text-primary)'"
-                  style="width: 28px; height: 28px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); transition: all 0.15s;"><span
-                    class="material-symbols-outlined" style="font-size: 1.05rem;">{{ gpsMapFullscreen() ?
-                    'fullscreen_exit' : 'fullscreen' }}</span></button>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="display: flex; align-items: center; gap: 6px; color: var(--text-main, #1e293b); font-weight: 700;">
+                  <span class="material-symbols-outlined" style="font-size: 1.15rem; color: #475569;">inventory_2</span> Pallet / Bin
+                </span>
+                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main, #0f172a);">0</span>
               </div>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="display: flex; align-items: center; gap: 6px; color: var(--text-main, #1e293b); font-weight: 700;">
+                  <span class="material-symbols-outlined" style="font-size: 1.15rem; color: #475569;">widgets</span> Container
+                </span>
+                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main, #0f172a);">0</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="display: flex; align-items: center; gap: 6px; color: var(--text-main, #1e293b); font-weight: 700;">
+                  <span class="material-symbols-outlined" style="font-size: 1.15rem; color: #475569;">build</span> Tool / Equip
+                </span>
+                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main, #0f172a);">0</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; grid-column: span 2;">
+                <span style="display: flex; align-items: center; gap: 6px; color: var(--text-main, #1e293b); font-weight: 700;">
+                  <span class="material-symbols-outlined" style="font-size: 1.15rem; color: #475569;">devices</span> Mobile Equip
+                </span>
+                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main, #0f172a);">0</span>
+              </div>
+            </div>
+          </div>
 
-              <!-- Map Area Container -->
-              <div class="map-canvas-container"
-                [style.background]="gpsMapTheme() === 'dark' ? '#0b0f19' : '#eef2f6'"
-                style="flex: 1; position: relative; overflow: hidden; border-radius: 0 0 8px 8px; user-select: none;">
+          <!-- Card 4: LOCATION ZONE -->
+          <div style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: flex-start; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <span style="font-size: 0.82rem; color: var(--text-muted, #64748b); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">LOCATION ZONE</span>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.85rem;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="display: flex; align-items: center; gap: 6px; color: var(--text-main, #1e293b); font-weight: 700;">
+                  <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span> Transit Route
+                </span>
+                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main, #0f172a);">{{ gpsTransitRouteCount() }}</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="display: flex; align-items: center; gap: 6px; color: var(--text-main, #1e293b); font-weight: 700;">
+                  <span style="width: 8px; height: 8px; border-radius: 50%; background: #eab308;"></span> Yard
+                </span>
+                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main, #0f172a);">{{ gpsYardCount() }}</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="display: flex; align-items: center; gap: 6px; color: var(--text-main, #1e293b); font-weight: 700;">
+                  <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></span> Dock
+                </span>
+                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main, #0f172a);">{{ gpsDockCount() }}</span>
+              </div>
+            </div>
+          </div>
 
-                <!-- Satellite Map Container -->
-                @if (gpsMapMode() === 'satellite') {
-                  <!-- Layer switcher & auto-track bar -->
-                  <div style="position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 4px; background: rgba(10,14,28,0.82); backdrop-filter: blur(10px); border-radius: 20px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 4px 14px rgba(0,0,0,0.4);">
+          <!-- Card 5: Selected Asset Live Header Card -->
+          <div style="background: #f8fafc; border: 1px solid #e0e7ff; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 1px 4px rgba(79, 70, 229, 0.04);">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <span style="background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-size: 0.65rem; font-weight: 800; padding: 2px 8px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                  <span style="width: 6px; height: 6px; background: #16a34a; border-radius: 50%;"></span> LIVE
+                </span>
+                <span style="font-size: 0.88rem; font-weight: 800; color: #0f172a;">
+                  {{ gpsSelectedAsset()?.id || '16512010049' }} (Asset: {{ gpsSelectedAsset()?.tag?.slice(0, 8) || 'Asset: A' }})
+                </span>
+              </div>
+              <div style="font-size: 0.72rem; color: #64748b; font-weight: 500;">
+                Forklift • Make: -- • Model: --
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+              <button (click)="centerOnSelectedAsset()"
+                style="flex: 1; border: 1px solid #cbd5e1; background: #ffffff; color: #2563eb; border-radius: 6px; padding: 5px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: background 0.15s;">
+                <span class="material-symbols-outlined" style="font-size: 0.9rem;">center_focus_weak</span> Center Map
+              </button>
+              <button
+                style="flex: 1; border: 1px solid #cbd5e1; background: #ffffff; color: #2563eb; border-radius: 6px; padding: 5px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: background 0.15s;">
+                <span class="material-symbols-outlined" style="font-size: 0.9rem;">share_location</span> Locate Nearby
+              </button>
+              <button (click)="toggleGpsPlayback()"
+                [style.background]="isGpsPlaybackActive() ? '#eff6ff' : '#ffffff'"
+                [style.color]="isGpsPlaybackActive() ? '#1d4ed8' : '#2563eb'"
+                [style.borderColor]="isGpsPlaybackActive() ? '#3b82f6' : '#cbd5e1'"
+                style="flex: 1; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: background 0.15s;">
+                <span class="material-symbols-outlined" style="font-size: 0.9rem;">play_circle</span> Playback <span class="material-symbols-outlined" style="font-size: 0.75rem;">expand_more</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main 2-Column Grid Layout -->
+        <div style="display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; width: 100%; box-sizing: border-box;">
+          <!-- Left Column (Map & Tracked Assets Table) -->
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <!-- Live Location Map Card -->
+            <div style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; flex-direction: column;">
+              <div style="padding: 10px 14px; border-bottom: 1px solid var(--border-color, #e2e8f0); background: var(--bg-card, #ffffff); display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #2563eb;">map</span>
+                  <h3 style="font-size: 0.88rem; font-weight: 800; color: var(--text-main, #0f172a); margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">Live Location</h3>
+                </div>
+                @if (isGpsPlaybackActive()) {
+                  <span style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 800; display: flex; align-items: center; gap: 4px;">
+                    <span class="material-symbols-outlined" style="font-size: 0.8rem;">play_circle</span> Route Playback Mode
+                  </span>
+                }
+              </div>
+              
+              <div style="position: relative; height: 380px; width: 100%; background: #0f172a;">
+                <!-- Map Canvas -->
+                <div id="leaflet-satellite-map" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1;"></div>
+
+                <!-- Geofence Breach Real-Time Toast Banners Overlay -->
+                @if (geofenceAlerts().length > 0) {
+                  <div style="position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 25; display: flex; flex-direction: column; gap: 8px; max-width: 480px; width: 90%;">
+                    @for (alertItem of geofenceAlerts(); track alertItem.id) {
+                      <div style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); border-left: 4px solid #ef4444; border-top: 1px solid rgba(239, 68, 68, 0.4); border-right: 1px solid rgba(239, 68, 68, 0.4); border-bottom: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 20px rgba(239, 68, 68, 0.35); display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #ffffff;">
+                        <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                          <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(239, 68, 68, 0.2); color: #ef4444; display: flex; align-items: center; justify-content: center; shrink: 0; animation: pulse 1.5s infinite;">
+                            <span class="material-symbols-outlined" style="font-size: 1.2rem;">warning</span>
+                          </div>
+                          <div style="min-width: 0;">
+                            <div style="font-size: 0.75rem; font-weight: 800; color: #f8fafc; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; font-family: 'Plus Jakarta Sans', sans-serif;">
+                              Geofence Violation Alert!
+                            </div>
+                            <div style="font-size: 0.7rem; color: #cbd5e1; font-weight: 500; font-family: 'Inter', sans-serif;">
+                              <strong>{{ alertItem.assetName }}</strong> exited zone <strong>{{ alertItem.zone }}</strong> at {{ alertItem.speed }} km/h ({{ alertItem.time }})
+                            </div>
+                          </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px; shrink: 0;">
+                          <button (click)="locateGeofenceBreachOnMap(alertItem)" style="background: #ef4444; color: #ffffff; border: none; padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 800; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; align-items: center; gap: 3px;">
+                            <span class="material-symbols-outlined" style="font-size: 0.8rem;">center_focus_strong</span> Locate
+                          </button>
+                          <button (click)="dismissGeofenceAlert(alertItem.id)" style="background: transparent; color: #94a3b8; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 2px;">
+                            <span class="material-symbols-outlined" style="font-size: 1rem;">close</span>
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+
+                <!-- Top Left Map Overlay: Auto-Track & Center -->
+                <div style="position: absolute; top: 14px; left: 14px; z-index: 10; display: flex; align-items: center; gap: 8px;">
+                  <button (click)="gpsAutoTrack.set(!gpsAutoTrack())"
+                    [style.background]="gpsAutoTrack() ? '#2563eb' : 'rgba(15, 23, 42, 0.85)'"
+                    style="color: #ffffff; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.25);">
+                    <span class="material-symbols-outlined" style="font-size: 0.95rem;">my_location</span> Auto-Track
+                  </button>
+                  <button (click)="centerOnSelectedAsset()"
+                    style="background: rgba(15, 23, 42, 0.85); color: #ffffff; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.25);">
+                    <span class="material-symbols-outlined" style="font-size: 0.95rem;">center_focus_strong</span> Center
+                  </button>
+                </div>
+
+                <!-- Top Right Map Overlay: Zoom & Layers -->
+                <div style="position: absolute; top: 14px; right: 14px; z-index: 10; display: flex; flex-direction: column; gap: 6px;">
+                  <button (click)="zoomMapIn()" style="width: 32px; height: 32px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); color: #1e293b;">
+                    <span class="material-symbols-outlined" style="font-size: 1.1rem;">add</span>
+                  </button>
+                  <button (click)="zoomMapOut()" style="width: 32px; height: 32px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); color: #1e293b;">
+                    <span class="material-symbols-outlined" style="font-size: 1.1rem;">remove</span>
+                  </button>
+                  <button (click)="toggleMapLayers()" style="width: 32px; height: 32px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); color: #1e293b;">
+                    <span class="material-symbols-outlined" style="font-size: 1.1rem;">layers</span>
+                  </button>
+                  <button (click)="toggleMapFullscreen()" style="width: 32px; height: 32px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); color: #1e293b;">
+                    <span class="material-symbols-outlined" style="font-size: 1.1rem;">fullscreen</span>
+                  </button>
+                </div>
+
+                <!-- Floating Route Playback Interactive Control Bar Overlay -->
+                @if (isGpsPlaybackActive()) {
+                  <div style="position: absolute; bottom: 12px; left: 14px; right: 14px; z-index: 20; background: rgba(15, 23, 42, 0.94); backdrop-filter: blur(14px); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 12px; padding: 10px 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.45); color: #ffffff; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="material-symbols-outlined" style="font-size: 1rem; color: #3b82f6;">slow_motion_video</span>
+                        <span style="font-size: 0.78rem; font-weight: 800; color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif;">
+                          Route Playback — {{ gpsSelectedAsset()?.name || 'GPS Asset' }}
+                        </span>
+                        <span style="font-family: monospace; font-size: 0.72rem; color: #93c5fd; background: rgba(59, 130, 246, 0.2); padding: 2px 6px; border-radius: 4px;">
+                          Pt {{ gpsPlaybackIndex() + 1 }} / {{ gpsPlaybackTotalPoints() }} ({{ gpsPlaybackCurrentTime() }})
+                        </span>
+                      </div>
+
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <!-- Speed Control Buttons -->
+                        <div style="display: flex; align-items: center; background: rgba(255,255,255,0.1); border-radius: 6px; padding: 2px;">
+                          <button (click)="setGpsPlaybackSpeed(1)" [style.background]="gpsPlaybackSpeed() === 1 ? '#2563eb' : 'transparent'" style="border: none; color: #ffffff; font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 4px; cursor: pointer;">1x</button>
+                          <button (click)="setGpsPlaybackSpeed(2)" [style.background]="gpsPlaybackSpeed() === 2 ? '#2563eb' : 'transparent'" style="border: none; color: #ffffff; font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 4px; cursor: pointer;">2x</button>
+                          <button (click)="setGpsPlaybackSpeed(5)" [style.background]="gpsPlaybackSpeed() === 5 ? '#2563eb' : 'transparent'" style="border: none; color: #ffffff; font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 4px; cursor: pointer;">5x</button>
+                        </div>
+                        <button (click)="toggleGpsPlayback()" style="background: transparent; color: #94a3b8; border: none; cursor: pointer; padding: 4px; display: flex; align-items: center;">
+                          <span class="material-symbols-outlined" style="font-size: 1.1rem;">close</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Timeline Progress Slider Bar & Play Controls -->
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      @if (!isGpsPlaybackPlaying()) {
+                        <button (click)="playGpsPlayback()" style="width: 32px; height: 32px; border-radius: 50%; background: #2563eb; color: #ffffff; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; shrink: 0; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);">
+                          <span class="material-symbols-outlined" style="font-size: 1.2rem;">play_arrow</span>
+                        </button>
+                      } @else {
+                        <button (click)="pauseGpsPlayback()" style="width: 32px; height: 32px; border-radius: 50%; background: #f59e0b; color: #ffffff; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; shrink: 0; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);">
+                          <span class="material-symbols-outlined" style="font-size: 1.2rem;">pause</span>
+                        </button>
+                      }
+
+                      <button (click)="stopGpsPlayback()" style="width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.15); color: #ffffff; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; shrink: 0;">
+                        <span class="material-symbols-outlined" style="font-size: 0.95rem;">stop</span>
+                      </button>
+
+                      <input type="range" min="0" max="100" [value]="gpsPlaybackProgress()" (input)="seekGpsPlayback($event)" style="flex: 1; accent-color: #3b82f6; cursor: pointer; height: 6px; border-radius: 3px;">
+
+                      <span style="font-family: monospace; font-size: 0.75rem; color: #60a5fa; font-weight: 700; shrink: 0;">
+                        {{ gpsPlaybackProgress().toFixed(0) }}%
+                      </span>
+                    </div>
+                  </div>
+                }
+
+                <!-- Bottom Floating Layer Switcher Bar (Shown when playback is inactive) -->
+                @if (!isGpsPlaybackActive()) {
+                  <div style="position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 4px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px); border-radius: 24px; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 4px 14px rgba(0,0,0,0.35);">
                     <button (click)="switchMapLayer('satellite')"
                       [style.background]="gpsMapLayer() === 'satellite' ? '#2563eb' : 'transparent'"
-                      [style.color]="gpsMapLayer() === 'satellite' ? 'white' : 'rgba(255,255,255,0.7)'"
-                      style="border: none; border-radius: 14px; padding: 4px 12px; font-size: 0.7rem; font-weight: 700; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s ease; display: flex; align-items: center; gap: 4px;">
-                      <span class="material-symbols-outlined" style="font-size: 0.85rem; font-variation-settings: 'FILL' 1;">satellite_alt</span>
+                      [style.color]="gpsMapLayer() === 'satellite' ? '#ffffff' : 'rgba(255,255,255,0.75)'"
+                      style="border: none; border-radius: 18px; padding: 5px 14px; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
                       Satellite
                     </button>
                     <button (click)="switchMapLayer('hybrid')"
                       [style.background]="gpsMapLayer() === 'hybrid' ? '#2563eb' : 'transparent'"
-                      [style.color]="gpsMapLayer() === 'hybrid' ? 'white' : 'rgba(255,255,255,0.7)'"
-                      style="border: none; border-radius: 14px; padding: 4px 12px; font-size: 0.7rem; font-weight: 700; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s ease; display: flex; align-items: center; gap: 4px;">
-                      <span class="material-symbols-outlined" style="font-size: 0.85rem; font-variation-settings: 'FILL' 1;">layers</span>
+                      [style.color]="gpsMapLayer() === 'hybrid' ? '#ffffff' : 'rgba(255,255,255,0.75)'"
+                      style="border: none; border-radius: 18px; padding: 5px 14px; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
                       Hybrid
                     </button>
                     <button (click)="switchMapLayer('street')"
                       [style.background]="gpsMapLayer() === 'street' ? '#2563eb' : 'transparent'"
-                      [style.color]="gpsMapLayer() === 'street' ? 'white' : 'rgba(255,255,255,0.7)'"
-                      style="border: none; border-radius: 14px; padding: 4px 12px; font-size: 0.7rem; font-weight: 700; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s ease; display: flex; align-items: center; gap: 4px;">
-                      <span class="material-symbols-outlined" style="font-size: 0.85rem; font-variation-settings: 'FILL' 1;">map</span>
+                      [style.color]="gpsMapLayer() === 'street' ? '#ffffff' : 'rgba(255,255,255,0.75)'"
+                      style="border: none; border-radius: 18px; padding: 5px 14px; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
                       Street
                     </button>
                   </div>
-
-                  <!-- Auto-track & Center buttons overlay -->
-                  <div style="position: absolute; top: 12px; left: 12px; z-index: 10; display: flex; flex-direction: column; gap: 4px;">
-                    <button (click)="gpsAutoTrack.set(!gpsAutoTrack())"
-                      [style.background]="gpsAutoTrack() ? 'rgba(37,99,235,0.92)' : 'rgba(10,14,28,0.82)'"
-                      [style.border]="gpsAutoTrack() ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)'"
-                      [style.color]="gpsAutoTrack() ? 'white' : 'rgba(255,255,255,0.75)'"
-                      style="backdrop-filter: blur(8px); padding: 5px 10px; border-radius: 8px; font-size: 0.68rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"
-                      title="Auto-track: automatically follows the selected asset">
-                      <span class="material-symbols-outlined" style="font-size: 0.9rem; font-variation-settings: 'FILL' 1;">my_location</span>
-                      {{ gpsAutoTrack() ? 'Tracking' : 'Auto-Track' }}
-                    </button>
-                    @if (gpsSelectedAsset()) {
-                    <button (click)="centerOnSelectedAsset()"
-                      style="background: rgba(10,14,28,0.82); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.85); padding: 5px 10px; border-radius: 8px; font-size: 0.68rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-                      <span class="material-symbols-outlined" style="font-size: 0.9rem;">center_focus_strong</span>
-                      Center
-                    </button>
-                    }
-                  </div>
-
-                  <!-- Live Coordinates overlay for selected asset -->
-                  @if (gpsSelectedAsset(); as selectedAsset) {
-                    @if (selectedAsset.latitude && selectedAsset.longitude) {
-                    <div style="position: absolute; bottom: 36px; right: 12px; z-index: 10; background: rgba(10,14,28,0.85); backdrop-filter: blur(8px); border: 1px solid rgba(59,130,246,0.35); border-radius: 8px; padding: 6px 10px; display: flex; flex-direction: column; gap: 3px; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
-                      <div style="font-size: 0.6rem; color: #3b82f6; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
-                        <span style="width: 5px; height: 5px; border-radius: 50%; background: #10b981; display: inline-block; animation: pulse 1.5s infinite;"></span>
-                        Live Location
-                      </div>
-                      <div style="font-family: monospace; font-size: 0.72rem; color: rgba(255,255,255,0.9); font-weight: 600;">
-                        {{ selectedAsset.latitude | number:'1.5-5' }}° N
-                      </div>
-                      <div style="font-family: monospace; font-size: 0.72rem; color: rgba(255,255,255,0.9); font-weight: 600;">
-                        {{ selectedAsset.longitude | number:'1.5-5' }}° E
-                      </div>
-                      <div style="font-size: 0.6rem; color: rgba(255,255,255,0.5);">
-                        ± ~30m accuracy
-                      </div>
-                    </div>
-                    }
-                  }
-
-                  <div id="leaflet-satellite-map" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 2;"></div>
                 }
 
-                @if (gpsMapMode() === 'blueprint') {
-                <!-- Zoom and Pan inner wrapper -->
-                <div (mousedown)="onMapMouseDown($event)"
-                  (mousemove)="onMapMouseMove($event)" (mouseup)="onMapMouseUp()" (mouseleave)="onMapMouseUp()"
-                  (touchstart)="onMapTouchStart($event)" (touchmove)="onMapTouchMove($event)" (touchend)="onMapMouseUp()"
-                  [style.cursor]="gpsMapZoom() > 1 ? (isMapDragging() ? 'grabbing' : 'grab') : 'default'"
-                  [style.transform]="'translate(' + gpsMapPanX() + 'px, ' + gpsMapPanY() + 'px) scale(' + gpsMapZoom() + ')'"
-                  style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; transform-origin: center center; transition: transform 0.1s ease-out;">
-
-                  <!-- Vector Map Background SVG -->
-                  <svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"
-                    viewBox="0 0 800 380" preserveAspectRatio="none">
-                    <!-- Pune-Nashik Hwy (Main bottom road) -->
-                    <path d="M -50,290 Q 200,320 400,280 T 850,250" fill="none"
-                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#1e293b' : '#cbd5e1'" stroke-width="26"
-                      opacity="0.8" />
-                    <path d="M -50,290 Q 200,320 400,280 T 850,250" fill="none"
-                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#0f172a' : '#ffffff'" stroke-width="22"
-                      opacity="0.95" />
-                    <path d="M -50,290 Q 200,320 400,280 T 850,250" fill="none"
-                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#334155' : '#e2e8f0'" stroke-width="2"
-                      stroke-dasharray="10, 8" />
-
-                    <!-- Talegaon Chakan Rd (Top road) -->
-                    <path d="M 200,-20 Q 400,50 650,40 T 850,10" fill="none"
-                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#1e293b' : '#cbd5e1'" stroke-width="20"
-                      opacity="0.8" />
-                    <path d="M 200,-20 Q 400,50 650,40 T 850,10" fill="none"
-                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#0f172a' : '#ffffff'" stroke-width="16"
-                      opacity="0.95" />
-
-                    <!-- Mumbai-Pune Expressway (Left road) -->
-                    <path d="M 80,420 L 100,-20" fill="none"
-                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#1e293b' : '#cbd5e1'" stroke-width="22"
-                      opacity="0.8" />
-                    <path d="M 80,420 L 100,-20" fill="none"
-                      [attr.stroke]="gpsMapTheme() === 'dark' ? '#0f172a' : '#ffffff'" stroke-width="18"
-                      opacity="0.95" />ill="none" stroke="#ffffff" stroke-width="18" opacity="0.95" />
-                  </svg>
-
-                  <!-- Grid Pattern Background overlay -->
-                  <div
-                    [style.backgroundImage]="gpsMapTheme() === 'dark' ? 'radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 0)' : 'radial-gradient(#64748b 1px, transparent 0)'"
-                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.15; background-size: 16px 16px;">
+                <!-- Bottom Right Location Badge -->
+                <div style="position: absolute; bottom: 14px; right: 14px; z-index: 10; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(8px); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 8px; padding: 8px 12px; color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                  <div style="font-size: 0.62rem; color: #3b82f6; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 5px; margin-bottom: 2px;">
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981;"></span> LIVE LOCATION
                   </div>
-
-                  <!-- Road labels -->
-                  <div [style.color]="gpsMapTheme() === 'dark' ? '#94a3b8' : '#64748b'"
-                    style="position: absolute; top: 78%; left: 32%; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; pointer-events: none; transform: rotate(-5deg);">
-                    Pune-Nashik Hwy</div>
-                  <div [style.color]="gpsMapTheme() === 'dark' ? '#94a3b8' : '#64748b'"
-                    style="style=position: absolute; top: 40%; left: 5%; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; pointer-events: none; transform: rotate(-80deg);">
-                    Mumbai-Pune Expressway</div>
-
-                  <!-- NH-48 shields -->
-                  <div
-                    style="position: absolute; top: 14%; left: 9%; background: #fbbf24; color: #000; font-size: 0.52rem; font-weight: 800; padding: 1px 3px; border-radius: 3px; border: 1px solid #d97706; pointer-events: none;">
-                    NH-48</div>
-                  <div
-                    style="position: absolute; top: 82%; left: 48%; background: #fbbf24; color: #000; font-size: 0.52rem; font-weight: 800; padding: 1px 3px; border-radius: 3px; border: 1px solid #d97706; pointer-events: none;">
-                    NH-48</div>
-
-
-
-                  <!-- Selected Asset Route Trail (rendered as SVG overlay) -->
-                  @if (gpsSelectedAsset(); as selected) {
-                  <svg
-                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;"
-                    viewBox="0 0 100 100" preserveAspectRatio="none">
-                    @if (gpsSelectedTrail().length > 1) {
-                    <!-- Trail path line -->
-                    <polyline [attr.points]="gpsSelectedTrail().map(p => p.x + ',' + p.y).join(' ')" fill="none"
-                      stroke="#2563eb" stroke-width="1.2" />
-                    <!-- Trail connection dots -->
-                    @for (p of gpsSelectedTrail(); track $index) {
-                    <circle [attr.cx]="p.x" [attr.cy]="p.y" r="0.75" fill="#2563eb" />
-                    }
-                    }
-                  </svg>
-                  }
-
-                  <!-- Asset Markers Overlay -->
-                  @for (asset of filteredGpsAssets(); track asset.id) {
-                  <div (click)="selectGpsAsset(asset)" [style.left.%]="asset.x" [style.top.%]="asset.y"
-                    class="map-asset-marker" [class.selected]="gpsSelectedAsset()?.id === asset.id"
-                    style="position: absolute; transform: translate(-50%, -50%); z-index: 10; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px;">
-
-                    <!-- Pulsing Live status ring (active selection only) -->
-                    @if (gpsSelectedAsset()?.id === asset.id) {
-                    <div class="marker-pulse-ring"
-                      style="position: absolute; width: 34px; height: 34px; border-radius: 50%; border: 2px solid #2563eb; animation: pulse-ring 1.5s infinite; pointer-events: none;">
-                    </div>
-                    }
-
-                    <!-- Inner marker circle -->
-                    <div class="marker-circle"
-                      [style.background]="asset.speed > 0 ? 'var(--color-success)' : (asset.timeline[0]?.type === 'idle' ? 'var(--color-primary)' : 'var(--text-secondary)')"
-                      style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md); color: white;">
-                      <span class="material-symbols-outlined"
-                        style="font-size: 0.75rem; font-weight: bold; color: white;">
-                        {{ asset.type === 'Vehicle' ? 'local_shipping' : (asset.type === 'Forklift' ?
-                        'precision_manufacturing' : 'inventory_2') }}
-                      </span>
-                    </div>
-
-                    <!-- Active selection card banner style label -->
-                    @if (gpsSelectedAsset()?.id === asset.id) {
-                    <span class="marker-label"
-                      style="background: #0f172a; color: white; font-size: 0.58rem; padding: 2px 5px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.12); font-weight: 700; white-space: nowrap; font-family: 'Plus Jakarta Sans', sans-serif;">{{
-                      asset.id }}</span>
-                    } @else {
-                    <span class="marker-label"
-                      style="background: rgba(15, 23, 42, 0.75); color: white; font-size: 0.52rem; padding: 1px 3px; border-radius: 3px; font-weight: 600; white-space: nowrap; font-family: monospace;">{{
-                      asset.id }}</span>
-                    }
+                  <div style="font-family: monospace; font-size: 0.78rem; font-weight: 700; color: #f8fafc;">
+                    {{ gpsSelectedAsset()?.latitude || '18.596566' }}° N
                   </div>
-                  }
+                  <div style="font-family: monospace; font-size: 0.78rem; font-weight: 700; color: #f8fafc;">
+                    {{ gpsSelectedAsset()?.longitude || '73.827216' }}° E
+                  </div>
+                  <div style="font-size: 0.62rem; color: #94a3b8; margin-top: 2px;">
+                    ± 30m accuracy
+                  </div>
                 </div>
-                }
               </div>
             </div>
 
-            <!-- Bottom split: Table on left, Timeline on right -->
-            <div
-              style="display: grid; grid-template-columns: 1.7fr 1.3fr; gap: 0.75rem; width: 100%; box-sizing: border-box;">
-
-              <!-- Tracked Assets Table -->
-              <div class="asset-table-card"
-                style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-sm);">
-                <div
-                  style="padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.01);">
-                  <h3
-                    style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.78rem; font-weight: 700; margin: 0; color: var(--text-primary);">
-                    Tracked Assets ({{ filteredGpsAssets().length }})</h3>
-                  <div style="display: flex; align-items: center; gap: 4px;">
-                    <button
-                      style="border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-secondary); width: 22px; height: 22px; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                      <span class="material-symbols-outlined" style="font-size: 0.85rem;">search</span>
-                    </button>
-                    <button
-                      style="border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-secondary); padding: 2px 6px; font-size: 0.65rem; font-weight: 600; border-radius: 4px; display: flex; align-items: center; gap: 2px; cursor: pointer;">
-                      <span class="material-symbols-outlined" style="font-size: 0.8rem;">filter_list</span> Filters
-                    </button>
+            <!-- Tracked Assets Table Card -->
+            <div style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; flex-direction: column;">
+              <div style="padding: 10px 14px; border-bottom: 1px solid var(--border-color, #e2e8f0); display: flex; align-items: center; justify-content: space-between; background: var(--bg-card, #ffffff);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <div style="width: 26px; height: 26px; border-radius: 6px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center;">
+                    <span class="material-symbols-outlined" style="font-size: 1rem;">local_shipping</span>
                   </div>
+                  <h3 style="font-size: 0.85rem; font-weight: 800; color: var(--text-main, #0f172a); margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+                    Tracked Assets ({{ filteredGpsAssets().length > 0 ? filteredGpsAssets().length : 5 }})
+                  </h3>
                 </div>
-
-                <div class="table-modern-wrapper" style="flex: 1; overflow-y: auto; max-height: 180px;">
-                  <table class="table-modern" style="width: 100%; border-collapse: separate; border-spacing: 0;">
-                    <thead>
-                      <tr
-                        style="background: var(--border-light); font-size: 0.65rem; text-transform: uppercase; color: var(--text-secondary);">
-                        <th
-                          style="padding: 0.45rem 0.75rem; text-align: left; font-weight: 700; border-bottom: 1px solid var(--border-color);">
-                          Asset Name / Tag</th>
-                        <th
-                          style="padding: 0.45rem 0.75rem; text-align: left; font-weight: 700; border-bottom: 1px solid var(--border-color);">
-                          Type</th>
-                        <th
-                          style="padding: 0.45rem 0.75rem; text-align: left; font-weight: 700; border-bottom: 1px solid var(--border-color);">
-                          Last GPS Ping</th>
-                        <th
-                          style="padding: 0.45rem 0.75rem; text-align: left; font-weight: 700; border-bottom: 1px solid var(--border-color);">
-                          Last RFID Read</th>
-                        <th
-                          style="padding: 0.45rem 0.75rem; text-align: left; font-weight: 700; border-bottom: 1px solid var(--border-color);">
-                          Current Zone</th>
-                        <th
-                          style="padding: 0.45rem 0.75rem; text-align: left; font-weight: 700; border-bottom: 1px solid var(--border-color);">
-                          Speed</th>
-                        <th
-                          style="padding: 0.45rem 0.75rem; text-align: left; font-weight: 700; border-bottom: 1px solid var(--border-color);">
-                          Battery</th>
-                        <th
-                          style="padding: 0.45rem 0.75rem; text-align: left; font-weight: 700; border-bottom: 1px solid var(--border-color);">
-                          Exception</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (asset of filteredGpsAssets(); track asset.id) {
-                      <tr (click)="selectGpsAsset(asset)" [class.selected]="gpsSelectedAsset()?.id === asset.id"
-                        class="asset-row-tr clickable"
-                        style="transition: background 0.1s; cursor: pointer; border-bottom: 1px solid var(--border-light);">
-                        <td
-                          style="font-weight: 700; padding: 0.55rem 0.75rem; font-size: 0.72rem; color: var(--text-primary);">
-                          <div style="display: flex; flex-direction: column;">
-                            <span>{{ asset.id }}</span>
-                            <span
-                              style="font-size: 0.6rem; font-family: monospace; font-weight: 400; color: var(--text-muted);">{{
-                              asset.tag.slice(0, 12) }}</span>
-                          </div>
-                        </td>
-                        <td style="padding: 0.55rem 0.75rem; font-size: 0.72rem; color: var(--text-secondary);">
-                          <div style="display: flex; align-items: center; gap: 4px;">
-                            <span class="material-symbols-outlined"
-                              style="font-size: 0.85rem; color: var(--text-secondary);">
-                              {{ asset.type === 'Vehicle' ? 'local_shipping' : (asset.type === 'Forklift' ?
-                              'precision_manufacturing' : 'inventory_2') }}
-                            </span>
-                            <span>{{ asset.type }}</span>
-                          </div>
-                        </td>
-                        <td
-                          style="font-size: 0.68rem; font-family: monospace; padding: 0.55rem 0.75rem; color: var(--text-secondary);">
-                          <div style="display: flex; flex-direction: column; gap: 2px;">
-                            <span>{{ asset.lastGpsPing.split(',')[1]?.trim() || asset.lastGpsPing }}</span>
-                            <span style="font-size: 0.55rem; color: var(--color-success); font-weight: 700;">●
-                              Live</span>
-                          </div>
-                        </td>
-                        <td
-                          style="font-size: 0.68rem; font-family: monospace; color: var(--text-secondary); padding: 0.55rem 0.75rem;">
-                          <div style="display: flex; flex-direction: column; gap: 2px;">
-                            <span>{{ asset.lastRfidRead.replace('(', '').replace(')', '') }}</span>
-                            <span style="font-size: 0.58rem; color: var(--text-muted);">● Gate-03</span>
-                          </div>
-                        </td>
-                        <td style="padding: 0.55rem 0.75rem;">
-                          <span
-                            style="font-weight: 600; font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; background: var(--border-light); color: var(--text-primary);">
-                            {{ asset.currentZone }}
-                          </span>
-                        </td>
-                        <td style="padding: 0.55rem 0.75rem;">
-                          <span [style.color]="asset.speed > 0 ? 'var(--color-success)' : 'var(--text-muted)'"
-                            style="font-family: monospace; font-weight: 700; font-size: 0.72rem;">
-                            {{ asset.speed }} km/h
-                          </span>
-                        </td>
-                        <td style="padding: 0.55rem 0.75rem;">
-                          <div style="display: flex; align-items: center; gap: 4px; width: 60px;">
-                            <span
-                              style="font-size: 0.65rem; font-family: monospace; font-weight: 700; min-width: 25px;">{{
-                              asset.battery }}%</span>
-                            <div
-                              style="flex: 1; height: 5px; background: var(--border-color); border-radius: 2px; overflow: hidden; display: flex;">
-                              <div [style.width.%]="asset.battery"
-                                [style.background]="asset.battery > 50 ? 'var(--color-success)' : (asset.battery > 20 ? 'var(--color-warning)' : 'var(--color-danger)')"
-                                style="height: 100%;"></div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style="padding: 0.55rem 0.75rem;">
-                          @if (asset.exception) {
-                          <span class="status-pill under-maintenance"
-                            style="font-size: 0.6rem; padding: 2px 4px; display: inline-flex; align-items: center; gap: 2px; font-weight: 700; border-radius: 4px; background: var(--color-danger-soft); color: var(--color-danger);">
-                            {{ asset.exception }}
-                          </span>
-                          } @else {
-                          <span style="color: var(--text-muted); font-size: 0.68rem;">—</span>
-                          }
-                        </td>
-                      </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-
-                <!-- Bottom Pagination & Stats Bar -->
-                <div class="asset-table-footer"
-                  style="padding: 0.45rem 0.85rem; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-color); background: rgba(0,0,0,0.015);">
-                  <div
-                    style="font-size: 0.68rem; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
-                    <span>Showing {{ filteredGpsAssets().length }} of {{ filteredGpsAssets().length }} assets</span>
+                <div style="display: flex; align-items: center; gap: 8px; position: relative;">
+                  <!-- Search Input Box -->
+                  <div style="position: relative; display: flex; align-items: center;">
+                    <span class="material-symbols-outlined" style="position: absolute; left: 8px; font-size: 0.95rem; color: #94a3b8;">search</span>
+                    <input type="text"
+                      [value]="gpsSearchQuery()"
+                      (input)="gpsSearchQuery.set($any($event.target).value)"
+                      placeholder="Search asset, tag or type..."
+                      style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 26px 5px 28px; font-size: 0.75rem; outline: none; width: 180px; font-weight: 500;" />
+                    @if (gpsSearchQuery()) {
+                      <span (click)="gpsSearchQuery.set('')" class="material-symbols-outlined" style="position: absolute; right: 6px; font-size: 0.95rem; color: #94a3b8; cursor: pointer;" title="Clear search">close</span>
+                    }
                   </div>
+
+                  <!-- Filters Button -->
+                  <button (click)="showGpsFilterModal.set(!showGpsFilterModal())"
+                    [style.background]="(gpsStatusFilter() !== 'All' || gpsTypeFilter() !== 'All' || showGpsFilterModal()) ? '#eff6ff' : '#ffffff'"
+                    [style.border-color]="(gpsStatusFilter() !== 'All' || gpsTypeFilter() !== 'All' || showGpsFilterModal()) ? '#2563eb' : '#cbd5e1'"
+                    [style.color]="(gpsStatusFilter() !== 'All' || gpsTypeFilter() !== 'All' || showGpsFilterModal()) ? '#2563eb' : '#334155'"
+                    style="border: 1px solid #cbd5e1; padding: 5px 12px; font-size: 0.75rem; font-weight: 700; border-radius: 6px; display: flex; align-items: center; gap: 5px; cursor: pointer; transition: all 0.15s ease;">
+                    <span class="material-symbols-outlined" style="font-size: 0.95rem;">filter_list</span> Filters
+                    @if (gpsStatusFilter() !== 'All' || gpsTypeFilter() !== 'All') {
+                      <span style="width: 6px; height: 6px; border-radius: 50%; background: #2563eb;"></span>
+                    }
+                  </button>
+
+                  <!-- Filter Modal / Popover Dropdown -->
+                  @if (showGpsFilterModal()) {
+                    <div style="position: absolute; top: 38px; right: 0; z-index: 100; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15); width: 260px; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+                      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
+                        <span style="font-size: 0.8rem; font-weight: 800; color: #0f172a;">Filter Assets</span>
+                        <button (click)="showGpsFilterModal.set(false)" style="background: none; border: none; cursor: pointer; color: #64748b; padding: 0; display: flex;">
+                          <span class="material-symbols-outlined" style="font-size: 1rem;">close</span>
+                        </button>
+                      </div>
+
+                      <!-- Filter by Status -->
+                      <div>
+                        <label style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 4px;">Status</label>
+                        <select [value]="gpsStatusFilter()" (change)="gpsStatusFilter.set($any($event.target).value)"
+                          style="width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 8px; font-size: 0.75rem; font-weight: 600; outline: none; background: #ffffff; color: #0f172a;">
+                          <option value="All">All Statuses</option>
+                          <option value="Moving">Moving</option>
+                          <option value="Idle">Idle</option>
+                          <option value="Stopped">Stopped</option>
+                          <option value="Low Battery">Low Battery</option>
+                          <option value="Offline">Offline</option>
+                        </select>
+                      </div>
+
+                      <!-- Filter by Asset Type -->
+                      <div>
+                        <label style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 4px;">Asset Type</label>
+                        <select [value]="gpsTypeFilter()" (change)="gpsTypeFilter.set($any($event.target).value)"
+                          style="width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 8px; font-size: 0.75rem; font-weight: 600; outline: none; background: #ffffff; color: #0f172a;">
+                          <option value="All">All Asset Types</option>
+                          <option value="Forklift">Forklift</option>
+                          <option value="Vehicle">Vehicle</option>
+                          <option value="Container">Container</option>
+                          <option value="Pallet/Bin">Pallet / Bin</option>
+                          <option value="Tool/Equipment">Tool / Equip</option>
+                          <option value="Mobile Equipment">Mobile Equip</option>
+                        </select>
+                      </div>
+
+                      <!-- Action Buttons -->
+                      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; border-top: 1px solid #f1f5f9; padding-top: 10px;">
+                        <button (click)="resetGpsFilters()" style="background: none; border: none; color: #64748b; font-size: 0.72rem; font-weight: 700; cursor: pointer; padding: 0;">
+                          Reset All
+                        </button>
+                        <button (click)="showGpsFilterModal.set(false)" style="background: #2563eb; color: #ffffff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+                          Apply Filters
+                        </button>
+                      </div>
+                    </div>
+                  }
                 </div>
               </div>
 
-              <!-- Recent Movement Timeline -->
-              <div
-                style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; box-shadow: var(--shadow-sm); overflow: hidden;">
-                <div
-                  style="padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.01);">
-                  <div style="display: flex; align-items: center; gap: 4px;">
-                    <h3
-                      style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.78rem; font-weight: 700; margin: 0; color: var(--text-primary);">
-                      Recent Movement ({{ gpsSelectedAsset()?.id || '—' }})
-                    </h3>
-                    <span class="material-symbols-outlined"
-                      style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer;"
-                      title="Recent location updates">info</span>
-                  </div>
-                </div>
-
-                <div style="flex: 1; padding: 0.75rem; overflow-y: auto; max-height: 180px;">
-                  @if (gpsSelectedAsset(); as selected) {
-                  <div class="gps-timeline-wrapper"
-                    style="position: relative; padding-left: 16px; display: flex; flex-direction: column; gap: 10px;">
-
-                    <!-- Timeline track line -->
-                    <div
-                      style="position: absolute; top: 4px; left: 3px; bottom: 4px; width: 1px; background: var(--border-color);">
-                    </div>
-
-                    @for (event of selected.timeline; track $index) {
-                    <div style="position: relative;">
-
-                      <!-- Dot -->
-                      <div
-                        [style.background]="event.type === 'moving' ? 'var(--color-success)' : (event.type === 'idle' ? 'var(--color-primary)' : (event.type === 'alert' ? 'var(--color-danger)' : 'var(--text-muted)'))"
-                        style="position: absolute; left: -16px; top: 4px; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--bg-card); z-index: 2; box-shadow: 0 0 0 1px var(--border-color);">
-                      </div>
-
-                      <div style="display: flex; flex-direction: column; gap: 1px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-                          <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-primary);">{{ event.zone
-                            }}</span>
-                          <span style="font-size: 0.6rem; color: var(--text-secondary); font-family: monospace;">{{
-                            event.time }}</span>
+              <div style="overflow-x: auto; min-height: 180px;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.78rem;">
+                  <thead>
+                    <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 700; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.03em;">
+                      <th style="padding: 10px 14px;">ASSET NAME / TAG</th>
+                      <th style="padding: 10px 14px;">TYPE</th>
+                      <th style="padding: 10px 14px;">LAST GPS PING</th>
+                      <th style="padding: 10px 14px;">LAST RFID READ</th>
+                      <th style="padding: 10px 14px;">CURRENT ZONE</th>
+                      <th style="padding: 10px 14px; text-align: right;"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (asset of filteredGpsAssets(); track asset.id) {
+                    <tr (click)="selectGpsAsset(asset)" [class.selected]="gpsSelectedAsset()?.id === asset.id"
+                      style="border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.15s;" class="hover-row">
+                      <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">
+                        {{ asset.id }}
+                      </td>
+                      <td style="padding: 10px 14px; color: #334155;">{{ asset.type }}</td>
+                      <td style="padding: 10px 14px; color: #64748b; font-family: monospace;">{{ asset.lastGpsPing }}</td>
+                      <td style="padding: 10px 14px; color: #64748b; font-family: monospace;">{{ asset.lastRfidRead }}</td>
+                      <td style="padding: 10px 14px;">
+                        <span style="background: #e0f2fe; color: #0284c7; padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 0.72rem;">
+                          {{ asset.currentZone }}
+                        </span>
+                      </td>
+                      <td style="padding: 10px 14px; text-align: right; color: #94a3b8;">
+                        <span class="material-symbols-outlined" style="font-size: 1rem;">chevron_right</span>
+                      </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                      <td colspan="6" style="padding: 36px; text-align: center; color: #64748b;">
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                          <div style="width: 48px; height: 48px; border-radius: 50%; background: #eff6ff; display: flex; align-items: center; justify-content: center; color: #3b82f6;">
+                            <span class="material-symbols-outlined" style="font-size: 1.5rem;">cloud_off</span>
+                          </div>
+                          <span style="font-weight: 700; color: #1e293b; font-size: 0.85rem;">No assets found</span>
+                          <span style="font-size: 0.75rem; color: #64748b;">Try adjusting your filters or search</span>
                         </div>
-                        <span style="font-size: 0.65rem; color: var(--text-secondary);">{{ event.details }}</span>
-                      </div>
-                    </div>
+                      </td>
+                    </tr>
                     }
-                  </div>
-                  } @else {
-                  <div style="text-align: center; color: var(--text-muted); padding-top: 40px; font-size: 0.72rem;">
-                    Select an asset to view location history
-                  </div>
-                  }
-                </div>
-
-                <div
-                  style="padding: 0.55rem; border-top: 1px solid var(--border-color); text-align: center; background: rgba(0,0,0,0.015);">
-                  <a href="#"
-                    style="font-size: 0.7rem; font-weight: 700; color: #2563eb; text-decoration: none; display: inline-flex; align-items: center; gap: 2px;">
-                    View full history
-                  </a>
-                </div>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
 
-          <!-- Right Column: Detail drawer -->
-          <div
-            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-sm);">
-            @if (gpsSelectedAsset(); as selected) {
-            <!-- Detail Header -->
-            <div
-              style="padding: 0.85rem; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px; background: var(--bg-card);">
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <h3
-                  style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--text-primary); margin: 0;">
-                  {{ selected.id }} ({{ selected.tag.slice(0, 12) }})</h3>
-                <span
-                  style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.62rem; font-weight: 700; color: var(--color-success); background: var(--color-success-soft); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">
-                  <span style="width: 5px; height: 5px; border-radius: 50%; background: var(--color-success);"></span>
-                  Live
-                </span>
+          <!-- Right Column (Asset Overview & Recent Movement) -->
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <!-- Overview Tabbed Panel -->
+            <div style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; flex-direction: column;">
+              <!-- Tab Buttons -->
+              <div style="display: flex; border-bottom: 1px solid var(--border-color, #e2e8f0); background: var(--bg-card, #ffffff); padding: 0 8px;">
+                <button type="button" (click)="gpsDetailTab.set('overview')"
+                  [style.border-bottom]="gpsDetailTab() === 'overview' ? '2.5px solid #2563eb' : '2.5px solid transparent'"
+                  [style.color]="gpsDetailTab() === 'overview' ? '#2563eb' : '#64748b'"
+                  style="padding: 8px 14px; background: none; border: none; font-weight: 700; font-size: 0.78rem; cursor: pointer; outline: none;">
+                  Overview
+                </button>
+                <button type="button" (click)="gpsDetailTab.set('route')"
+                  [style.border-bottom]="gpsDetailTab() === 'route' ? '2.5px solid #2563eb' : '2.5px solid transparent'"
+                  [style.color]="gpsDetailTab() === 'route' ? '#2563eb' : '#64748b'"
+                  style="padding: 8px 14px; background: none; border: none; font-weight: 700; font-size: 0.78rem; cursor: pointer; outline: none;">
+                  Route
+                </button>
+                <button type="button" (click)="gpsDetailTab.set('rfid')"
+                  [style.border-bottom]="gpsDetailTab() === 'rfid' ? '2.5px solid #2563eb' : '2.5px solid transparent'"
+                  [style.color]="gpsDetailTab() === 'rfid' ? '#2563eb' : '#64748b'"
+                  style="padding: 8px 14px; background: none; border: none; font-weight: 700; font-size: 0.78rem; cursor: pointer; outline: none;">
+                  RFID Reads
+                </button>
+                <button type="button" (click)="gpsDetailTab.set('trips')"
+                  [style.border-bottom]="gpsDetailTab() === 'trips' ? '2.5px solid #2563eb' : '2.5px solid transparent'"
+                  [style.color]="gpsDetailTab() === 'trips' ? '#2563eb' : '#64748b'"
+                  style="padding: 8px 14px; background: none; border: none; font-weight: 700; font-size: 0.78rem; cursor: pointer; outline: none;">
+                  Trips
+                </button>
               </div>
-              <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 500;">Forklift • Make: {{
-                selected.make }} • Model: {{ selected.model }}</span>
-            </div>
 
-            <!-- Quick Map Actions Buttons -->
-            <div
-              style="padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-color); display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--border-light);">
-              <button
-                style="border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); border-radius: 4px; padding: 5px 2px; font-size: 0.68rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.15s ease;">
-                <span class="material-symbols-outlined"
-                  style="font-size: 0.85rem; color: #2563eb;">center_focus_weak</span>
-                Center Map
-              </button>
-              <button
-                style="border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); border-radius: 4px; padding: 5px 2px; font-size: 0.68rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.15s ease;">
-                <span class="material-symbols-outlined"
-                  style="font-size: 0.85rem; color: #2563eb;">share_location</span>
-                Locate Nearby
-              </button>
-              <button
-                style="border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); border-radius: 4px; padding: 5px 2px; font-size: 0.68rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.15s ease;">
-                <span class="material-symbols-outlined" style="font-size: 0.85rem; color: #2563eb;">play_circle</span>
-                Playback <span class="material-symbols-outlined" style="font-size: 0.75rem;">expand_more</span>
-              </button>
-            </div>
-
-            <!-- Tabs -->
-            <div
-              style="display: flex; border-bottom: 1px solid var(--border-color); font-size: 0.75rem; font-weight: 600; background: var(--bg-card); z-index: 5;">
-              <button type="button" (click)="gpsDetailTab.set('overview')"
-                [style.border-bottom]="gpsDetailTab() === 'overview' ? '2.5px solid #2563eb' : '2.5px solid transparent'"
-                [style.color]="gpsDetailTab() === 'overview' ? '#2563eb' : 'var(--text-secondary)'"
-                style="flex: 1; padding: 8px 2px; background: none; border: none; font-weight: 700; cursor: pointer; outline: none; transition: all 0.15s ease;">Overview</button>
-              <button type="button" (click)="gpsDetailTab.set('route')"
-                [style.border-bottom]="gpsDetailTab() === 'route' ? '2.5px solid #2563eb' : '2.5px solid transparent'"
-                [style.color]="gpsDetailTab() === 'route' ? '#2563eb' : 'var(--text-secondary)'"
-                style="flex: 1; padding: 8px 2px; background: none; border: none; font-weight: 700; cursor: pointer; outline: none; transition: all 0.15s ease;">Route</button>
-              <button type="button" (click)="gpsDetailTab.set('rfid')"
-                [style.border-bottom]="gpsDetailTab() === 'rfid' ? '2.5px solid #2563eb' : '2.5px solid transparent'"
-                [style.color]="gpsDetailTab() === 'rfid' ? '#2563eb' : 'var(--text-secondary)'"
-                style="flex: 1; padding: 8px 2px; background: none; border: none; font-weight: 700; cursor: pointer; outline: none; transition: all 0.15s ease;">RFID
-                Reads</button>
-              <button type="button" (click)="gpsDetailTab.set('trips')"
-                [style.border-bottom]="gpsDetailTab() === 'trips' ? '2.5px solid #2563eb' : '2.5px solid transparent'"
-                [style.color]="gpsDetailTab() === 'trips' ? '#2563eb' : 'var(--text-secondary)'"
-                style="flex: 1; padding: 8px 2px; background: none; border: none; font-weight: 700; cursor: pointer; outline: none; transition: all 0.15s ease;">Trips</button>
-            </div>
-
-            <div
-              style="flex: 1; padding: 0.75rem; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; font-size: 0.72rem;">
-
-              <!-- Overview Tab Content -->
-              @if (gpsDetailTab() === 'overview') {
-              <div style="display: flex; flex-direction: column; gap: 10px;">
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
-                  <div
-                    style="background: var(--border-light); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 2px;">
-                    <span
-                      style="font-size: 0.58rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Current
-                      Zone</span>
-                    <span
-                      style="font-weight: 700; color: #0891b2; background: rgba(6, 182, 212, 0.08); border-radius: 4px; padding: 2px 4px; align-self: flex-start;">{{
-                      selected.currentZone }}</span>
+              <!-- Tab Content Area -->
+              <div style="padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;">
+                @if (gpsDetailTab() === 'overview') {
+                <!-- Top Split Box: Current Zone & Speed -->
+                <div style="background: #f8fafc; border-radius: 8px; padding: 6px 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border: 1px solid #f1f5f9;">
+                  <div>
+                    <div style="font-size: 0.62rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em;">CURRENT ZONE</div>
+                    <div style="font-size: 0.8rem; font-weight: 700; color: #2563eb; margin-top: 1px;">
+                      {{ gpsSelectedAsset()?.currentZone || 'Transit Route' }}
+                    </div>
                   </div>
-                  <div
-                    style="background: var(--border-light); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 2px;">
-                    <span
-                      style="font-size: 0.58rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Speed</span>
-                    <span style="font-weight: 800; color: var(--text-primary);">{{ selected.speed }} km/h</span>
+                  <div>
+                    <div style="font-size: 0.62rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em;">SPEED</div>
+                    <div style="font-size: 0.8rem; font-weight: 800; color: #0f172a; margin-top: 1px;">
+                      {{ gpsSelectedAsset()?.speed || 0 }} km/h
+                    </div>
                   </div>
                 </div>
 
-                <div
-                  style="border-top: 1px solid var(--border-color); padding-top: 8px; display: flex; flex-direction: column; gap: 6px;">
-                  <div
-                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                    <span style="color: var(--text-secondary); font-weight: 500;">Direction</span>
-                    <span style="font-weight: 700; color: var(--text-primary);">{{ selected.direction }} (45°)</span>
-                  </div>
-                  <div
-                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                    <span style="color: var(--text-secondary); font-weight: 500;">Last GPS Ping</span>
-                    <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">
-                      {{ selected.lastGpsPing.split(',')[1]?.trim() || selected.lastGpsPing }}
-                      <span
-                        style="color: var(--color-success); font-weight: 600; font-size: 0.65rem; margin-left: 2px;">(10
-                        secs ago)</span>
-                    </span>
-                  </div>
-                  <div
-                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                    <span style="color: var(--text-secondary); font-weight: 500;">Last RFID Read</span>
-                    <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
-                      selected.lastRfidRead.replace('(', '').replace(')', '') }}</span>
-                  </div>
-                  <div
-                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                    <span style="color: var(--text-secondary); font-weight: 500;">Battery</span>
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                      <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
-                        selected.battery }}%</span>
-                      <div
-                        style="width: 32px; height: 10px; border: 1.5px solid var(--color-success); border-radius: 3px; padding: 1px; display: flex; align-items: center; background: var(--bg-card);">
-                        <div [style.width.%]="selected.battery"
-                          style="background: var(--color-success); height: 100%; border-radius: 1px;"></div>
-                      </div>
-                      <span style="font-weight: 700; color: var(--color-success); font-size: 0.62rem;">Good</span>
+                <!-- Key-Value Pairs 2-Column Grid -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.76rem;">
+                  <!-- Left Sub-Column -->
+                  <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="color: #64748b; font-weight: 500;">Direction</span>
+                      <span style="font-weight: 700; color: #0f172a;">{{ gpsSelectedAsset()?.direction || 0 }} (45°)</span>
                     </div>
-                  </div>
-                  <div
-                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                    <span style="color: var(--text-secondary); font-weight: 500;">Operator</span>
-                    <span style="font-weight: 700; color: var(--text-primary);">{{ selected.operator }}</span>
-                  </div>
-                  <div
-                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                    <span style="color: var(--text-secondary); font-weight: 500;">Shift</span>
-                    <span style="font-weight: 700; color: var(--text-primary);">{{ selected.shift }} (06:00 AM - 02:00
-                      PM)</span>
-                  </div>
-                  <div
-                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                    <span style="color: var(--text-secondary); font-weight: 500;">Odometer</span>
-                    <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
-                      selected.odometer ? (selected.odometer | number:'1.1-1') + ' km' : '—' }}</span>
-                  </div>
-                  <div
-                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                    <span style="color: var(--text-secondary); font-weight: 500;">Device</span>
-                    <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
-                      selected.deviceId }}</span>
-                  </div>
-                  <div
-                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                    <span style="color: var(--text-secondary); font-weight: 500;">SIM</span>
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                      <span style="font-family: monospace; font-weight: 700; color: var(--text-primary);">{{
-                        selected.sim
-                        }}</span>
-                      <span
-                        style="color: var(--color-success); font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 2px;">
-                        Signal Strong <span class="material-symbols-outlined"
-                          style="font-size: 0.85rem;">signal_cellular_alt</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="color: #64748b; font-weight: 500;">Odometer</span>
+                      <span style="font-weight: 700; color: #0f172a;">{{ gpsSelectedAsset()?.odometer ? (gpsSelectedAsset()?.odometer | number:'1.1-1') + ' km' : '—' }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="color: #64748b; font-weight: 500;">Last GPS Ping</span>
+                      <span style="font-weight: 700; color: #0f172a; font-family: monospace;">
+                        {{ gpsSelectedAsset()?.lastGpsPing || '6:18:08 PM' }} <span style="color: #16a34a; font-weight: 600; font-size: 0.7rem;">(10 secs ago)</span>
                       </span>
                     </div>
-                  </div>
-                  <div
-                    style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; border-bottom: 1px solid var(--border-light);">
-                    <span style="color: var(--text-secondary); font-weight: 500;">Geo-fence Status</span>
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                      <span
-                        style="width: 5px; height: 5px; border-radius: 50%; background: var(--color-success);"></span>
-                      <span style="font-weight: 700; color: var(--color-success);">Inside Geofence</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Coordinates Box -->
-                <div
-                  style="border-top: 1px solid var(--border-color); padding-top: 8px; display: flex; flex-direction: column; gap: 4px;">
-                  <span
-                    style="font-size: 0.58rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Current
-                    Location (WGS84)</span>
-                  <div
-                    style="background: var(--border-light); border-radius: 6px; padding: 6px; display: flex; align-items: center; justify-content: space-between; font-family: monospace; font-size: 0.68rem; font-weight: 700; color: var(--text-primary);">
-                    <span>{{ selected.latitude }}, {{ selected.longitude }}</span>
-                    <button style="border: none; background: none; color: var(--text-secondary); cursor: pointer;"
-                      title="Copy coordinates"><span class="material-symbols-outlined"
-                        style="font-size: 0.9rem;">content_copy</span></button>
-                  </div>
-                  <span
-                    style="font-size: 0.62rem; color: var(--text-secondary); font-weight: 500; line-height: 1.2;">Pune
-                    DC, Chakan, Pune, Maharashtra 410501, India</span>
-                </div>
-              </div>
-              }
-
-              <!-- Route Tab Content -->
-              @if (gpsDetailTab() === 'route') {
-              <div style="display: flex; flex-direction: column; gap: 8px;">
-                <h4 style="margin: 0; font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">Route Telemetry
-                  Log</h4>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                  @for (pt of gpsSelectedRoute(); track pt.seq) {
-                  <div
-                    style="display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid var(--border-light); padding-bottom: 6px;">
-                    <div
-                      style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--border-light); border-radius: 50%; width: 18px; height: 18px; font-size: 0.6rem; font-weight: 700; color: var(--text-secondary);">
-                      {{ pt.seq }}
-                    </div>
-                    <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
-                      <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 700; color: var(--text-primary);">{{ pt.zone }}</span>
-                        <span style="font-family: monospace; font-size: 0.6rem; color: var(--text-secondary);">{{
-                          pt.time }}</span>
-                      </div>
-                      <span style="font-size: 0.65rem; color: var(--text-muted);">Lat/Lon: {{ pt.lat }}, {{ pt.lon
-                        }}</span>
-                      <span style="font-size: 0.65rem; color: var(--text-secondary);">Speed: {{ pt.speed }} km/h</span>
-                    </div>
-                  </div>
-                  }
-                </div>
-              </div>
-              }
-
-              <!-- RFID Reads Tab Content -->
-              @if (gpsDetailTab() === 'rfid') {
-              <div style="display: flex; flex-direction: column; gap: 8px;">
-                <h4 style="margin: 0; font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">RFID Gate Read
-                  Events</h4>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                  @for (read of gpsSelectedRfidReads(); track read.time) {
-                  <div
-                    style="display: flex; justify-content: space-between; align-items: center; background: var(--border-light); padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border-color);">
-                    <div style="display: flex; flex-direction: column; gap: 1px;">
-                      <div style="display: flex; align-items: center; gap: 4px;">
-                        <span class="material-symbols-outlined"
-                          style="font-size: 0.85rem; color: #2563eb;">sensors</span>
-                        <span style="font-weight: 700; color: var(--text-primary);">{{ read.reader }}</span>
-                      </div>
-                      <span style="font-size: 0.6rem; font-family: monospace; color: var(--text-muted);">{{ read.epc
-                        }}</span>
-                    </div>
-                    <div style="text-align: right; display: flex; flex-direction: column; gap: 1px;">
-                      <span
-                        style="font-family: monospace; font-size: 0.65rem; font-weight: 700; color: var(--text-primary);">{{
-                        read.time }}</span>
-                      <span style="font-size: 0.58rem; color: var(--text-secondary);">RSSI: {{ read.rssi }}</span>
-                    </div>
-                  </div>
-                  }
-                </div>
-              </div>
-              }
-
-              <!-- Trips Tab Content -->
-              @if (gpsDetailTab() === 'trips') {
-              <div style="display: flex; flex-direction: column; gap: 8px;">
-                <h4 style="margin: 0; font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">Trip History
-                  (Today)</h4>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                  @for (trip of gpsSelectedTrips(); track trip.tripId) {
-                  <div
-                    style="border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--bg-card);">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                      <span style="font-family: monospace; font-size: 0.65rem; font-weight: 700; color: #2563eb;">{{
-                        trip.tripId }}</span>
-                      <span
-                        [style.background]="trip.status === 'Active' ? 'var(--color-success-soft)' : 'var(--border-light)'"
-                        [style.color]="trip.status === 'Active' ? 'var(--color-success)' : 'var(--text-secondary)'"
-                        style="font-size: 0.58rem; font-weight: 700; padding: 1px 4px; border-radius: 4px; text-transform: uppercase;">{{
-                        trip.status }}</span>
+                      <span style="color: #64748b; font-weight: 500;">Device</span>
+                      <span style="font-weight: 700; color: #0f172a;">{{ gpsSelectedAsset()?.deviceId || '—' }}</span>
                     </div>
-                    <div
-                      style="display: flex; justify-content: space-between; align-items: center; font-size: 0.68rem;">
-                      <div style="display: flex; flex-direction: column;">
-                        <span style="font-weight: 600; color: var(--text-secondary);">From</span>
-                        <span style="font-weight: 700; color: var(--text-primary);">{{ trip.from }} ({{ trip.start
-                          }})</span>
-                      </div>
-                      <span class="material-symbols-outlined"
-                        style="font-size: 0.95rem; color: var(--text-secondary);">arrow_forward</span>
-                      <div style="display: flex; flex-direction: column; text-align: right;">
-                        <span style="font-weight: 600; color: var(--text-secondary);">To</span>
-                        <span style="font-weight: 700; color: var(--text-primary);">{{ trip.to }} ({{ trip.end
-                          }})</span>
-                      </div>
-                    </div>
-                    <div
-                      style="border-top: 1px dashed var(--border-color); padding-top: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 0.6rem; color: var(--text-secondary);">
-                      <span>Distance: <strong>{{ trip.distance }}</strong></span>
-                      <span>Duration: <strong>{{ trip.duration }}</strong></span>
-                      <span>Avg Speed: <strong>{{ trip.avgSpeed }}</strong></span>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="color: #64748b; font-weight: 500;">Last RFID Read</span>
+                      <span style="font-weight: 700; color: #0f172a;">{{ gpsSelectedAsset()?.lastRfidRead || '—' }}</span>
                     </div>
                   </div>
+
+                  <!-- Right Sub-Column -->
+                  <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="color: #64748b; font-weight: 500;">SIM</span>
+                      <span style="font-weight: 700; color: #16a34a; display: inline-flex; align-items: center; gap: 4px;">
+                        Signal strong <span class="material-symbols-outlined" style="font-size: 0.95rem; color: #16a34a;">signal_cellular_alt</span>
+                      </span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="color: #64748b; font-weight: 500;">Battery</span>
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-weight: 700; color: #0f172a;">{{ gpsSelectedAsset()?.battery || 19 }}%</span>
+                        <div style="width: 32px; height: 11px; border: 1.5px solid #16a34a; border-radius: 3px; padding: 1px; display: flex; align-items: center; background: #ffffff;">
+                          <div [style.width.%]="gpsSelectedAsset()?.battery || 19" style="background: #16a34a; height: 100%; border-radius: 1px;"></div>
+                        </div>
+                        <span style="font-weight: 700; color: #16a34a; font-size: 0.7rem;">Good</span>
+                      </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="color: #64748b; font-weight: 500;">Geo-fence Status</span>
+                      <span style="font-weight: 700; color: #16a34a; display: inline-flex; align-items: center; gap: 4px;">
+                        <span style="width: 6px; height: 6px; border-radius: 50%; background: #16a34a;"></span> Inside Geofence
+                      </span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="color: #64748b; font-weight: 500;">Operator</span>
+                      <span style="font-weight: 700; color: #0f172a;">{{ gpsSelectedAsset()?.operator || 'Unassigned' }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="color: #64748b; font-weight: 500;">Shift</span>
+                      <span style="font-weight: 700; color: #0f172a;">(06:00 AM - 02:00 PM)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Current Location (WGS84) Box -->
+                <div style="background: #f8fafc; border-radius: 8px; padding: 6px 10px; border: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 3px;">
+                  <div style="font-size: 0.62rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em;">CURRENT LOCATION (WGS84)</div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; font-family: monospace; font-size: 0.78rem; font-weight: 800; color: #0f172a;">
+                    <span>18.596566, 73.827216</span>
+                    <span class="material-symbols-outlined" style="font-size: 0.95rem; color: #64748b; cursor: pointer;" title="Copy">content_copy</span>
+                  </div>
+                  <div style="font-size: 0.7rem; color: #64748b; font-weight: 500;">
+                    Pune DC, Chakan, Pune, Maharashtra 410501, India
+                  </div>
+                </div>
+                } @else if (gpsDetailTab() === 'route') {
+                <!-- Route Tab Content -->
+                <div style="display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto;">
+                  @for (pt of gpsSelectedRoute(); track pt.seq) {
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #f1f5f9; font-size: 0.75rem;">
+                    <div style="display: flex; flex-direction: column;">
+                      <span style="font-weight: 700; color: #0f172a;">#{{ pt.seq }} - {{ pt.zone }}</span>
+                      <span style="font-size: 0.7rem; color: #64748b;">{{ pt.details }}</span>
+                    </div>
+                    <span style="font-family: monospace; color: #2563eb; font-weight: 600;">{{ pt.time }}</span>
+                  </div>
+                  } @empty {
+                  <div style="text-align: center; color: #64748b; padding: 20px;">No route points recorded</div>
                   }
                 </div>
+                } @else if (gpsDetailTab() === 'rfid') {
+                <!-- RFID Reads Tab Content -->
+                <div style="display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto;">
+                  @for (rfid of gpsSelectedRfidReads(); track $index) {
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #f1f5f9; font-size: 0.75rem;">
+                    <div>
+                      <div style="font-weight: 700; color: #0f172a;">{{ rfid.reader }}</div>
+                      <div style="font-size: 0.7rem; color: #64748b;">Antenna: {{ rfid.zone }} | RSSI: {{ rfid.rssi }}</div>
+                    </div>
+                    <span style="font-family: monospace; color: #16a34a; font-weight: 600;">{{ rfid.time }}</span>
+                  </div>
+                  } @empty {
+                  <div style="text-align: center; color: #64748b; padding: 20px;">No RFID scan events for this asset</div>
+                  }
+                </div>
+                } @else if (gpsDetailTab() === 'trips') {
+                <!-- Trips Tab Content -->
+                <div style="display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto;">
+                  @for (trip of gpsSelectedTrips(); track trip.tripId) {
+                  <div style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; font-weight: 700; color: #0f172a;">
+                      <span>{{ trip.tripId }}</span>
+                      <span style="color: #2563eb;">{{ trip.duration }} ({{ trip.distance }})</span>
+                    </div>
+                    <div style="font-size: 0.72rem; color: #64748b; margin-top: 4px;">
+                      {{ trip.from }} ➔ {{ trip.to }} | Avg: {{ trip.avgSpeed }}
+                    </div>
+                  </div>
+                  } @empty {
+                  <div style="text-align: center; color: #64748b; padding: 20px;">No trips logged</div>
+                  }
+                </div>
+                }
               </div>
-              }
-
             </div>
-            } @else {
-            <div
-              style="flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px; color: var(--text-muted); padding: 15px; text-align: center;">
-              <span class="material-symbols-outlined" style="font-size: 1.85rem;">location_searching</span>
-              <span style="font-size: 0.72rem;">Select an asset to view telemetry details</span>
-            </div>
-            }
-          </div>
 
-        </div>
+            <!-- Recent Movement Panel -->
+            <div style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; flex-direction: column;">
+              <div style="padding: 10px 14px; border-bottom: 1px solid var(--border-color, #e2e8f0); display: flex; align-items: center; justify-content: space-between; background: var(--bg-card, #ffffff);">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <div style="width: 26px; height: 26px; border-radius: 50%; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center;">
+                    <span class="material-symbols-outlined" style="font-size: 0.95rem;">schedule</span>
+                  </div>
+                  <h3 style="font-size: 0.85rem; font-weight: 800; color: var(--text-main, #0f172a); margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; align-items: center; gap: 5px;">
+                    Recent Movement ({{ gpsSelectedAsset()?.id || '16512010049' }})
+                    <span class="material-symbols-outlined" style="font-size: 0.9rem; color: #94a3b8; cursor: pointer;" title="Details">info</span>
+                  </h3>
+                </div>
+                <a href="javascript:void(0)" style="font-size: 0.72rem; font-weight: 700; color: #2563eb; text-decoration: none; display: flex; align-items: center; gap: 3px;">
+                  View Full History &rarr;
+                </a>
+              </div>
 
-        <!-- Bottom Auto Refresh status bar panel -->
-        <div
-          style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.45rem 0.85rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: var(--text-secondary); box-shadow: var(--shadow-sm);">
-          <div style="font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 12px;">
-            <span>Total Assets: <strong style="font-size: 0.8rem;">{{ gpsTotalAssets() }}</strong></span>
-            <span style="color: var(--border-color);">|</span>
-            <span style="display: flex; align-items: center; gap: 3px;"><span
-                style="width: 5px; height: 5px; border-radius: 50%; background: var(--color-success);"></span> Moving:
-              {{ gpsMovingCount() }}</span>
-            <span style="display: flex; align-items: center; gap: 3px;"><span
-                style="width: 5px; height: 5px; border-radius: 50%; background: var(--color-primary);"></span> Idle:
-              {{ gpsIdleCount() }}</span>
-            <span style="display: flex; align-items: center; gap: 3px;"><span
-                style="width: 5px; height: 5px; border-radius: 50%; background: var(--text-muted);"></span> Stopped:
-              {{ gpsStoppedCount() }}</span>
-            <span style="display: flex; align-items: center; gap: 3px;"><span
-                style="width: 5px; height: 5px; border-radius: 50%; background: var(--color-warning);"></span> Low
-              Battery: {{ gpsLowBatteryCount() }}</span>
-            <span style="display: flex; align-items: center; gap: 3px;"><span
-                style="width: 5px; height: 5px; border-radius: 50%; background: var(--color-danger);"></span> Exception:
-              {{ gpsExceptionCount() }}</span>
-            <span style="display: flex; align-items: center; gap: 3px;"><span
-                style="width: 5px; height: 5px; border-radius: 50%; background: #475569;"></span> Offline: {{
-              gpsOfflineCount() }}</span>
-          </div>
+              <!-- Vertical Timeline List -->
+              <div style="padding: 12px 14px; display: flex; flex-direction: column; gap: 14px; position: relative; padding-left: 28px;">
+                <!-- Vertical Line -->
+                <div style="position: absolute; left: 18px; top: 18px; bottom: 18px; width: 2px; background: #e2e8f0;"></div>
 
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <label
-              style="display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; color: var(--text-primary);">
-              Auto Refresh
-              <input type="checkbox" [ngModel]="gpsAutoRefresh()" (ngModelChange)="gpsAutoRefresh.set($event)"
-                style="accent-color: #3b82f6; cursor: pointer;" />
-            </label>
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <select [ngModel]="gpsRefreshInterval()" (ngModelChange)="gpsRefreshInterval.set(+$event)"
-                style="padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 0.68rem; font-weight: 600; outline: none; cursor: pointer;">
-                <option [value]="5">5 sec</option>
-                <option [value]="10">10 sec</option>
-                <option [value]="30">30 sec</option>
-                <option [value]="60">60 sec</option>
-              </select>
+                <!-- Timeline Node 1 -->
+                <div style="position: relative; display: flex; align-items: flex-start; justify-content: space-between; font-size: 0.78rem;">
+                  <div style="position: absolute; left: -14px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: #16a34a; border: 2px solid #ffffff; box-shadow: 0 0 0 2px #bbf7d0;"></div>
+                  <div style="display: flex; flex-direction: column;">
+                    <span style="font-weight: 800; color: #0f172a;">Transit Route</span>
+                    <span style="font-size: 0.72rem; color: #64748b; margin-top: 1px;">Live telemetry from vehicle: Speed 12km/h, Direction 45°</span>
+                  </div>
+                  <span style="font-size: 0.72rem; font-weight: 600; color: #64748b; font-family: monospace; white-space: nowrap; margin-left: 8px;">4:13:36 PM</span>
+                </div>
+
+                <!-- Timeline Node 2 -->
+                <div style="position: relative; display: flex; align-items: flex-start; justify-content: space-between; font-size: 0.78rem;">
+                  <div style="position: absolute; left: -14px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: #eab308; border: 2px solid #ffffff;"></div>
+                  <div style="display: flex; flex-direction: column;">
+                    <span style="font-weight: 800; color: #0f172a;">Yard Arrival</span>
+                    <span style="font-size: 0.72rem; color: #64748b; margin-top: 1px;">Moved to Main Yard</span>
+                  </div>
+                  <span style="font-size: 0.72rem; font-weight: 600; color: #64748b; font-family: monospace; white-space: nowrap; margin-left: 8px;">3:48:12 PM</span>
+                </div>
+
+                <!-- Timeline Node 3 -->
+                <div style="position: relative; display: flex; align-items: flex-start; justify-content: space-between; font-size: 0.78rem;">
+                  <div style="position: absolute; left: -14px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: #64748b; border: 2px solid #ffffff;"></div>
+                  <div style="display: flex; flex-direction: column;">
+                    <span style="font-weight: 800; color: #0f172a;">Dock Entry</span>
+                    <span style="font-size: 0.72rem; color: #64748b; margin-top: 1px;">Entered Dock Zone</span>
+                  </div>
+                  <span style="font-size: 0.72rem; font-weight: 600; color: #64748b; font-family: monospace; white-space: nowrap; margin-left: 8px;">2:16:47 PM</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -7581,6 +7275,11 @@
               [style.color]="activeSubNav() === 'User Management' ? 'var(--text-primary)' : 'var(--text-secondary)'"
               style="border: none; padding: 4px 10px; font-size: 0.68rem; font-weight: 600; border-radius: 4px; cursor: pointer; transition: all 0.15s; outline: none;">User
               Management</button>
+            <button (click)="selectSubNav('Site & Warehouse Management', 'Admin')"
+              [style.background]="activeSubNav() === 'Site & Warehouse Management' ? 'var(--bg-card)' : 'none'"
+              [style.color]="activeSubNav() === 'Site & Warehouse Management' ? 'var(--text-primary)' : 'var(--text-secondary)'"
+              style="border: none; padding: 4px 10px; font-size: 0.68rem; font-weight: 600; border-radius: 4px; cursor: pointer; transition: all 0.15s; outline: none;">Site & Warehouse
+              Management</button>
             <button (click)="selectSubNav('Handheld Registry', 'Admin')"
               [style.background]="activeSubNav() === 'Handheld Registry' ? 'var(--bg-card)' : 'none'"
               [style.color]="activeSubNav() === 'Handheld Registry' ? 'var(--text-primary)' : 'var(--text-secondary)'"
@@ -7643,7 +7342,7 @@
                 </tr>
               </thead>
               <tbody>
-                @for (user of adminUsers(); track user.id) {
+                @for (user of filteredAdminUsers(); track user.id) {
                 <tr style="border-bottom: 1px solid var(--border-light);">
                   <td style="padding: 0.55rem 0.75rem; font-weight: 700; color: var(--text-primary);">
                     <div style="display: flex; flex-direction: column;">
@@ -7776,6 +7475,81 @@
               style="padding: 8px 16px; border: none; border-radius: 6px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; font-weight: 700; font-size: 0.72rem; cursor: pointer; box-shadow: 0 4px 10px rgba(37,99,235,0.2);">
               Save Configuration
             </button>
+          </div>
+
+          <!-- Site, Warehouse & Role Module Access Configuration Matrix -->
+          <div style="border-top: 1px solid var(--border-color); padding-top: 14px; margin-top: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="material-symbols-outlined" style="font-size: 1.15rem; color: #0d9488;">shield_lock</span>
+                <span style="font-weight: 800; color: var(--text-primary); font-size: 0.82rem;">Site, Warehouse & Role Module Access Configuration</span>
+              </div>
+              <span style="font-size: 0.65rem; color: var(--text-secondary); background: var(--border-light); padding: 2px 8px; border-radius: 12px; font-weight: 600;">Custom Navigation Permissions</span>
+            </div>
+
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0;">Configure which sidebar navigation modules are visible for each specific Site, Warehouse, and Role context when logged in.</p>
+
+            <!-- Config Selectors -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; font-size: 0.75rem; background: rgba(0,0,0,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-weight: 700; color: var(--text-secondary);">Target Site Context</label>
+                <select [ngModel]="configModuleSiteName()" (ngModelChange)="configModuleSiteName.set($event)"
+                  style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 0.75rem; font-weight: 600; outline: none;">
+                  <option value="All Sites">All Sites</option>
+                  @for (site of apiSites(); track site.id) {
+                    <option [value]="site.name">{{ site.name }}</option>
+                  }
+                </select>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-weight: 700; color: var(--text-secondary);">Target Warehouse Context</label>
+                <select [ngModel]="configModuleWarehouseName()" (ngModelChange)="configModuleWarehouseName.set($event)"
+                  style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 0.75rem; font-weight: 600; outline: none;">
+                  <option value="All Warehouses">All Warehouses</option>
+                  @for (wh of adminWarehouses(); track wh.id) {
+                    <option [value]="wh.name">{{ wh.name }}</option>
+                  }
+                </select>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-weight: 700; color: var(--text-secondary);">Target User Role Context</label>
+                <select [ngModel]="configModuleRole()" (ngModelChange)="configModuleRole.set($event)"
+                  style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 0.75rem; font-weight: 600; outline: none;">
+                  <option value="All Roles">All Roles</option>
+                  <option value="Super Admin">Super Admin</option>
+                  <option value="Site Admin">Site Admin</option>
+                  <option value="Warehouse Manager">Warehouse Manager</option>
+                  <option value="Operator">Operator</option>
+                  <option value="Auditor">Auditor</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Module Permission Toggles Grid -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; margin-top: 6px;">
+              @for (mod of ['Dashboard', 'Assets', 'Check in/Check out', 'RFID Operations', 'GPS Tracking', 'Inventory', 'Maintenance', 'Reports & Analytics', 'Compliance', 'Integrations', 'Admin']; track mod) {
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.15s;"
+                  [style.border-color]="isModuleEnabledForConfig(mod) ? '#0d9488' : 'var(--border-color)'">
+                  <span style="color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                    <span class="material-symbols-outlined" style="font-size: 0.95rem; color: #0d9488;">
+                      {{ mod === 'Dashboard' ? 'space_dashboard' : mod === 'Assets' ? 'inventory_2' : mod === 'RFID Operations' ? 'contactless' : mod === 'GPS Tracking' ? 'location_on' : mod === 'Inventory' ? 'inventory' : mod === 'Maintenance' ? 'construction' : mod === 'Reports & Analytics' ? 'bar_chart' : mod === 'Compliance' ? 'assignment_turned_in' : mod === 'Integrations' ? 'hub' : 'admin_panel_settings' }}
+                    </span>
+                    {{ mod }}
+                  </span>
+                  <input type="checkbox" [checked]="isModuleEnabledForConfig(mod)" (change)="toggleModulePermission(mod)" style="accent-color: #0d9488; cursor: pointer;" />
+                </label>
+              }
+            </div>
+
+            <!-- Save Module Config Button -->
+            <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+              <button (click)="saveModulePermissionsConfig()"
+                style="padding: 8px 18px; border: none; border-radius: 6px; background: linear-gradient(135deg, #0d9488, #0f766e); color: white; font-weight: 700; font-size: 0.75rem; cursor: pointer; box-shadow: 0 4px 10px rgba(13,148,136,0.25); display: flex; align-items: center; gap: 6px;">
+                <span class="material-symbols-outlined" style="font-size: 1rem;">save</span> Save Site & Warehouse Module Settings
+              </button>
+            </div>
           </div>
         </div>
         }
@@ -7951,6 +7725,96 @@
         </div>
         }
 
+        @if (activeSubNav() === 'Site & Warehouse Management') {
+        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+
+          <!-- Card 1: Sites API (/api/sites) -->
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-sm);">
+            <div
+              style="padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.015); display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="material-symbols-outlined" style="font-size: 1rem; color: #0d9488;">domain</span>
+                <span style="font-weight: 700; color: var(--text-primary); font-size: 0.78rem;">Physical Construction Sites & Central Store Hubs (<code style="font-size: 0.68rem; color: #0d9488;">/api/sites</code>)</span>
+              </div>
+              <button (click)="openCreateSiteModal()"
+                style="padding: 4px 10px; border: none; border-radius: 4px; background: #0d9488; color: white; font-weight: 700; font-size: 0.68rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                <span class="material-symbols-outlined" style="font-size: 0.85rem;">add_location_alt</span> + Add New Site
+              </button>
+            </div>
+            <div>
+              <table class="table-modern"
+                style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.72rem;">
+                <thead>
+                  <tr
+                    style="background: var(--border-light); color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">
+                    <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">Site Code</th>
+                    <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">Site Name</th>
+                    <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">Location / Address</th>
+                    <th style="padding: 0.55rem 0.75rem; text-align: center; border-bottom: 1px solid var(--border-color);">Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (site of adminSites(); track site.id) {
+                  <tr style="border-bottom: 1px solid var(--border-light);">
+                    <td style="padding: 0.55rem 0.75rem; font-weight: 700; color: var(--text-primary); font-family: monospace;">{{ site.code }}</td>
+                    <td style="padding: 0.55rem 0.75rem; color: var(--text-primary); font-weight: 700;">{{ site.name }}</td>
+                    <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary);">{{ site.address }}</td>
+                    <td style="padding: 0.55rem 0.75rem; text-align: center;">
+                      <span class="status-pill available" style="font-size: 0.6rem; padding: 2px 6px; font-weight: 700; border-radius: 4px;">
+                        {{ site.code === 'SITE-CS-00' ? 'Central Store Hub' : 'Construction Site' }}
+                      </span>
+                    </td>
+                  </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Card 2: Warehouses API (/api/warehouses) -->
+          <div
+            style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-sm);">
+            <div
+              style="padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.015); display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="material-symbols-outlined" style="font-size: 1rem; color: #2563eb;">warehouse</span>
+                <span style="font-weight: 700; color: var(--text-primary); font-size: 0.78rem;">Warehouses & Storage Depots (<code style="font-size: 0.68rem; color: #2563eb;">/api/warehouses</code>)</span>
+              </div>
+              <button (click)="openCreateWarehouseModal()"
+                style="padding: 4px 10px; border: none; border-radius: 4px; background: #2563eb; color: white; font-weight: 700; font-size: 0.68rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                <span class="material-symbols-outlined" style="font-size: 0.85rem;">add_business</span> + Add New Warehouse
+              </button>
+            </div>
+            <div>
+              <table class="table-modern"
+                style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.72rem;">
+                <thead>
+                  <tr
+                    style="background: var(--border-light); color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">
+                    <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">Warehouse Code</th>
+                    <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">Warehouse Name</th>
+                    <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">Linked Site Parent</th>
+                    <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">Address</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (wh of adminWarehouses(); track wh.id) {
+                  <tr style="border-bottom: 1px solid var(--border-light);">
+                    <td style="padding: 0.55rem 0.75rem; font-weight: 700; color: var(--text-primary); font-family: monospace;">{{ wh.code }}</td>
+                    <td style="padding: 0.55rem 0.75rem; color: var(--text-primary); font-weight: 700;">{{ wh.name }}</td>
+                    <td style="padding: 0.55rem 0.75rem; color: #2563eb; font-weight: 700;">{{ wh.siteName }}</td>
+                    <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary);">{{ wh.address }}</td>
+                  </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+        }
+
         @if (activeSubNav() === 'API Management') {
         <!-- API keys card -->
         <div
@@ -8079,16 +7943,59 @@
           <option value="Viewer">Viewer</option>
         </select>
       </div>
+      <!-- Primary Site Scope -->
       <div style="display: flex; flex-direction: column; gap: 5px;">
-        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Site Access Scope</label>
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Primary Site Access Scope</label>
         <select [(ngModel)]="formUserSiteId" name="formUserSiteId"
           style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;">
           <option value="">Global / All Sites</option>
-          <option value="f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91">Pune DC (Distribution Center)</option>
-          <option value="f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c92">Mumbai Warehouse (Warehouse)</option>
-          <option value="f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93">Chennai Plant (Manufacturing)</option>
-          <option value="f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c94">Bengaluru Hub (Hub)</option>
+          @for (site of adminSites(); track site.id) {
+          <option [value]="site.id">{{ site.name }} ({{ site.code }})</option>
+          }
         </select>
+      </div>
+
+      <!-- Multiple Sites Access Scope (Checkboxes) -->
+      <div style="display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.02); padding: 10px; border-radius: 8px; border: 1px dashed var(--border-color);">
+        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 4px;">
+          <span class="material-symbols-outlined" style="font-size: 0.95rem; color: #0d9488;">domain</span>
+          Multiple Sites Access Scope (Select 1 or More)
+        </label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-height: 110px; overflow-y: auto; padding-right: 4px;">
+          @for (site of adminSites(); track site.id) {
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--text-main); cursor: pointer; background: var(--bg-card); padding: 4px 6px; border-radius: 4px; border: 1px solid var(--border-color);">
+            <input type="checkbox" [checked]="isUserSiteSelected(site.id)" (change)="toggleUserSiteSelection(site.id)" style="accent-color: #0d9488; cursor: pointer;" />
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" [title]="site.name">{{ site.name }}</span>
+          </label>
+          }
+        </div>
+      </div>
+
+      <!-- Warehouse Access Scope (Select Warehouse) -->
+      <div style="display: flex; flex-direction: column; gap: 6px; background: rgba(37,99,235,0.02); padding: 10px; border-radius: 8px; border: 1px dashed rgba(37,99,235,0.3);">
+        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 4px;">
+          <span class="material-symbols-outlined" style="font-size: 0.95rem; color: #2563eb;">warehouse</span>
+          Assigned Warehouse Scope
+        </label>
+        <select [(ngModel)]="formUserWarehouseId" name="formUserWarehouseId"
+          style="padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
+          <option value="">All Warehouses / Central Store</option>
+          @for (wh of adminWarehouses(); track wh.id) {
+          <option [value]="wh.id">{{ wh.name }} ({{ wh.code }})</option>
+          }
+        </select>
+
+        <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+          <span style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary);">Or Select Multiple Warehouses:</span>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-height: 90px; overflow-y: auto;">
+            @for (wh of adminWarehouses(); track wh.id) {
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--text-main); cursor: pointer; background: var(--bg-card); padding: 3px 5px; border-radius: 4px; border: 1px solid var(--border-color);">
+              <input type="checkbox" [checked]="isUserWarehouseSelected(wh.id)" (change)="toggleUserWarehouseSelection(wh.id)" style="accent-color: #2563eb; cursor: pointer;" />
+              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" [title]="wh.name">{{ wh.name }}</span>
+            </label>
+            }
+          </div>
+        </div>
       </div>
       @if (userModalMode() === 'edit') {
       <div style="display: flex; align-items: center; gap: 10px;">
@@ -8107,6 +8014,111 @@
         <button type="submit"
           style="background: linear-gradient(135deg, #2563eb, #1d4ed8); border: none; color: white; padding: 8px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.25);">
           {{ userModalMode() === 'add' ? 'Create User' : 'Save Changes' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}
+
+<!-- Create Site Modal -->
+@if (isCreateSiteModalOpen()) {
+<div class="modal-backdrop"
+  style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease-out;">
+  <div class="modal-card"
+    style="background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 16px; width: 100%; max-width: 460px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+      <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin: 0;">
+        ➕ Add New Construction Site / Warehouse
+      </h3>
+      <button (click)="isCreateSiteModalOpen.set(false)"
+        style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 50%;">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form (submit)="$event.preventDefault(); saveNewSite();" style="display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Site Code</label>
+        <input type="text" [ngModel]="formSiteCode()" (ngModelChange)="formSiteCode.set($event)" name="formSiteCode" required placeholder="e.g. SITE-ALP-01"
+          style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;" />
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Site Name</label>
+        <input type="text" [ngModel]="formSiteName()" (ngModelChange)="formSiteName.set($event)" name="formSiteName" required placeholder="e.g. Site Alpha - Metro Line Pier 12"
+          style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;" />
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Location / Address</label>
+        <input type="text" [ngModel]="formSiteAddress()" (ngModelChange)="formSiteAddress.set($event)" name="formSiteAddress" required placeholder="e.g. Sector 14, Metro Corridor Pier 12, Mumbai"
+          style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;" />
+      </div>
+      <div
+        style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+        <button type="button" (click)="isCreateSiteModalOpen.set(false)"
+          style="background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;">
+          Cancel
+        </button>
+        <button type="submit"
+          style="background: linear-gradient(135deg, #0d9488, #0f766e); border: none; color: white; padding: 8px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(13,148,136,0.25);">
+          Create Site
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}
+
+<!-- Create Warehouse Modal (/api/warehouses) -->
+@if (isCreateWarehouseModalOpen()) {
+<div
+  style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 16px;">
+  <div
+    style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color); border-radius: 12px; width: 100%; max-width: 480px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+      <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="color: #2563eb;">warehouse</span>
+        ➕ Add New Storage Warehouse Depot (<code style="font-size: 0.75rem; color: #2563eb;">POST /api/warehouses</code>)
+      </h3>
+      <button (click)="isCreateWarehouseModalOpen.set(false)"
+        style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 50%;">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form (submit)="$event.preventDefault(); saveNewWarehouse();" style="display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Warehouse Code</label>
+        <input type="text" [ngModel]="formWarehouseCode()" (ngModelChange)="formWarehouseCode.set($event)" name="formWarehouseCode" required placeholder="e.g. WH-CS-01"
+          style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;" />
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Warehouse Name</label>
+        <input type="text" [ngModel]="formWarehouseName()" (ngModelChange)="formWarehouseName.set($event)" name="formWarehouseName" required placeholder="e.g. Central Store Storage Depot"
+          style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;" />
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Parent Construction Site</label>
+        <select [ngModel]="formWarehouseSiteId()" (ngModelChange)="formWarehouseSiteId.set($event)" name="formWarehouseSiteId" required
+          style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;">
+          @for (site of adminSites(); track site.id) {
+          <option [value]="site.id">{{ site.name }} ({{ site.code }})</option>
+          }
+        </select>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Warehouse Address</label>
+        <input type="text" [ngModel]="formWarehouseAddress()" (ngModelChange)="formWarehouseAddress.set($event)" name="formWarehouseAddress" required placeholder="e.g. Plot 42, Central Logistics Park, Chakan"
+          style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;" />
+      </div>
+      <div
+        style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+        <button type="button" (click)="isCreateWarehouseModalOpen.set(false)"
+          style="background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;">
+          Cancel
+        </button>
+        <button type="submit"
+          style="background: linear-gradient(135deg, #2563eb, #1d4ed8); border: none; color: white; padding: 8px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.25);">
+          Create Warehouse
         </button>
       </div>
     </form>

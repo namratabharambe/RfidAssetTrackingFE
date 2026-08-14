@@ -19,6 +19,7 @@ interface Asset {
   id: string;
   assetNumber?: string;
   name: string;
+  image?: string;
   rfidTag: string;
   qrCode?: string;
   gpsId: string;
@@ -226,7 +227,7 @@ export class App implements AfterViewInit, OnDestroy {
     { name: 'Reports & Analytics', icon: 'bar_chart', badge: null, submenus: [] },
     { name: 'Compliance', icon: 'assignment_turned_in', badge: null, submenus: ['Audit & Inspections', 'Geofence Violations', 'Certificates & Licenses'] },
     { name: 'Integrations', icon: 'hub', badge: null, submenus: null },
-    { name: 'Admin', icon: 'admin_panel_settings', badge: null, submenus: ['User Management', 'System Settings', 'Reader Profiles', 'API Management'] }
+    { name: 'Admin', icon: 'admin_panel_settings', badge: null, submenus: ['User Management', 'Site & Warehouse Management', 'System Settings', 'Reader Profiles', 'API Management'] }
   ];
 
   // State Signals
@@ -250,14 +251,198 @@ export class App implements AfterViewInit, OnDestroy {
     return email.includes('devam');
   });
 
+  // Returns the set of site names this user is allowed to see.
+  // For Devam users "All Sites" means ONLY their Devam sites, not every org.
+  protected readonly allowedSiteNames = computed((): Set<string> | null => {
+    if (!this.isDevamUser()) return null; // null = no restriction (global admin)
+    const names = new Set<string>(this.apiSites().map((s: any) => s.name));
+    this.apiWarehouses().forEach((w: any) => names.add(w.name));
+    return names;
+  });
+
+  // Returns true if the given site name is visible to the current user.
+  protected isSiteAllowed(siteName: string): boolean {
+    const allowed = this.allowedSiteNames();
+    if (!allowed) return true; // no restriction
+    if (siteName === 'All Sites') return true; // label is always shown
+    return allowed.has(siteName);
+  }
+
+  // Returns true if a record's site matches the current site filter.
+  // When selectedSite is 'All Sites' and user is a Devam user,
+  // ONLY records whose site is in allowedSiteNames pass through.
+  protected siteMatchesFilter(recordSite: string | null | undefined): boolean {
+    const sel = this.selectedSite();
+    const allowed = this.allowedSiteNames();
+
+    if (sel === 'All Sites') {
+      // No restriction for global admins
+      if (!allowed) return true;
+      // Devam users: only show records belonging to their sites/warehouses
+      if (!recordSite) return false;
+      return allowed.has(recordSite);
+    }
+
+    // Specific site selected: exact match
+    return recordSite === sel;
+  }
+
+  // System Settings: Module Access Config Signals
+  protected readonly configModuleSiteName = signal<string>('All Sites');
+  protected readonly configModuleWarehouseName = signal<string>('All Warehouses');
+  protected readonly configModuleRole = signal<string>('All Roles');
+  protected readonly siteModulePermissions = signal<Record<string, string[]>>({});
+
+  protected toggleModulePermission(moduleName: string) {
+    const site = this.configModuleSiteName();
+    const wh = this.configModuleWarehouseName();
+    const role = this.configModuleRole();
+    const key = `${site}_${wh}_${role}`;
+    
+    const current = this.siteModulePermissions()[key] || [
+      'Dashboard', 'Assets', 'Check in/Check out', 'RFID Operations', 'GPS Tracking', 
+      'Inventory', 'Maintenance', 'Reports & Analytics', 'Compliance', 'Integrations', 'Admin'
+    ];
+
+    let updated: string[];
+    if (current.includes(moduleName)) {
+      updated = current.filter(m => m !== moduleName);
+    } else {
+      updated = [...current, moduleName];
+    }
+
+    const newMap = { ...this.siteModulePermissions(), [key]: updated };
+    this.siteModulePermissions.set(newMap);
+  }
+
+  protected isModuleEnabledForConfig(moduleName: string): boolean {
+    const site = this.configModuleSiteName();
+    const wh = this.configModuleWarehouseName();
+    const role = this.configModuleRole();
+    const key = `${site}_${wh}_${role}`;
+    const list = this.siteModulePermissions()[key];
+    if (!list) return true; // Enabled by default
+    return list.includes(moduleName);
+  }
+
+  protected fetchModulePermissionsFromApi() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    const site = this.configModuleSiteName();
+    const wh = this.configModuleWarehouseName();
+    const role = this.configModuleRole();
+
+    this.http.get<any>(`${environment.apiUrl}/systemsettings/module-permissions?site=${encodeURIComponent(site)}&warehouse=${encodeURIComponent(wh)}&role=${encodeURIComponent(role)}`).subscribe({
+      next: (res) => {
+        if (res && res.allConfigurations) {
+          this.siteModulePermissions.set(res.allConfigurations);
+        } else if (res && res.modules) {
+          const key = `${site}_${wh}_${role}`;
+          this.siteModulePermissions.set({ ...this.siteModulePermissions(), [key]: res.modules });
+        }
+      },
+      error: () => {
+        const saved = localStorage.getItem('site_module_permissions');
+        if (saved) {
+          try { this.siteModulePermissions.set(JSON.parse(saved)); } catch (e) {}
+        }
+      }
+    });
+  }
+
+  protected saveModulePermissionsConfig() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    const site = this.configModuleSiteName();
+    const wh = this.configModuleWarehouseName();
+    const role = this.configModuleRole();
+    const key = `${site}_${wh}_${role}`;
+    
+    const modules = this.siteModulePermissions()[key] || [
+      'Dashboard', 'Assets', 'Check in/Check out', 'RFID Operations', 'GPS Tracking', 
+      'Inventory', 'Maintenance', 'Reports & Analytics', 'Compliance', 'Integrations', 'Admin'
+    ];
+
+    // Save to LocalStorage
+    localStorage.setItem('site_module_permissions', JSON.stringify(this.siteModulePermissions()));
+
+    // Save to Backend API (/api/systemsettings/module-permissions)
+    this.http.post(`${environment.apiUrl}/systemsettings/module-permissions`, {
+      site,
+      warehouse: wh,
+      role,
+      modules
+    }).subscribe({
+      next: (res: any) => {
+        if (res && res.allConfigurations) {
+          this.siteModulePermissions.set(res.allConfigurations);
+        }
+        alert(`Successfully saved module permissions to backend database for Site: ${site}, Warehouse: ${wh}, Role: ${role}! The navigation sidebar has been dynamically updated.`);
+      },
+      error: (err) => {
+        console.warn('Backend API save warning, saved locally', err);
+        alert(`Saved module permissions locally for Site: ${site}, Warehouse: ${wh}, Role: ${role}! The navigation sidebar has been dynamically updated.`);
+      }
+    });
+  }
+
   protected readonly filteredNavItems = computed(() => {
-    const isDevam = this.isDevamUser();
-    if (isDevam) {
-      const allowedNames = ['Dashboard', 'Assets', 'Inventory', 'Reports & Analytics', 'Settings'];
-      const devamHiddenSubmenus = ['Asset Categories'];
-      return this.navItems
-        .map(item => {
-          if (item.name === 'Admin') {
+    const user = this.authService.currentUser();
+    if (!user) return this.navItems;
+
+    // Extract user roles (from JWT claims or user object)
+    let userRoles: string[] = [];
+    if (Array.isArray(user.roles)) {
+      userRoles = user.roles.map((r: any) => (typeof r === 'string' ? r : r.name || '').toLowerCase());
+    } else if (user.roleName || user.roleId || user.role) {
+      userRoles = (user.roleName || user.roleId || user.role || '').toLowerCase().split(',').map((r: string) => r.trim());
+    }
+
+    // Role capabilities
+    const isSiteAdmin = userRoles.length === 0 || userRoles.some(r => r.includes('admin') || r.includes('super') || r.includes('system'));
+    const isProjectManager = userRoles.some(r => r.includes('manager') || r.includes('project'));
+    const isWarehouseManager = userRoles.some(r => r.includes('warehouse') || r.includes('store'));
+    const isAuditor = userRoles.some(r => r.includes('audit') || r.includes('compliance'));
+    const isSupervisor = userRoles.some(r => r.includes('supervisor') || r.includes('operator'));
+
+    // Site context restriction
+    const isSiteRestricted = !!user.siteId || this.allowedSiteNames() !== null;
+
+    // Determine base allowed sidebar items based on Role & Site restriction
+    let allowedNames: string[] = [];
+    if (isSiteAdmin) {
+      allowedNames = ['Dashboard', 'Assets', 'Check in/Check out', 'RFID Operations', 'GPS Tracking', 'Inventory', 'Maintenance', 'Reports & Analytics', 'Compliance', 'Integrations', 'Admin'];
+    } else if (isProjectManager) {
+      allowedNames = ['Dashboard', 'Assets', 'Check in/Check out', 'RFID Operations', 'GPS Tracking', 'Inventory', 'Maintenance', 'Reports & Analytics', 'Compliance', 'Settings'];
+    } else if (isWarehouseManager) {
+      allowedNames = ['Dashboard', 'Assets', 'Check in/Check out', 'Inventory', 'Maintenance', 'Reports & Analytics', 'Settings'];
+    } else if (isAuditor) {
+      allowedNames = ['Dashboard', 'Assets', 'Inventory', 'Reports & Analytics', 'Compliance'];
+    } else if (isSupervisor) {
+      allowedNames = ['Dashboard', 'Assets', 'Check in/Check out', 'RFID Operations', 'Inventory', 'Maintenance'];
+    } else {
+      allowedNames = ['Dashboard', 'Assets', 'Check in/Check out', 'Inventory', 'Reports & Analytics', 'Settings'];
+    }
+
+    // Check custom System Settings module permissions for the selected site/warehouse/role
+    const currentSite = this.selectedSite();
+    const permissionsMap = this.siteModulePermissions();
+    const matchingKey = Object.keys(permissionsMap).find(k => k.startsWith(currentSite) || k.startsWith('All Sites'));
+    if (matchingKey && permissionsMap[matchingKey]) {
+      const configuredModules = permissionsMap[matchingKey];
+      allowedNames = allowedNames.filter(name => configuredModules.includes(name) || name === 'Settings' || name === 'Admin');
+    }
+
+    return this.navItems
+      .map(item => {
+        if (item.name === 'Admin') {
+          if (isSiteAdmin) {
+            return {
+              ...item,
+              submenus: isSiteRestricted 
+                ? ['User Management', 'Site & Warehouse Management', 'System Settings', 'Reader Profiles']
+                : item.submenus
+            };
+          }
+          if (allowedNames.includes('Settings')) {
             return {
               name: 'Settings',
               icon: 'settings',
@@ -265,21 +450,14 @@ export class App implements AfterViewInit, OnDestroy {
               submenus: ['System Settings']
             };
           }
-          // Strip hidden submenus for devam
-          if (item.submenus) {
-            return {
-              ...item,
-              submenus: item.submenus.filter((s: string) => !devamHiddenSubmenus.includes(s))
-            };
-          }
-          return item;
-        })
-        .filter(item => allowedNames.includes(item.name));
-    }
-    return this.navItems;
+          return null;
+        }
+        return item;
+      })
+      .filter((item): item is typeof this.navItems[0] => item !== null && allowedNames.includes(item.name));
   });
 
-  protected readonly selectedSite = signal<string>('Pune DC');
+  protected readonly selectedSite = signal<string>('All Sites');
   protected readonly activeOperation = signal<string>('All Operations');
   protected readonly activeNav = signal<string>('Dashboard');
   protected readonly activeSubNav = signal<string>('');
@@ -424,12 +602,8 @@ export class App implements AfterViewInit, OnDestroy {
 
   // Dashboard KPI: live checked-out count from checkoutRecords (assignments & scans)
   protected readonly checkedOutCount = computed(() => {
-    const site = this.selectedSite();
     const op = this.activeOperation();
-    let list = this.checkoutRecords();
-    if (site !== 'All Sites') {
-      list = list.filter(r => r.site === site);
-    }
+    let list = this.checkoutRecords().filter(r => this.siteMatchesFilter(r.site));
     if (op !== 'All Operations') {
       list = list.filter(r => {
         const loc = (r.location || r.site || '').toLowerCase();
@@ -447,8 +621,167 @@ export class App implements AfterViewInit, OnDestroy {
 
   // Admin State
   protected readonly adminUsers = signal<any[]>([]);
+  protected readonly filteredAdminUsers = computed(() => {
+    const list = this.adminUsers();
+    const currentUser = this.authService.currentUser();
+    if (!currentUser) return list;
+
+    const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
+    const isDevam = userEmail.includes('devam');
+    const allowedSiteNames = this.allowedSiteNames();
+
+    if (!isDevam && !allowedSiteNames && !currentUser.siteId) {
+      return list;
+    }
+
+    return list.filter(u => {
+      const uEmail = (u.email || u.username || u.name || '').toLowerCase();
+
+      if (isDevam && uEmail.includes('devam')) {
+        return true;
+      }
+
+      if (allowedSiteNames && u.siteName && allowedSiteNames.has(u.siteName)) {
+        return true;
+      }
+
+      if (currentUser.siteId && u.siteId && u.siteId.toLowerCase() === currentUser.siteId.toLowerCase()) {
+        return true;
+      }
+
+      if (u.id === currentUser.id || uEmail === userEmail) {
+        return true;
+      }
+
+      return false;
+    });
+  });
   protected readonly adminReaders = signal<any[]>([]);
   protected readonly adminApiKeys = signal<any[]>([]);
+
+  // Site & Warehouse Admin State
+  protected readonly adminSites = signal<any[]>([
+    { id: 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91', code: 'SITE-CS-00', name: 'Pune DC / Central Store Warehouse', address: 'Plot 42, Central Logistics Park, Pune' },
+    { id: 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c92', code: 'SITE-ALP-01', name: 'Mumbai Warehouse / Site Alpha', address: 'Sector 14, Metro Pier 12, Mumbai' },
+    { id: 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93', code: 'SITE-BET-02', name: 'Chennai Plant / Site Beta', address: 'Plot 88, IT Park Zone, Chennai' },
+    { id: 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c94', code: 'SITE-GAM-03', name: 'Bengaluru Hub / Site Gamma', address: 'KM 44, Expressway Project, Bengaluru' }
+  ]);
+  protected readonly isCreateSiteModalOpen = signal<boolean>(false);
+  protected readonly formSiteCode = signal<string>('');
+  protected readonly formSiteName = signal<string>('');
+  protected readonly formSiteAddress = signal<string>('');
+
+  protected openCreateSiteModal() {
+    this.formSiteCode.set('');
+    this.formSiteName.set('');
+    this.formSiteAddress.set('');
+    this.isCreateSiteModalOpen.set(true);
+  }
+
+  protected saveNewSite() {
+    const name = this.formSiteName().trim();
+    if (!name) return;
+    const code = this.formSiteCode().trim() || ('SITE-' + Math.floor(100 + Math.random() * 900));
+    const address = this.formSiteAddress().trim() || 'Construction Project Location';
+
+    const newSite = {
+      id: 'site-' + Date.now(),
+      code,
+      name,
+      address
+    };
+
+    this.adminSites.update(list => [...list, newSite]);
+    
+    // Also push to HTTP backend if online
+    this.http.post(`${environment.apiUrl}/sites`, { code, name, address }).subscribe({
+      next: () => {
+        console.log('Site created successfully in backend database');
+        this.fetchSitesZonesWarehouses();
+      },
+      error: (err) => console.log('Stored locally', err)
+    });
+
+    this.isCreateSiteModalOpen.set(false);
+  }
+
+  // Warehouse Admin State
+  protected readonly adminWarehouses = signal<any[]>([
+    { id: 'wh-cs-01', code: 'WH-CS-01', name: 'Devam Central Store Warehouse', address: 'Plot 42, Central Logistics Park, Pune', siteId: 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91', siteName: 'Pune DC / Central Store Warehouse' }
+  ]);
+  protected readonly isCreateWarehouseModalOpen = signal<boolean>(false);
+  protected readonly formWarehouseCode = signal<string>('');
+  protected readonly formWarehouseName = signal<string>('');
+  protected readonly formWarehouseAddress = signal<string>('');
+  protected readonly formWarehouseSiteId = signal<string>('');
+
+  protected openCreateWarehouseModal() {
+    this.formWarehouseCode.set('');
+    this.formWarehouseName.set('');
+    this.formWarehouseAddress.set('');
+    this.formWarehouseSiteId.set(this.adminSites().length > 0 ? this.adminSites()[0].id : '');
+    this.isCreateWarehouseModalOpen.set(true);
+  }
+
+  protected fetchWarehousesFromApi() {
+    this.http.get<any[]>(`${environment.apiUrl}/warehouses`).subscribe({
+      next: (data) => {
+        if (Array.isArray(data)) {
+          const currentUser = this.authService.currentUser();
+          const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
+          let filtered = data;
+          if (userEmail.includes('devam')) {
+            const allowedSiteIds = new Set(this.adminSites().map((s: any) => s.id));
+            filtered = data.filter((w: any) => 
+              allowedSiteIds.has(w.siteId) || 
+              (w.name && w.name.toLowerCase().includes('devam')) || 
+              (w.code && w.code.toLowerCase().includes('devam')) ||
+              (w.name && w.name.toLowerCase().includes('central store'))
+            );
+          }
+          this.adminWarehouses.set(filtered.map((w: any) => ({
+            id: w.id,
+            code: w.code || 'WH-01',
+            name: w.name,
+            address: w.address || 'Warehouse Location',
+            siteId: w.siteId,
+            siteName: w.siteName || (this.adminSites().find(s => s.id === w.siteId)?.name || 'Assigned Site')
+          })));
+        }
+      },
+      error: (err) => console.log('Stored locally', err)
+    });
+  }
+
+  protected saveNewWarehouse() {
+    const name = this.formWarehouseName().trim();
+    if (!name) return;
+    const code = this.formWarehouseCode().trim() || ('WH-' + Math.floor(100 + Math.random() * 900));
+    const address = this.formWarehouseAddress().trim() || 'Central Storage Depot';
+    const siteId = this.formWarehouseSiteId() || (this.adminSites().length > 0 ? this.adminSites()[0].id : null);
+
+    const siteObj = this.adminSites().find(s => s.id === siteId);
+    const newWh = {
+      id: 'wh-' + Date.now(),
+      code,
+      name,
+      address,
+      siteId,
+      siteName: siteObj ? siteObj.name : 'Central Store'
+    };
+
+    this.adminWarehouses.update(list => [...list, newWh]);
+
+    this.http.post(`${environment.apiUrl}/warehouses`, { code, name, address, siteId }).subscribe({
+      next: () => {
+        console.log('Warehouse created in backend database');
+        this.fetchWarehousesFromApi();
+      },
+      error: (err) => console.log('Warehouse stored locally', err)
+    });
+
+    this.isCreateWarehouseModalOpen.set(false);
+  }
 
   // System Settings fields
   protected readonly sysOrgName = signal<string>('Prosper Asset Management Pvt Ltd');
@@ -492,7 +825,38 @@ export class App implements AfterViewInit, OnDestroy {
   protected formUserPassword = '';
   protected formUserRole = 'Viewer';
   protected formUserSiteId = '';
+  protected formUserWarehouseId = '';
+  protected readonly formUserSelectedSiteIds = signal<string[]>([]);
+  protected readonly formUserSelectedWarehouseIds = signal<string[]>([]);
   protected formUserIsActive = true;
+
+  protected toggleUserSiteSelection(siteId: string) {
+    const current = this.formUserSelectedSiteIds();
+    if (current.includes(siteId)) {
+      this.formUserSelectedSiteIds.set(current.filter(id => id !== siteId));
+    } else {
+      this.formUserSelectedSiteIds.set([...current, siteId]);
+    }
+  }
+
+  protected isUserSiteSelected(siteId: string): boolean {
+    return this.formUserSelectedSiteIds().includes(siteId);
+  }
+
+  protected toggleUserWarehouseSelection(whId: string) {
+    const current = this.formUserSelectedWarehouseIds();
+    if (current.includes(whId)) {
+      this.formUserSelectedWarehouseIds.set(current.filter(id => id !== whId));
+    } else {
+      this.formUserSelectedWarehouseIds.set([...current, whId]);
+    }
+  }
+
+  protected isUserWarehouseSelected(whId: string): boolean {
+    return this.formUserSelectedWarehouseIds().includes(whId);
+  }
+
+
 
   // Reader Modal State
   protected readonly isReaderModalOpen = signal<boolean>(false);
@@ -580,13 +944,8 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected readonly filteredCheckoutRecords = computed(() => {
     const f = this.checkoutFilter();
-    const site = this.selectedSite();
     const op = this.activeOperation();
-    let list = this.checkoutRecords();
-    if (site !== 'All Sites') {
-      const match = list.filter(r => r.site === site || !r.site || site === 'Devam Site');
-      if (match.length > 0) list = match;
-    }
+    let list = this.checkoutRecords().filter(r => this.siteMatchesFilter(r.site));
     if (op !== 'All Operations') {
       list = list.filter(r => {
         const loc = (r.location || r.site || '').toLowerCase();
@@ -602,13 +961,8 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected readonly filteredCheckinRecords = computed(() => {
     const f = this.checkoutFilter();
-    const site = this.selectedSite();
     const op = this.activeOperation();
-    let list = this.checkinRecords();
-    if (site !== 'All Sites') {
-      const match = list.filter(r => r.site === site || !r.site || site === 'Devam Site');
-      if (match.length > 0) list = match;
-    }
+    let list = this.checkinRecords().filter(r => this.siteMatchesFilter(r.site));
     if (op !== 'All Operations') {
       list = list.filter(r => {
         const loc = (r.location || r.site || '').toLowerCase();
@@ -623,13 +977,8 @@ export class App implements AfterViewInit, OnDestroy {
   });
 
   protected getCheckoutCountForFilter(opt: string): number {
-    const site = this.selectedSite();
     const op = this.activeOperation();
-    let list = this.checkoutRecords();
-    if (site !== 'All Sites') {
-      const match = list.filter(r => r.site === site || !r.site || site === 'Devam Site');
-      if (match.length > 0) list = match;
-    }
+    let list = this.checkoutRecords().filter(r => this.siteMatchesFilter(r.site));
     if (op !== 'All Operations') {
       list = list.filter(r => {
         const loc = (r.location || r.site || '').toLowerCase();
@@ -708,15 +1057,12 @@ export class App implements AfterViewInit, OnDestroy {
     const search = this.inventorySearchQuery().toLowerCase().trim();
     const status = this.inventoryStatusFilter();
     const zone = this.inventoryZoneFilter();
-    const globalSite = this.selectedSite();
-    const isDevam = this.isDevamUser();
     let list = this.inventoryItems();
 
-    if (isDevam || globalSite !== 'All Sites') {
-      list = list.filter(item => {
-        if (!item.zone) return false;
-        return item.zone.toLowerCase().includes(globalSite.toLowerCase());
-      });
+    // InventoryItem has no 'site' field; filter by zone name when a specific site is selected
+    const sel = this.selectedSite();
+    if (sel !== 'All Sites') {
+      list = list.filter(item => item.zone && item.zone.toLowerCase().includes(sel.toLowerCase()));
     }
 
     if (search) {
@@ -773,9 +1119,7 @@ export class App implements AfterViewInit, OnDestroy {
     const globalSite = this.selectedSite();
     let list = this.maintAlerts();
 
-    if (globalSite !== 'All Sites') {
-      list = list.filter(item => item.currentSite.includes(globalSite));
-    }
+    list = list.filter(item => this.siteMatchesFilter(item.currentSite));
 
     if (search) {
       list = list.filter(item => 
@@ -877,10 +1221,10 @@ export class App implements AfterViewInit, OnDestroy {
           const rfidList: any[] = Array.isArray(res.rfid) ? res.rfid : (res.rfid?.body ?? []);
           if (Array.isArray(rfidList)) {
             rfidList.forEach(t => {
-              const asset = this.assets().find(a => a.id === t.assetId);
+              const asset = this.assets().find(a => (a.id || '').toString().toLowerCase() === (t.assetId || t.AssetId || '').toString().toLowerCase());
               list.push({
                 id: t.id,
-                epc: t.epcCode,
+                epc: t.epcCode || t.EpcCode,
                 assetNumber: asset ? asset.assetNumber : '-',
                 assetName: asset ? asset.name : 'Unassigned',
                 type: 'RFID Pass-Metal',
@@ -899,13 +1243,13 @@ export class App implements AfterViewInit, OnDestroy {
           const bcList: any[] = Array.isArray(res.barcode) ? res.barcode : (res.barcode?.body ?? []);
           if (Array.isArray(bcList)) {
             bcList.forEach(b => {
-              const asset = this.assets().find(a => a.id === b.assetId);
+              const asset = this.assets().find(a => (a.id || '').toString().toLowerCase() === (b.assetId || b.AssetId || '').toString().toLowerCase());
               list.push({
                 id: b.id,
-                epc: b.barcodeValue,
+                epc: b.barcodeValue || b.BarcodeValue,
                 assetNumber: asset ? asset.assetNumber : '-',
                 assetName: asset ? asset.name : 'Unassigned',
-                type: 'Barcode ' + b.format,
+                type: 'Barcode ' + (b.format || 'Standard'),
                 RSSI: '-',
                 battery: '-',
                 lastSeen: 'Staging Scan',
@@ -921,15 +1265,15 @@ export class App implements AfterViewInit, OnDestroy {
           const gpsList: any[] = Array.isArray(res.gps) ? res.gps : (res.gps?.body ?? []);
           if (Array.isArray(gpsList)) {
             gpsList.forEach(g => {
-              const asset = this.assets().find(a => a.id === g.assetId);
+              const asset = this.assets().find(a => (a.id || '').toString().toLowerCase() === (g.assetId || g.AssetId || '').toString().toLowerCase());
               list.push({
                 id: g.id,
-                epc: g.imei,
+                epc: g.imei || g.Imei,
                 assetNumber: asset ? asset.assetNumber : '-',
                 assetName: asset ? asset.name : 'Unassigned',
                 type: 'GPS Active Device',
                 RSSI: '-72 dBm',
-                battery: g.batteryLevel + '%',
+                battery: (g.batteryLevel || 100) + '%',
                 lastSeen: 'GPS Network',
                 time: 'Just now',
                 status: g.status === 'Online' ? 'Active' : 'Inactive',
@@ -940,6 +1284,7 @@ export class App implements AfterViewInit, OnDestroy {
           }
 
           this.tagsList.set(list);
+          this.fetchAssets();
         },
         error: (err) => console.error('Failed to load tags from backend', err)
       });
@@ -1285,11 +1630,189 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly gpsSearchQuery = signal<string>('');
   protected readonly gpsStatusFilter = signal<string>('All');
   protected readonly gpsTypeFilter = signal<string>('All');
+  protected readonly showGpsFilterModal = signal<boolean>(false);
   protected readonly gpsShowGeofences = signal<boolean>(true);
   protected readonly gpsAutoRefresh = signal<boolean>(true);
   protected readonly gpsRefreshInterval = signal<number>(10);
   protected readonly gpsSelectedAsset = signal<GPSAsset | null>(null);
   protected readonly gpsDetailTab = signal<'overview' | 'route' | 'rfid' | 'trips'>('overview');
+
+  // GPS Route Playback state
+  protected readonly isGpsPlaybackActive = signal<boolean>(false);
+  protected readonly isGpsPlaybackPlaying = signal<boolean>(false);
+  protected readonly gpsPlaybackSpeed = signal<number>(1);
+  protected readonly gpsPlaybackProgress = signal<number>(0);
+  protected readonly gpsPlaybackIndex = signal<number>(0);
+  protected readonly gpsPlaybackTotalPoints = signal<number>(0);
+  protected readonly gpsPlaybackCurrentTime = signal<string>('—');
+  private gpsPlaybackTimer: any = null;
+  private gpsPlaybackTrail: any[] = [];
+
+  // Geofence Breach Toasts state
+  protected readonly geofenceAlerts = signal<Array<{
+    id: string;
+    assetId: string;
+    assetName: string;
+    zone: string;
+    speed: number;
+    time: string;
+    severity: 'warning' | 'danger';
+  }>>([
+    {
+      id: 'ALT-INITIAL-1',
+      assetId: '16512010049',
+      assetName: 'Toyota Forklift Model-X (16512010049)',
+      zone: 'Transit Route Highway',
+      speed: 58,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      severity: 'danger'
+    }
+  ]);
+
+  protected dismissGeofenceAlert(id: string) {
+    this.geofenceAlerts.update(alerts => alerts.filter(a => a.id !== id));
+  }
+
+  protected locateGeofenceBreachOnMap(alertItem: any) {
+    const asset = this.filteredGpsAssets().find(a => a.id === alertItem.assetId || a.name.includes(alertItem.assetName));
+    if (asset) {
+      this.selectGpsAsset(asset);
+      this.centerOnSelectedAsset();
+    }
+  }
+
+  protected toggleGpsPlayback() {
+    const next = !this.isGpsPlaybackActive();
+    this.isGpsPlaybackActive.set(next);
+    if (next) {
+      this.initGpsPlayback();
+    } else {
+      this.stopGpsPlayback();
+    }
+  }
+
+  protected initGpsPlayback() {
+    const history = this.gpsAssetHistory();
+    const sel = this.gpsSelectedAsset();
+    const baseLat = sel?.latitude || 18.5965;
+    const baseLon = sel?.longitude || 73.8272;
+
+    if (!history || history.length === 0) {
+      const mockPoints = [];
+      for (let i = 0; i <= 25; i++) {
+        const time = new Date(Date.now() - (25 - i) * 120000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        mockPoints.push({
+          lat: baseLat - 0.0060 + (i * 0.00030),
+          lon: baseLon - 0.0050 + (i * 0.00025),
+          time: time,
+          speed: Math.round(12 + Math.sin(i * 0.5) * 15),
+          zone: i > 12 ? 'Transit Route' : 'Main Yard'
+        });
+      }
+      this.gpsPlaybackTrail = mockPoints;
+    } else {
+      this.gpsPlaybackTrail = history;
+    }
+
+    this.gpsPlaybackTotalPoints.set(this.gpsPlaybackTrail.length);
+    this.gpsPlaybackIndex.set(0);
+    this.gpsPlaybackProgress.set(0);
+    this.updateGpsPlaybackFrame(0);
+  }
+
+  protected playGpsPlayback() {
+    if (this.isGpsPlaybackPlaying()) return;
+    this.isGpsPlaybackPlaying.set(true);
+    this.startGpsPlaybackTimer();
+  }
+
+  protected pauseGpsPlayback() {
+    this.isGpsPlaybackPlaying.set(false);
+    if (this.gpsPlaybackTimer) {
+      clearInterval(this.gpsPlaybackTimer);
+      this.gpsPlaybackTimer = null;
+    }
+  }
+
+  protected stopGpsPlayback() {
+    this.pauseGpsPlayback();
+    this.gpsPlaybackIndex.set(0);
+    this.gpsPlaybackProgress.set(0);
+    this.updateGpsPlaybackFrame(0);
+  }
+
+  protected seekGpsPlayback(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const progress = parseFloat(target.value);
+    this.gpsPlaybackProgress.set(progress);
+    const total = this.gpsPlaybackTotalPoints();
+    if (total === 0) return;
+    const idx = Math.min(total - 1, Math.floor((progress / 100) * total));
+    this.gpsPlaybackIndex.set(idx);
+    this.updateGpsPlaybackFrame(idx);
+  }
+
+  protected setGpsPlaybackSpeed(speed: number) {
+    this.gpsPlaybackSpeed.set(speed);
+    if (this.isGpsPlaybackPlaying()) {
+      this.pauseGpsPlayback();
+      this.playGpsPlayback();
+    }
+  }
+
+  private startGpsPlaybackTimer() {
+    if (this.gpsPlaybackTimer) clearInterval(this.gpsPlaybackTimer);
+    const intervalMs = Math.round(1000 / this.gpsPlaybackSpeed());
+    this.gpsPlaybackTimer = setInterval(() => {
+      let nextIdx = this.gpsPlaybackIndex() + 1;
+      const total = this.gpsPlaybackTotalPoints();
+      if (nextIdx >= total) {
+        this.pauseGpsPlayback();
+        nextIdx = total - 1;
+      }
+      this.gpsPlaybackIndex.set(nextIdx);
+      const pct = total > 1 ? (nextIdx / (total - 1)) * 100 : 100;
+      this.gpsPlaybackProgress.set(pct);
+      this.updateGpsPlaybackFrame(nextIdx);
+    }, intervalMs);
+  }
+
+  private updateGpsPlaybackFrame(idx: number) {
+    if (!this.gpsPlaybackTrail || this.gpsPlaybackTrail.length === 0) return;
+    const pt = this.gpsPlaybackTrail[idx];
+    if (!pt) return;
+
+    const lat = parseFloat(pt.lat || pt.Lat || pt.latitude);
+    const lon = parseFloat(pt.lon || pt.Lon || pt.longitude);
+    const speed = parseFloat(pt.speed || pt.Speed || 0);
+    const time = pt.time || pt.Time || new Date().toLocaleTimeString();
+
+    this.gpsPlaybackCurrentTime.set(time);
+
+    const currentSel = this.gpsSelectedAsset();
+    if (currentSel) {
+      const updatedSel = {
+        ...currentSel,
+        latitude: lat,
+        longitude: lon,
+        speed: speed,
+        lastGpsPing: time
+      };
+      this.gpsSelectedAsset.set(updatedSel);
+    }
+
+    if (this.satelliteMap && !isNaN(lat) && !isNaN(lon)) {
+      this.updateSatelliteMarkers();
+      this.satelliteMap.panTo([lat, lon], { animate: true, duration: 0.3 });
+    }
+  }
+
+  protected resetGpsFilters() {
+    this.gpsSearchQuery.set('');
+    this.gpsStatusFilter.set('All');
+    this.gpsTypeFilter.set('All');
+    this.showGpsFilterModal.set(false);
+  }
 
   // Map zoom and pan state
   protected readonly gpsMapZoom = signal<number>(1);
@@ -1305,32 +1828,59 @@ export class App implements AfterViewInit, OnDestroy {
   private panStartY = 0;
 
   protected zoomMapIn() {
-    const next = Math.min(3, this.gpsMapZoom() + 0.25);
-    this.gpsMapZoom.set(next);
-    if (next === 1) {
-      this.gpsMapPanX.set(0);
-      this.gpsMapPanY.set(0);
+    if (this.satelliteMap) {
+      this.satelliteMap.zoomIn();
+    } else {
+      const next = Math.min(3, this.gpsMapZoom() + 0.25);
+      this.gpsMapZoom.set(next);
+      if (next === 1) {
+        this.gpsMapPanX.set(0);
+        this.gpsMapPanY.set(0);
+      }
     }
   }
 
   protected zoomMapOut() {
-    const next = Math.max(1, this.gpsMapZoom() - 0.25);
-    this.gpsMapZoom.set(next);
-    if (next === 1) {
-      this.gpsMapPanX.set(0);
-      this.gpsMapPanY.set(0);
+    if (this.satelliteMap) {
+      this.satelliteMap.zoomOut();
+    } else {
+      const next = Math.max(1, this.gpsMapZoom() - 0.25);
+      this.gpsMapZoom.set(next);
+      if (next === 1) {
+        this.gpsMapPanX.set(0);
+        this.gpsMapPanY.set(0);
+      }
     }
   }
 
   protected toggleMapLayers() {
-    this.gpsMapTheme.set(this.gpsMapTheme() === 'standard' ? 'dark' : 'standard');
+    const layers: ('satellite' | 'hybrid' | 'street')[] = ['satellite', 'hybrid', 'street'];
+    const current = this.gpsMapLayer();
+    const nextIndex = (layers.indexOf(current) + 1) % layers.length;
+    this.switchMapLayer(layers[nextIndex]);
   }
 
   protected toggleMapFullscreen() {
-    this.gpsMapFullscreen.set(!this.gpsMapFullscreen());
-    this.gpsMapZoom.set(1);
-    this.gpsMapPanX.set(0);
-    this.gpsMapPanY.set(0);
+    const mapElem = document.getElementById('leaflet-satellite-map');
+    if (mapElem) {
+      const parent = mapElem.parentElement || mapElem;
+      if (!document.fullscreenElement) {
+        if (parent.requestFullscreen) {
+          parent.requestFullscreen().catch(err => console.warn(err));
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(err => console.warn(err));
+        }
+      }
+      setTimeout(() => {
+        if (this.satelliteMap) {
+          this.satelliteMap.invalidateSize(true);
+        }
+      }, 250);
+    } else {
+      this.gpsMapFullscreen.set(!this.gpsMapFullscreen());
+    }
   }
 
   protected onMapMouseDown(event: MouseEvent) {
@@ -1389,6 +1939,10 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly gpsContainerCount = computed(() => this.siteFilteredGpsAssets().filter(a => a.type === 'Container').length);
   protected readonly gpsToolEquipCount = computed(() => this.siteFilteredGpsAssets().filter(a => a.type === 'Tool/Equipment').length);
   protected readonly gpsMobileEquipCount = computed(() => this.siteFilteredGpsAssets().filter(a => a.type === 'Mobile Equipment').length);
+
+  protected readonly gpsTransitRouteCount = computed(() => this.siteFilteredGpsAssets().filter(a => a.currentZone === 'Transit Route').length || 1);
+  protected readonly gpsYardCount = computed(() => this.siteFilteredGpsAssets().filter(a => a.currentZone.includes('Yard')).length || 2);
+  protected readonly gpsDockCount = computed(() => this.siteFilteredGpsAssets().filter(a => a.currentZone.includes('Dock')).length || 2);
 
   // GPS asset history list signal
   protected readonly gpsAssetHistory = signal<any[]>([]);
@@ -1650,9 +2204,7 @@ export class App implements AfterViewInit, OnDestroy {
     const op = this.activeOperation();
     let list = this.assets();
     
-    if (globalSite !== 'All Sites') {
-      list = list.filter(asset => asset.site === globalSite);
-    }
+    list = list.filter(asset => this.siteMatchesFilter(asset.site));
     
     if (op !== 'All Operations') {
       list = list.filter(asset => {
@@ -1671,9 +2223,7 @@ export class App implements AfterViewInit, OnDestroy {
     const site = this.selectedSite();
     const op = this.activeOperation();
     
-    if (site !== 'All Sites') {
-      list = list.filter(a => a.site === site);
-    }
+    list = list.filter(a => this.siteMatchesFilter(a.site));
     
     if (op !== 'All Operations') {
       list = list.filter(a => {
@@ -1695,9 +2245,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly siteOnlyFilteredAssets = computed(() => {
     const globalSite = this.selectedSite();
     let list = this.assets();
-    if (globalSite !== 'All Sites') {
-      list = list.filter(asset => asset.site === globalSite);
-    }
+    list = list.filter(asset => this.siteMatchesFilter(asset.site));
     return list;
   });
 
@@ -1744,7 +2292,11 @@ export class App implements AfterViewInit, OnDestroy {
 
   // Devam dashboard — recent transactions from checkoutRecords
   protected readonly devamRecentTransactions = computed(() => {
-    const records = this.checkoutRecords();
+    const site = this.selectedSite();
+    let records = this.checkoutRecords();
+    if (site && site !== 'All Sites') {
+      records = records.filter(r => !r.site || r.site === site || r.site.toLowerCase().includes(site.toLowerCase()));
+    }
     return records.slice(0, 5).map(r => ({
       type: r.operation || (r.status === 'Active' ? 'Check Out' : 'Check In'),
       assetName: r.assetName || r.asset || '—',
@@ -1819,6 +2371,17 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected readonly customGroups = signal<{name: string, categoryName: string}[]>([]);
   protected readonly apiCategories = signal<any[]>([]);
+  protected readonly categorySearchQuery = signal<string>('');
+
+  protected readonly filteredApiCategories = computed(() => {
+    const search = this.categorySearchQuery().toLowerCase().trim();
+    const list = this.apiCategories();
+    if (!search) return list;
+    return list.filter(cat =>
+      (cat.name || '').toLowerCase().includes(search) ||
+      (cat.description || '').toLowerCase().includes(search)
+    );
+  });
   protected readonly apiSites = signal<any[]>([
     { id: '1', name: 'Pune DC', location: 'Pune, Maharashtra' },
     { id: '2', name: 'Mumbai Warehouse', location: 'Mumbai, Maharashtra' },
@@ -1873,6 +2436,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly selectedAsset = signal<Asset | null>(null);
   protected readonly activeAssetTab = signal<string>('Overview');
   protected readonly activeAssetSite = signal<string>('All Assets');
+  protected readonly activeAssetCategory = signal<string>('All Categories');
   protected readonly activeAssetStatus = signal<string>('');
   protected readonly assetSearchQuery = signal<string>('');
   protected readonly showAssetFilters = signal<boolean>(false);
@@ -1880,6 +2444,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly filteredAssets = computed(() => {
     const q = this.assetSearchQuery().toLowerCase();
     const siteFilter = this.activeAssetSite();
+    const categoryFilter = this.activeAssetCategory();
     const statusFilter = this.activeAssetStatus();
     const globalSite = this.selectedSite();
     let list = this.assets().map(asset => {
@@ -1898,9 +2463,7 @@ export class App implements AfterViewInit, OnDestroy {
       return asset;
     });
     
-    if (globalSite !== 'All Sites') {
-      list = list.filter(asset => asset.site === globalSite);
-    }
+    list = list.filter(asset => this.siteMatchesFilter(asset.site));
 
     // Set first matched asset as selected if current selection is not in filtered list
     const op = this.activeOperation();
@@ -1910,10 +2473,13 @@ export class App implements AfterViewInit, OnDestroy {
         asset.name.toLowerCase().includes(q) ||
         asset.rfidTag.toLowerCase().includes(q) ||
         asset.gpsId.toLowerCase().includes(q) ||
+        (asset.category && asset.category.toLowerCase().includes(q)) ||
         (asset.custodian && asset.custodian.toLowerCase().includes(q));
       
       if (!matchesSearch) return false;
       
+      if (categoryFilter !== 'All Categories' && asset.category !== categoryFilter) return false;
+
       if (siteFilter !== 'All Assets') {
         if (siteFilter === 'Warehouse' && !asset.site?.includes('DC') && !asset.site?.includes('Warehouse')) return false;
         if (siteFilter === 'Manufacturing' && !asset.site?.includes('Plant')) return false;
@@ -2274,15 +2840,25 @@ export class App implements AfterViewInit, OnDestroy {
     const list = this.parsedAssets();
     if (list.length === 0) return;
 
+    const currentUser = this.authService.currentUser();
+    const currentSiteName = this.selectedSite();
+
+    // Resolve current active site Guid for Devam / active organization fallback
+    let defaultSiteObj = this.apiSites().find(s => s.name.toLowerCase() === currentSiteName.toLowerCase());
+    if (!defaultSiteObj && currentUser?.siteId) {
+      defaultSiteObj = this.apiSites().find(s => s.id?.toLowerCase() === currentUser.siteId.toLowerCase());
+    }
+    const defaultSiteId = defaultSiteObj ? defaultSiteObj.id : (currentUser?.siteId || 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91');
+
     // Map fields to CreateAssetCommand matching the backend Command schema
     const commands = list.map(a => {
       // Find category Guid
       const matchedCat = this.apiCategories().find(c => c.name.toLowerCase() === a.category.toLowerCase());
       const catId = matchedCat ? matchedCat.id : 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d'; // fallback to Returnable Container id
 
-      // Find site Guid
-      const matchedSite = this.apiSites().find(s => s.name.toLowerCase() === a.site.toLowerCase());
-      const siteId = matchedSite ? matchedSite.id : 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91'; // fallback to Pune DC id
+      // Find site Guid matching uploaded row, or default to current user / organization siteId (Devam Site)
+      const matchedSite = a.site && a.site !== '-' ? this.apiSites().find(s => s.name.toLowerCase() === a.site.toLowerCase()) : null;
+      const siteId = matchedSite ? matchedSite.id : defaultSiteId;
 
       // Find zone Guid
       const matchedZone = this.apiZones().find(z => z.name.toLowerCase() === a.zone.toLowerCase());
@@ -2325,7 +2901,23 @@ export class App implements AfterViewInit, OnDestroy {
     // Call API Bulk Create endpoint
     this.http.post(`${environment.apiUrl}/assets/bulk`, commands).subscribe({
       next: (res: any) => {
-        alert(`Successfully imported ${res.count} assets into the database!`);
+        // Automatically sync any provided RFID EPC tags or GPS IMEIs to backend pool
+        list.forEach(a => {
+          if (a.rfidTag && a.rfidTag !== '-' && a.rfidTag.trim().length > 0) {
+            this.http.post(`${environment.apiUrl}/rfidtags`, {
+              epcCode: a.rfidTag.trim(),
+              assetId: null
+            }).subscribe({ error: () => {} });
+          }
+          if (a.gpsId && a.gpsId !== '-' && a.gpsId.trim().length > 0) {
+            this.http.post(`${environment.apiUrl}/gpsdevices`, {
+              imei: a.gpsId.trim(),
+              assetId: null
+            }).subscribe({ error: () => {} });
+          }
+        });
+
+        alert(`Successfully imported ${res.count || list.length} assets into PostgreSQL database for ${currentSiteName}! They are now live and synced for the Android application.`);
         this.isBulkFileUploaded.set(false);
         this.parsedAssets.set([]);
         this.fetchAssets(); // Refresh asset master grid and dashboard counts
@@ -2498,6 +3090,20 @@ export class App implements AfterViewInit, OnDestroy {
     return list;
   });
 
+  protected readonly groupSearchQuery = signal<string>('');
+
+  protected readonly filteredAssetGroupsList = computed(() => {
+    const q = this.groupSearchQuery().toLowerCase().trim();
+    const list = this.assetGroupsList();
+    if (!q) return list;
+    return list.filter(g =>
+      g.id.toLowerCase().includes(q) ||
+      g.name.toLowerCase().includes(q) ||
+      g.category.toLowerCase().includes(q) ||
+      g.custodian.toLowerCase().includes(q)
+    );
+  });
+
   protected readonly availableGroupsForSelectedCategory = computed(() => {
     const catId = this.formCategory();
     const matchedCat = this.apiCategories().find(c => c.id && catId && c.id.toLowerCase() === catId.toLowerCase());
@@ -2611,7 +3217,62 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly allEvents = signal<EventItem[]>([]);
 
   // UI state derived computed properties
-  protected currentStats = signal<SiteStats>(this.siteData['Pune DC']);
+  protected readonly currentStats = computed((): SiteStats => {
+    const siteAssets = this.siteFilteredAssets();
+    const totalS = siteAssets.length;
+    const inUseS = siteAssets.filter(a => a.status === 'In Use' || a.status === 'Assigned').length;
+    const availableS = siteAssets.filter(a => a.status === 'Available').length;
+    const maintS = siteAssets.filter(a => a.status === 'Under Maintenance' || a.status === 'Maintenance').length;
+    const checkedOutS = siteAssets.filter(a => a.status === 'Checked Out').length;
+    const activeS = inUseS + availableS + maintS;
+    const activePctS = totalS > 0 ? ((activeS / totalS) * 100).toFixed(1) + '%' : '0%';
+    const inUsePctS = totalS > 0 ? ((inUseS / totalS) * 100).toFixed(1) + '%' : '0%';
+    const maintPctS = totalS > 0 ? ((maintS / totalS) * 100).toFixed(1) + '%' : '0%';
+
+    const computeStatusCategory = (assetList: Asset[]) => [
+      assetList.filter(a => a.status === 'In Use' || a.status === 'Assigned').length,
+      assetList.filter(a => a.status === 'Available').length,
+      assetList.filter(a => a.status === 'Under Maintenance' || a.status === 'Maintenance').length,
+      assetList.filter(a => a.status === 'Checked Out').length,
+      assetList.filter(a => a.status === 'Retired' || a.status === 'Disposed').length
+    ];
+
+    const computeTopCategories = (assetList: Asset[]) => [
+      assetList.filter(a => (a.category || '').toLowerCase().includes('container') || (a.category || '').toLowerCase().includes('returnable')).length,
+      assetList.filter(a => (a.category || '').toLowerCase().includes('material') || (a.category || '').toLowerCase().includes('handling')).length,
+      assetList.filter(a => (a.category || '').toLowerCase().includes('power') || (a.category || '').toLowerCase().includes('tool') || (a.category || '').toLowerCase().includes('equipment')).length,
+      assetList.filter(a => (a.category || '').toLowerCase().includes('it') || (a.category || '').toLowerCase().includes('digital')).length,
+      assetList.filter(a => (a.category || '').toLowerCase().includes('vehicle') || (a.category || '').toLowerCase().includes('truck')).length,
+      assetList.filter(a => (a.category || '').toLowerCase().includes('consumable') || (a.category || '').toLowerCase().includes('raw') || (a.category || '').toLowerCase().includes('other') || (a.category || '').toLowerCase().includes('medical')).length
+    ];
+
+    const currentUtilPctS = totalS > 0 ? Math.round((inUseS / totalS) * 100) : 0;
+    const siteName = this.selectedSite();
+    const existing = this.siteData[siteName] || this.siteData['Pune DC'];
+
+    return {
+      ...existing,
+      totalAssets: totalS,
+      activeAssets: activeS,
+      activePct: activePctS,
+      assetsInUse: inUseS,
+      inUsePct: inUsePctS,
+      checkedOut: checkedOutS,
+      underMaintenance: maintS,
+      maintenancePct: maintPctS,
+      statusCategory: computeStatusCategory(siteAssets),
+      topCategories: computeTopCategories(siteAssets),
+      utilizationOverTime: [
+        Math.max(0, currentUtilPctS - 12),
+        Math.max(0, currentUtilPctS - 8),
+        Math.max(0, currentUtilPctS - 5),
+        Math.max(0, currentUtilPctS - 3),
+        Math.max(0, currentUtilPctS - 1),
+        currentUtilPctS,
+        currentUtilPctS
+      ]
+    };
+  });
 
   // Refs for Chart elements
   @ViewChild('utilizationSparklineCanvas') utilizationSparklineCanvas!: ElementRef<HTMLCanvasElement>;
@@ -2712,8 +3373,6 @@ export class App implements AfterViewInit, OnDestroy {
     effect(() => {
       const site = this.selectedSite();
       const op = this.activeOperation();
-      const newStats = this.siteData[site] || this.siteData['Pune DC'];
-      this.currentStats.set(newStats);
       
       // Update charts on site or operation change (if already initialized in browser)
       if (isPlatformBrowser(this.platformId) && Object.keys(this.charts).length > 0) {
@@ -2777,17 +3436,35 @@ export class App implements AfterViewInit, OnDestroy {
           else if (item.status === 'Retired') status = 'Retired';
 
           // Resolve tags from linked pools
-          const linkedRfid = rfidPool.find(t => t.assetId === item.id);
-          const linkedBarcode = bcPool.find(b => b.assetId === item.id);
-          const linkedGps = gpsPool.find(g => g.assetId === item.id);
+          const linkedRfid = rfidPool.find(t => {
+            const tAssetId = (t.assetId || t.AssetId || '').toString().trim().toLowerCase();
+            const itemId = (item.id || '').toString().trim().toLowerCase();
+            const tEpc = (t.epcCode || t.EpcCode || '').toString().trim().toLowerCase();
+            const itemNum = (item.assetNumber || '').toString().trim().toLowerCase();
+            return (tAssetId && itemId && tAssetId === itemId) || (tEpc && itemNum && tEpc === itemNum);
+          });
+          const linkedBarcode = bcPool.find(b => {
+            const bAssetId = (b.assetId || b.AssetId || '').toString().trim().toLowerCase();
+            const itemId = (item.id || '').toString().trim().toLowerCase();
+            return bAssetId && itemId && bAssetId === itemId;
+          });
+          const linkedGps = gpsPool.find(g => {
+            const gAssetId = (g.assetId || g.AssetId || '').toString().trim().toLowerCase();
+            const itemId = (item.id || '').toString().trim().toLowerCase();
+            return gAssetId && itemId && gAssetId === itemId;
+          });
+
+          const resolvedRfidTag = linkedRfid
+            ? (linkedRfid.epcCode || linkedRfid.EpcCode)
+            : (item.rfidTag || item.epcCode || item.rfidTagEpc || '—');
 
           return {
             id: item.id,
             assetNumber: item.assetNumber || item.id,
             name: item.name,
-            rfidTag: linkedRfid ? linkedRfid.epcCode : '—',
-            qrCode: linkedBarcode ? linkedBarcode.barcodeValue : (item.qrCode || '—'),
-            gpsId: linkedGps ? linkedGps.imei : '—',
+            rfidTag: resolvedRfidTag,
+            qrCode: linkedBarcode ? (linkedBarcode.barcodeValue || linkedBarcode.BarcodeValue) : (item.qrCode || '—'),
+            gpsId: linkedGps ? (linkedGps.imei || linkedGps.Imei) : (item.gpsId || '—'),
             serialNumber: item.serialNumber || '—',
             category: category,
             group: item.group || '—',
@@ -2832,16 +3509,34 @@ export class App implements AfterViewInit, OnDestroy {
             vendorName: '—',
             vendorPhone: '—',
             vendorEmail: '—',
+            image: item.image || item.Image || undefined,
             serviceHistory: []
           };
         });
 
-        this.assets.set(mapped);
+        // ── Org-level isolation: Devam users only see assets from their sites ──
+        const currentUser = this.authService.currentUser();
+        const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
+        let filteredMapped = mapped;
+        if (userEmail.includes('devam')) {
+          const allowedSiteIds = new Set(this.apiSites().map((s: any) => s.id?.toLowerCase()));
+          filteredMapped = mapped.filter(a => {
+            // If asset has no siteId it's unassigned, keep it only if there's no restriction
+            if (!a.id) return false;
+            // Try matching via the raw item's siteId stored in the mapped object
+            const rawItem = data.find((d: any) => d.id === a.id);
+            if (!rawItem) return false;
+            const assetSiteId = (rawItem.siteId || '').toLowerCase();
+            if (!assetSiteId) return false;
+            return allowedSiteIds.has(assetSiteId);
+          });
+        }
+
+        this.assets.set(filteredMapped);
         this.fetchScanEvents();
         this.fetchRealEvents();
         this.fetchInventoryScans();
-        this.fetchTags();
-        const allAssets = mapped;
+        const allAssets = filteredMapped;
 
         const computeStatusCategory = (assetList: Asset[]) => [
           assetList.filter(a => a.status === 'In Use' || a.status === 'Assigned').length,
@@ -2921,7 +3616,10 @@ export class App implements AfterViewInit, OnDestroy {
           ]
         };
 
-        const sites = ['Pune DC', 'Mumbai Warehouse', 'Chennai Plant', 'Bengaluru Hub'];
+        // Build per-site data for all known sites (including dynamic Devam sites)
+        const staticSites = ['Pune DC', 'Mumbai Warehouse', 'Chennai Plant', 'Bengaluru Hub'];
+        const dynamicSiteNames = this.apiSites().map((s: any) => s.name).filter((n: string) => !staticSites.includes(n));
+        const sites = [...staticSites, ...dynamicSiteNames];
         sites.forEach(siteName => {
           const siteAssets = allAssets.filter(a => a.site === siteName);
           const totalS = siteAssets.length;
@@ -2987,7 +3685,6 @@ export class App implements AfterViewInit, OnDestroy {
 
         const selected = this.selectedSite();
         if (this.siteData[selected]) {
-          this.currentStats.set({ ...this.siteData[selected] });
           if (isPlatformBrowser(this.platformId) && Object.keys(this.charts).length > 0) {
             this.buildCharts();
           }
@@ -3645,20 +4342,30 @@ export class App implements AfterViewInit, OnDestroy {
           const deduplicatedList = Array.from(uniqueMap.values());
 
           this.scanEventsList.set(deduplicatedList.map((e: any, index: number) => {
-            const epcClean = (e.epcCode || '').trim().toLowerCase();
+            const epcClean = (e.epcCode || e.epc || '').trim().toLowerCase();
             const asset = this.assets().find(a => 
               (a.rfidTag || '').trim().toLowerCase() === epcClean || 
               (a.assetNumber || '').trim().toLowerCase() === epcClean
             );
+
+            const rawAnt = e.antennaIndex || e.antennaPort || e.antennaId || e.antenna || e.antennaNo || 1;
+            let antNum = 1;
+            if (rawAnt) {
+              const parsed = parseInt(String(rawAnt).replace(/[^0-9]/g, ''), 10);
+              if (!isNaN(parsed) && parsed > 0) antNum = parsed;
+            }
+            const antennaStr = 'A' + antNum;
+            const directionStr = (antNum === 1 || antNum === 2 || e.direction === 'OUT' || e.direction === 'EXIT') ? 'OUT' : 'IN';
+
             return {
               index: index + 1,
-              epc: e.epcCode,
+              epc: e.epcCode || e.epc,
               assetId: asset ? asset.assetNumber : 'UNKNOWN TAG',
               assetName: asset ? asset.name : 'Unknown Asset',
-              time: new Date(e.timestamp).toLocaleTimeString(),
-              antenna: 'A' + e.antennaIndex,
-              rssi: e.rssi + ' dBm',
-              direction: 'IN',
+              time: e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : 'Just now',
+              antenna: antennaStr,
+              rssi: (e.rssi !== undefined ? e.rssi : -50) + ' dBm',
+              direction: directionStr,
               status: e.status === 'Processed' ? 'Matched' : (e.status || 'Matched'),
               source: e.handheldDeviceName ? 'Scan from Handheld' : 'Scanned through Fixed Reader',
               location: asset && asset.currentLocation ? `${asset.currentLocation} (${asset.site || '—'})` : '—'
@@ -3728,9 +4435,11 @@ export class App implements AfterViewInit, OnDestroy {
         });
       }
 
+      const scannedAssetIds = new Set<string>();
+
       if (Array.isArray(scans) && scans.length > 0) {
         scans.forEach((e: any) => {
-          const asset = this.assets().find(a => a.rfidTag === e.epcCode || a.assetNumber === e.epcCode);
+          const asset = this.assets().find(a => a.rfidTag === e.epcCode || a.assetNumber === e.epcCode || a.id === e.assetId);
           const dt = new Date(e.timestamp || Date.now());
           const timeStr = dt.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + dt.toLocaleTimeString('en-US', { hour12: true });
           
@@ -3738,6 +4447,13 @@ export class App implements AfterViewInit, OnDestroy {
           if (e.readerId && readerSiteMap.has(e.readerId.toLowerCase())) {
             siteName = readerSiteMap.get(e.readerId.toLowerCase())!;
           }
+
+          if (e.epcCode) scannedAssetIds.add(e.epcCode.toLowerCase());
+          if (e.assetId) scannedAssetIds.add(e.assetId.toLowerCase());
+          if (asset?.assetNumber) scannedAssetIds.add(asset.assetNumber.toLowerCase());
+          if (asset?.id) scannedAssetIds.add(asset.id.toLowerCase());
+          if (asset?.rfidTag) scannedAssetIds.add(asset.rfidTag.toLowerCase());
+          if (asset?.name) scannedAssetIds.add(asset.name.toLowerCase());
 
           rawEvents.push({
             timestamp: dt,
@@ -3749,7 +4465,7 @@ export class App implements AfterViewInit, OnDestroy {
               assetName: asset ? asset.name : 'Scanned RFID Tag',
               category: asset ? asset.category : 'Returnable Container',
               location: siteName + ' - ' + (e.readerName || e.handheldDeviceName || 'Gate Reader'),
-              details: `Antenna: A${e.antennaIndex || 1}, RSSI: ${e.rssi || -55} dBm, Status: ${e.status || 'Active'}`,
+              details: `Antenna: A${e.antennaIndex || e.antennaPort || e.antennaId || 1}, RSSI: ${e.rssi || -55} dBm, Status: ${e.status || 'Active'}`,
               source: e.handheldDeviceName ? 'Scan from Handheld' : 'Scanned through Fixed Reader',
               operator: e.handheldDeviceName || 'System'
             }
@@ -3757,23 +4473,45 @@ export class App implements AfterViewInit, OnDestroy {
         });
       }
 
-      // Also map Check-In / Check-Out records into rawEvents so Dashboard is always filled with real events
+      // Also map Check-In / Check-Out records into rawEvents, skipping assets that already have a live RFID scan event
       const allCheckRecords = [...this.checkoutRecords(), ...this.checkinRecords()];
       allCheckRecords.forEach((c: any) => {
+        const raw = c.raw || {};
+        const idsToCheck = [
+          c.epc,
+          c.equipment,
+          c.assetNumber,
+          c.assetId,
+          c.tagEpc,
+          c.id,
+          raw.assetId,
+          raw.assetNumber,
+          raw.asset?.assetNumber,
+          raw.asset?.rfidTag,
+          raw.asset?.id,
+          raw.asset?.name
+        ].filter(Boolean).map((x: string) => x.toString().toLowerCase());
+
+        if (idsToCheck.some(id => scannedAssetIds.has(id))) {
+          return; // Skip duplicate record for the same asset!
+        }
         const dt = new Date(c.time || Date.now());
+        const isHandheld = c.type === 'Handheld Reader' || (c.entity && c.entity.toLowerCase().includes('handheld'));
+        const displayAssetId = raw.assetNumber || raw.asset?.assetNumber || c.assetNumber || c.assetId || c.epc || c.id;
+        const displayAssetName = c.equipment || raw.assetName || raw.asset?.name || 'Tracked Asset';
         rawEvents.push({
           timestamp: dt,
           item: {
             id: c.id || c.tagEpc,
             time: c.time || dt.toLocaleString(),
             type: c.scanType || 'RFID Read',
-            assetId: c.assetNumber || c.assetId || c.tagEpc,
-            assetName: c.assetName || 'Tracked Asset',
-            category: c.category || 'Asset Movement',
-            location: (c.site || 'Pune DC') + ' - ' + (c.gateName || 'Dispatch Gate'),
+            assetId: displayAssetId,
+            assetName: displayAssetName,
+            category: c.category || raw.asset?.category || 'Asset Movement',
+            location: (c.site || 'Pune DC') + ' - ' + (isHandheld ? 'C72 Handheld Reader' : (c.gateName || 'Dispatch Gate')),
             details: `Purpose: ${c.purpose || 'CheckOut'}, Status: ${c.status || 'Active'}`,
-            source: c.readerType || 'Fixed Reader Gate',
-            operator: c.driverName || c.custodian || 'Gate Operator'
+            source: isHandheld ? 'Scan from Handheld' : (c.readerType || 'Fixed Reader Gate'),
+            operator: isHandheld ? 'C72 Handheld Reader' : (c.driverName || c.custodian || 'Gate Operator')
           }
         });
       });
@@ -4003,7 +4741,6 @@ export class App implements AfterViewInit, OnDestroy {
 
           const selected = this.selectedSite();
           if (this.siteData[selected]) {
-            this.currentStats.set({ ...this.siteData[selected] });
             if (isPlatformBrowser(this.platformId) && Object.keys(this.charts).length > 0) {
               this.destroyCharts();
               this.buildCharts();
@@ -4069,14 +4806,42 @@ export class App implements AfterViewInit, OnDestroy {
         
         const currentUser = this.authService.currentUser();
         const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
+        const userSiteId = currentUser?.siteId;
+        const userSiteName = currentUser?.siteName;
+
         if (userEmail.includes('devam')) {
-          const devamSiteName = currentUser?.siteName && currentUser.siteName !== 'Global / All Sites' ? currentUser.siteName : 'Devam Site';
-          if (!sites.some((s: any) => s.name === devamSiteName)) {
-            sites = [...sites, { id: 'devam-site-id', name: devamSiteName, location: 'Devam Logistics Site' }];
-          }
+          const filtered = sites.filter((s: any) => {
+            const name = (s.name || '').toLowerCase();
+            const code = (s.code || '').toLowerCase();
+            if (userSiteId && s.id === userSiteId) return true;
+            if (userSiteName && userSiteName !== 'Global / All Sites' && name.includes(userSiteName.toLowerCase())) return true;
+            if (name.includes('devam') || code.includes('devam') || name.includes('central store')) return true;
+            return false;
+          });
+
+          sites = filtered.length > 0 ? filtered : [{
+            id: userSiteId || 'devam-site-id',
+            code: 'SITE-DEVAM-01',
+            name: (userSiteName && userSiteName !== 'Global / All Sites') ? userSiteName : 'Devam Central Store Site Alpha',
+            address: 'Devam Logistics Central Depot, Pune'
+          }];
+
+          // Keep selectedSite as 'All Sites' so the user sees their scoped data by default.
+          // The allowedSiteNames computed ensures only Devam data is shown.
+          this.selectedSite.set('All Sites');
         }
 
         this.apiSites.set(sites);
+        const mapped = sites.map((s: any) => ({
+          id: s.id,
+          code: s.code || ('SITE-' + (s.id ? s.id.substring(0, 4).toUpperCase() : '001')),
+          name: s.name,
+          address: s.address || s.location || 'Construction Location'
+        }));
+        this.adminSites.set(mapped);
+
+        this.fetchWarehousesFromApi();
+
         sites.forEach(s => {
           if (s && s.name && !this.siteData[s.name]) {
             this.siteData[s.name] = {
@@ -4099,15 +4864,29 @@ export class App implements AfterViewInit, OnDestroy {
         });
       },
       error: (err) => {
-        console.error('Failed to load sites, using default sites fallback', err);
-        this.apiSites.set(defaultSites);
+        console.error('Failed to load sites', err);
       }
     });
 
     this.apiService.getWarehouses(1, 200).subscribe({
       next: (res) => {
         const data = res?.body || res;
-        if (Array.isArray(data)) this.apiWarehouses.set(data);
+        if (Array.isArray(data)) {
+          const currentUser = this.authService.currentUser();
+          const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
+          if (userEmail.includes('devam')) {
+            const allowedSiteIds = new Set(this.apiSites().map((s: any) => s.id));
+            const filteredWhs = data.filter((w: any) => 
+              allowedSiteIds.has(w.siteId) || 
+              (w.name && w.name.toLowerCase().includes('devam')) || 
+              (w.code && w.code.toLowerCase().includes('devam')) ||
+              (w.name && w.name.toLowerCase().includes('central store'))
+            );
+            this.apiWarehouses.set(filteredWhs);
+          } else {
+            this.apiWarehouses.set(data);
+          }
+        }
       },
       error: (err) => console.error('Failed to load warehouses', err)
     });
@@ -4251,6 +5030,10 @@ export class App implements AfterViewInit, OnDestroy {
 
               if (t.checkOut && Array.isArray(t.checkOut.table)) {
                 t.checkOut.table.forEach((co: any) => {
+                  const driverLower = (driverName || '').toLowerCase();
+                  const eqTypeLower = (co.equipmentType || '').toLowerCase();
+                  if (driverLower.includes('entry') || eqTypeLower.includes('checkin') || eqTypeLower.includes('entry')) return;
+
                   const dedupeKey = (co.equipmentId || co.tagName || co.equipment) + '_' + driverName;
                   if (addedCheckoutIds.has(co.equipmentId) || addedCheckoutIds.has(co.tagName) || addedCheckoutIds.has(dedupeKey)) return;
                   if (co.equipmentId) addedCheckoutIds.add(co.equipmentId);
@@ -4269,18 +5052,18 @@ export class App implements AfterViewInit, OnDestroy {
                                              (co.equipment && missingEquipmentIds.has(co.equipment.toLowerCase()));
 
                   let detectedStatus = co.detected || '-';
-                  if (!co.detected || co.detected === '' || co.detected === 'Active') {
-                    detectedStatus = wasReturned ? 'RETURNED' : (isMissingInCheckin ? 'MISSING' : '-');
-                  }
-
-                  let checkoutType = co.equipmentType || 'READER';
-                  if (checkoutType.toUpperCase().includes('HANDHELD') || checkoutType.toUpperCase().includes('OPERATOR')) {
-                    checkoutType = 'Handheld Reader';
-                  } else {
-                    checkoutType = 'READER';
+                  if (!co.detected || co.detected === '' || co.detected === 'Active' || co.detected === '-') {
+                    detectedStatus = wasReturned ? 'RETURNED' : (isMissingInCheckin ? 'MISSING' : 'RETURNED');
                   }
 
                   let entityName = co.operatorName || driverName;
+                  let checkoutType = 'Handheld Reader';
+                  if (entityName === 'EXIT' || driverName === 'EXIT' || eqTypeLower.includes('fixed') || eqTypeLower.includes('portal') || (co.operatorName && co.operatorName.toLowerCase() === 'exit')) {
+                    checkoutType = 'READER';
+                  } else {
+                    checkoutType = 'Handheld Reader';
+                  }
+
                   if (!entityName || entityName === 'Handheld RFID Reader' || entityName === 'Handheld Operator' || entityName === 'Standalone Handheld Operator' || entityName === 'Warehouse Exit/Entry Door') {
                     entityName = (checkoutType === 'Handheld Reader') ? 'Handheld Reader' : 'EXIT';
                   }
@@ -4307,8 +5090,7 @@ export class App implements AfterViewInit, OnDestroy {
                   if (addedCheckinIds.has(ci.equipmentId) || addedCheckinIds.has(ci.tagName) || addedCheckinIds.has(dedupeKey)) return;
 
                   // Only include in checkin panel if actually returned or missing case
-                  const isRealReturn = ci.gateStatus === 'RETURNED' || ci.gateStatus === 'Matched' || ci.gateStatus === 'COMPLETED' || ci.gateStatus === 'Missing';
-                  if (!isRealReturn) return;
+                  const isRealReturn = true;
 
                   if (ci.equipmentId) addedCheckinIds.add(ci.equipmentId);
                   if (ci.tagName) addedCheckinIds.add(ci.tagName);
@@ -4324,9 +5106,9 @@ export class App implements AfterViewInit, OnDestroy {
                     id: ci.equipmentId || ci.tagName,
                     entity: ciEntity,
                     equipment: ci.equipment,
-                    type: 'READER',
+                    type: (ciEntity === 'ENTRY') ? 'READER' : 'Handheld Reader',
                     epc: ci.tagName || (ci.equipmentId ? 'E200' + ci.equipmentId.substring(0, 8) : 'EPC-UNKNOWN'),
-                    gateStatus: ci.gateStatus === 'Matched' ? 'RETURNED' : (ci.gateStatus || 'RETURNED'),
+                    gateStatus: (ciEntity === 'ENTRY') ? '-' : (ci.gateStatus === 'Matched' ? 'RETURNED' : (ci.gateStatus || '-')),
                     checkinTime: dtStr,
                     site: 'Pune DC',
                     raw: { id: ci.equipmentId }
@@ -4341,6 +5123,24 @@ export class App implements AfterViewInit, OnDestroy {
             const missingAssetKeys = new Set<string>();
             const returnedAssetKeys = new Set<string>();
             const custodiansWithCheckins = new Set<string>();
+
+            // Calculate tag scan counts across list to distinguish 1st scan (-) vs 2nd+ scan (RETURNED)
+            const tagScanCountMap = new Map<string, number>();
+            list.forEach((a: any) => {
+              const keysToCount = [
+                a.assetId,
+                a.id,
+                a.assetNumber,
+                a.assetName,
+                a.asset?.name,
+                a.asset?.rfidTag
+              ].filter(Boolean).map((k: string) => k.toLowerCase().trim());
+
+              const uniqueKeys = new Set<string>(keysToCount);
+              uniqueKeys.forEach(epcKey => {
+                tagScanCountMap.set(epcKey, (tagScanCountMap.get(epcKey) || 0) + 1);
+              });
+            });
 
             list.forEach((a: any) => {
               const isRet = a.actualReturnDate != null || a.status === 'Returned' || a.status === 'Completed';
@@ -4380,29 +5180,32 @@ export class App implements AfterViewInit, OnDestroy {
                 a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93' ? 'Chennai Plant' : 'Bengaluru Hub'
               ) : 'Pune DC';
 
-              let isEntryScan = a.purpose === 'Fixed Reader Entry' || a.notes?.toLowerCase().includes('antenna 4') || a.notes?.toLowerCase().includes('antenna 3') || a.notes?.toLowerCase().includes('fixed entry');
-              let isExitScan = a.purpose === 'Fixed Reader Exit' || a.purpose === 'READER' || a.notes?.toLowerCase().includes('antenna 1') || a.notes?.toLowerCase().includes('antenna 2') || a.notes?.toLowerCase().includes('fixed exit');
-              let isHandheldScan = a.purpose === 'Handheld Reader' || a.purpose === 'Handheld Checkout' || a.purpose === 'INDIVIDUAL_CHECKOUT' || a.purpose === 'HandheldScan' || (a.notes && a.notes.toLowerCase().includes('handheld'));
+              const rawCust = (a.custodianName || a.assignedToUsername || a.assignedToName || '').trim();
+              const rawCustLower = rawCust.toLowerCase();
+              const purposeLower = (a.purpose || '').toLowerCase();
+              const notesLower = (a.notes || '').toLowerCase();
+
+              const isEntryScan = purposeLower.includes('entry') || rawCustLower === 'entry' || notesLower.includes('antenna 4') || notesLower.includes('antenna 3') || notesLower.includes('fixed entry') || notesLower.includes('checkin');
+              const isExitScan = purposeLower.includes('exit') || rawCustLower === 'exit' || notesLower.includes('antenna 1') || notesLower.includes('antenna 2') || notesLower.includes('fixed exit') || notesLower.includes('checkout');
+              const isHandheldScan = purposeLower.includes('handheld') || purposeLower.includes('individual') || notesLower.includes('handheld') || (!isEntryScan && !isExitScan && rawCustLower !== 'exit' && rawCustLower !== 'entry' && rawCustLower !== 'warehouse exit/entry door');
 
               // Prefer actual custodian / individual / driver name
-              let rawEntity = a.custodianName || a.assignedToUsername || a.assignedToName || '';
-              if (!rawEntity || rawEntity === 'Standalone Handheld Operator' || rawEntity === 'Handheld Operator' || rawEntity === 'Handheld RFID Reader' || rawEntity === 'Individual Custodian') {
-                if (isExitScan || isEntryScan) {
+              let rawEntity = rawCust;
+              if (!rawEntity || rawCustLower === 'standalone handheld operator' || rawCustLower === 'handheld operator' || rawCustLower === 'handheld rfid reader' || rawCustLower === 'individual custodian') {
+                if (isExitScan) {
                   rawEntity = 'EXIT';
+                } else if (isEntryScan) {
+                  rawEntity = 'ENTRY';
                 } else {
                   rawEntity = 'Handheld Reader';
                 }
               }
 
               let formattedType = 'Handheld Reader';
-              if (isExitScan) {
+              if (isExitScan || isEntryScan || (rawCustLower === 'exit' || rawCustLower === 'entry') || (purposeLower === 'reader' && (rawCustLower === 'exit' || rawCustLower === 'entry'))) {
                 formattedType = 'READER';
-              } else if (isEntryScan) {
-                formattedType = 'READER';
-              } else if (isHandheldScan || (a.purpose && (a.purpose.includes('Handheld') || a.purpose.includes('INDIVIDUAL')))) {
+              } else {
                 formattedType = 'Handheld Reader';
-              } else if (a.purpose) {
-                formattedType = (a.purpose === 'RFID_CHECKOUT' || a.purpose === 'Fixed Reader Exit' || a.purpose === 'Fixed Reader Entry') ? 'READER' : a.purpose;
               }
 
               const epcVal = a.asset && a.asset.rfidTag ? a.asset.rfidTag : (a.assetNumber || 'AST-TRC-001245');
@@ -4421,27 +5224,40 @@ export class App implements AfterViewInit, OnDestroy {
               const isAssetReturned = itemKeys.some(k => returnedAssetKeys.has(k));
               const hasCustodianCheckedIn = custodiansWithCheckins.has(rawEntity.toLowerCase().trim());
 
+              let scanCount = 1;
+              for (const k of itemKeys) {
+                if (tagScanCountMap.has(k)) {
+                  scanCount = Math.max(scanCount, tagScanCountMap.get(k)!);
+                }
+              }
+
               let detectedVal = '-';
               let checkinGateStatus: string | null = null;
 
-              if (isCompleted) {
-                detectedVal = 'COMPLETED';
-                checkinGateStatus = 'COMPLETED';
-              } else if (isReturned || isAssetReturned) {
-                detectedVal = 'RETURNED';
-                checkinGateStatus = 'RETURNED';
+              if (formattedType === 'READER' || isExitScan || isEntryScan || rawEntity === 'EXIT' || rawEntity === 'ENTRY') {
+                // A fixed reader tag is ONLY considered checked out if an explicit check-out record exists for its EPC
+                const isTagCheckedOut = checkouts.some((c: any) => c.epc && epcVal && c.epc.toLowerCase() === epcVal.toLowerCase());
+                const fixedStatus = isTagCheckedOut ? 'RETURNED' : '-';
+
+                if (isEntryScan || rawEntity === 'ENTRY') {
+                  checkinGateStatus = fixedStatus;
+                  detectedVal = '-';
+                } else if (isExitScan || rawEntity === 'EXIT') {
+                  detectedVal = fixedStatus;
+                  checkinGateStatus = isTagCheckedOut ? 'RETURNED' : null;
+                } else {
+                  checkinGateStatus = fixedStatus;
+                  detectedVal = fixedStatus;
+                }
+              } else if (isReturned || isCompleted) {
+                checkinGateStatus = isCompleted ? 'COMPLETED' : 'RETURNED';
+                detectedVal = isCompleted ? 'COMPLETED' : 'RETURNED';
               } else if (isMissing || isAssetMissing || hasCustodianCheckedIn) {
-                // If custodian has performed a Check-In scan session, any un-returned asset is MISSING
-                detectedVal = 'MISSING';
                 checkinGateStatus = 'MISSING';
+                detectedVal = 'MISSING';
               } else {
-                // Initial Check-Out state before any Check-In scan session: Detected = "-", NOT in Check-In table
                 detectedVal = '-';
                 checkinGateStatus = null;
-              }
-
-              if (isEntryScan) {
-                checkinGateStatus = (isMissing || isAssetMissing) ? 'MISSING' : 'RETURNED';
               }
 
               const rawCheckinTimestamp = a.actualReturnDate || a.checkInDate || a.updatedOn || a.assignedDate || a.createdOn || a.timestamp;
@@ -4464,19 +5280,18 @@ export class App implements AfterViewInit, OnDestroy {
               };
 
               // ENTRY scans MUST NOT appear in Check-Out panel
-              if (!isEntryScan) {
-                const checkoutDedupeKey = (a.assetId || a.id || epcVal) + '_' + rawEntity;
+              if (!isEntryScan && !rawCustLower.includes('entry') && rawEntity !== 'ENTRY') {
+                const checkoutDedupeKey = (epcVal || a.assetId || a.id) + '_' + rawEntity;
                 const existingCheckout = checkouts.find(c => 
+                  (epcVal && c.epc && c.epc.toLowerCase() === epcVal.toLowerCase()) ||
                   (a.assetId && c.id === a.assetId) ||
-                  (a.id && c.id === a.id) ||
-                  (a.assetName && c.equipment && c.equipment.toLowerCase() === a.assetName.toLowerCase()) ||
-                  (a.asset && a.asset.name && c.equipment && c.equipment.toLowerCase() === a.asset.name.toLowerCase())
+                  (a.id && c.id === a.id)
                 );
 
                 if (existingCheckout) {
-                  if (rawEntity && rawEntity !== 'Warehouse Exit/Entry Door' && rawEntity !== 'EXIT' && rawEntity !== 'Handheld Reader') {
+                  existingCheckout.type = (rawEntity === 'EXIT' || isExitScan) ? 'READER' : 'Handheld Reader';
+                  if (rawEntity && rawEntity !== 'Warehouse Exit/Entry Door' && rawEntity !== 'Handheld Reader') {
                     existingCheckout.entity = rawEntity;
-                    existingCheckout.type = formattedType;
                   }
                   existingCheckout.detected = detectedVal;
                 } else if (!addedCheckoutIds.has(a.assetId) && !addedCheckoutIds.has(a.id) && !addedCheckoutIds.has(checkoutDedupeKey)) {
@@ -4489,15 +5304,13 @@ export class App implements AfterViewInit, OnDestroy {
 
               // Check-In panel: ONLY include if Returned, Missing, Completed, or Entry scan
               if (checkinGateStatus) {
-                const checkinDedupeKey = (a.assetId || a.id || epcVal) + '_checkin_' + rawEntity;
+                const checkinDedupeKey = (epcVal || a.assetId || a.id) + '_checkin_' + rawEntity;
                 
-                // If a checkin record for this asset already exists (e.g. from Fixed Reader entry scan under 'Warehouse Exit/Entry Door'),
-                // re-attribute its entity to rawEntity (e.g. 'new') and type to formattedType!
+                // Match existing checkin record strictly by unique EPC or ID
                 const existingCheckin = checkins.find(c => 
+                  (epcVal && c.epc && c.epc.toLowerCase() === epcVal.toLowerCase()) ||
                   (a.assetId && c.id === a.assetId) ||
-                  (a.id && c.id === a.id) ||
-                  (a.assetName && c.equipment && c.equipment.toLowerCase() === a.assetName.toLowerCase()) ||
-                  (a.asset && a.asset.name && c.equipment && c.equipment.toLowerCase() === a.asset.name.toLowerCase())
+                  (a.id && c.id === a.id)
                 );
 
                 let checkinEntity = rawEntity;
@@ -4529,8 +5342,61 @@ export class App implements AfterViewInit, OnDestroy {
             });
           }
 
+          // Enforce READER type and RETURNED status for all EXIT entity Check-Out items
+          checkouts.forEach((c: any) => {
+            if (c.entity === 'EXIT' || (c.raw && c.raw.purpose && c.raw.purpose.toLowerCase().includes('fixed')) || (c.raw && c.raw.custodianName && c.raw.custodianName.toLowerCase() === 'exit')) {
+              c.type = 'READER';
+              if (!c.detected || c.detected === '-' || c.detected === 'Active') {
+                c.detected = 'RETURNED';
+              }
+            } else {
+              c.type = 'Handheld Reader';
+            }
+
+            // Cross-reference: If this specific tag (by non-empty EPC) has undergone a check-out, update its matching check-in gate status to RETURNED
+            if (c.epc && c.epc !== 'EPC-UNKNOWN' && c.epc !== '—') {
+              const matchIn = checkins.find((ci: any) => ci.epc && ci.epc.toLowerCase() === c.epc.toLowerCase());
+              if (matchIn && (c.entity === 'EXIT' || c.type === 'READER')) {
+                matchIn.gateStatus = 'RETURNED';
+              }
+            }
+          });
+
+          // Ensure checkins array contains ONLY real check-ins (returned assets or entry scans), excluding active check-outs
+          const filteredCheckins = checkins.filter((c: any) => {
+            if (!c) return false;
+            const rawCust = (c.raw?.custodianName || c.entity || '').toLowerCase();
+            const rawPurp = (c.raw?.purpose || '').toLowerCase();
+            const rawNotes = (c.raw?.notes || '').toLowerCase();
+            const rawStatus = (c.raw?.status || '').toLowerCase();
+
+            const isRet = (c.raw?.actualReturnDate != null && c.raw?.actualReturnDate !== '') || rawStatus === 'returned' || rawStatus === 'completed' || c.gateStatus === 'RETURNED' || c.gateStatus === 'COMPLETED' || c.gateStatus === 'Matched';
+            const isEntry = rawPurp.includes('entry') || rawCust.includes('entry') || rawNotes.includes('antenna 4') || c.entity === 'ENTRY';
+            const isMissing = rawStatus === 'missing' || c.gateStatus === 'MISSING';
+
+            // Filter out handheld checkout scans or active exit checkout scans!
+            if ((rawCust.includes('operator') || rawCust.includes('handheld') || rawPurp.includes('handheld') || c.type === 'Handheld Reader' || c.entity === 'Handheld Reader') && !isRet && !isEntry && !isMissing) {
+              return false;
+            }
+            if ((c.entity === 'EXIT' || rawCust === 'exit') && !isRet && !isEntry && !isMissing) {
+              return false;
+            }
+            if (c.gateStatus === '-' && !isEntry && !isRet) {
+              return false;
+            }
+            return isRet || isEntry || isMissing;
+          });
+
+          filteredCheckins.forEach((c: any) => {
+            if (c.entity === 'ENTRY' || (c.raw && c.raw.purpose && c.raw.purpose.toLowerCase().includes('fixed')) || (c.raw && c.raw.custodianName && c.raw.custodianName.toLowerCase() === 'entry')) {
+              c.type = 'READER';
+            } else {
+              c.type = 'Handheld Reader';
+            }
+          });
+
           this.checkoutRecords.set(checkouts);
-          this.checkinRecords.set(checkins);
+          this.checkinRecords.set(filteredCheckins);
         },
         error: (err) => {
           console.error('Failed to fetch assignments', err);
@@ -4548,8 +5414,10 @@ export class App implements AfterViewInit, OnDestroy {
       // Start periodic real event polling from database!
       this.startRealEventPolling();
 
-      // Start RFID scan session simulation!
-      // this.startScanSessionSimulation();
+      // If active view is GPS Tracking, initialize Leaflet map
+      if (this.activeNav() === 'GPS Tracking' || localStorage.getItem('activeNav') === 'GPS Tracking') {
+        setTimeout(() => this.initSatelliteMap(), 300);
+      }
     }
   }
 
@@ -4613,33 +5481,28 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected onSignOut() {
-    this.authService.logout().subscribe({
-      next: () => {
-        this.isLoggedIn.set(false);
-        this.loginUsername.set('');
-        this.loginPassword.set('');
-        if (isPlatformBrowser(this.platformId)) {
-          this.authService.clearStorage();
-          localStorage.removeItem('isLoggedIn');
-          localStorage.removeItem('activeNav');
-          localStorage.removeItem('activeSubNav');
-        }
-        this.stopAssignmentPolling();
-      },
-      error: () => {
-        this.authService.clearStorage();
-        this.isLoggedIn.set(false);
-        this.loginUsername.set('');
-        this.loginPassword.set('');
-        if (isPlatformBrowser(this.platformId)) {
-          localStorage.removeItem('isLoggedIn');
-          localStorage.removeItem('activeNav');
-          localStorage.removeItem('activeSubNav');
-        }
-        this.stopAssignmentPolling();
-      }
-    });
+    // 1. Immediately reset login signals and local storage for instant UI response
+    this.isLoggedIn.set(false);
+    this.loginUsername.set('');
+    this.loginPassword.set('');
+    this.stopAssignmentPolling();
+
+    if (isPlatformBrowser(this.platformId)) {
+      this.authService.clearStorage();
+      localStorage.clear();
+    }
+
+    // 2. Best-effort API call to inform backend
+    try {
+      this.authService.logout().subscribe({
+        next: () => {},
+        error: () => {}
+      });
+    } catch {
+      // Ignore network / auth errors on sign out
+    }
   }
+
 
   protected selectSite(site: string) {
     this.selectedSite.set(site);
@@ -4887,23 +5750,23 @@ export class App implements AfterViewInit, OnDestroy {
         // Prepend to event list (limit list to 15 items)
         this.allEvents.update(evs => [newEvent, ...evs.slice(0, 14)]);
         
-        // Bump site stats slightly
-        this.currentStats.update(s => {
-          let rfidCount = s.rfidReadsToday;
-          let gpsCount = s.gpsPingsToday;
-          let excCount = s.exceptionAlerts;
-          
-          if (type === 'RFID Read') rfidCount += 1;
-          else if (type === 'GPS Ping') gpsCount += 1;
-          else excCount += 1;
-          
-          return {
-            ...s,
-            rfidReadsToday: rfidCount,
-            gpsPingsToday: gpsCount,
-            exceptionAlerts: excCount
-          };
-        });
+        // Bump site stats slightly in siteData
+        const selSite = this.selectedSite();
+        const s = this.siteData[selSite] || this.siteData['Pune DC'];
+        let rfidCount = s.rfidReadsToday;
+        let gpsCount = s.gpsPingsToday;
+        let excCount = s.exceptionAlerts;
+        
+        if (type === 'RFID Read') rfidCount += 1;
+        else if (type === 'GPS Ping') gpsCount += 1;
+        else excCount += 1;
+        
+        this.siteData[selSite] = {
+          ...s,
+          rfidReadsToday: rfidCount,
+          gpsPingsToday: gpsCount,
+          exceptionAlerts: excCount
+        };
       }
     }, 6000);
   }
@@ -4911,11 +5774,30 @@ export class App implements AfterViewInit, OnDestroy {
   // Filtered Events computed helper
   protected get filteredEvents(): EventItem[] {
     const q = this.searchQuery().toLowerCase();
+    const site = this.selectedSite();
     const events = this.allEvents();
 
     if (!events || events.length === 0) return [];
     
     return events.filter(ev => {
+      // 1. Filter by Selected Site
+      if (site && site !== 'All Sites') {
+        const evLoc = (ev.location || '').toLowerCase();
+        const evSource = (ev.source || '').toLowerCase();
+        const siteLower = site.toLowerCase();
+        
+        const matchesSite = evLoc.includes(siteLower) || 
+                            evSource.includes(siteLower) || 
+                            (siteLower.includes('pune') && (evLoc.includes('pune') || evLoc.includes('zone') || evLoc.includes('gate'))) ||
+                            (siteLower.includes('chennai') && (evLoc.includes('chennai') || evLoc.includes('mfg') || evLoc.includes('plant'))) ||
+                            (siteLower.includes('mumbai') && (evLoc.includes('mumbai') || evLoc.includes('wh') || evLoc.includes('warehouse'))) ||
+                            (siteLower.includes('bengaluru') && (evLoc.includes('bengaluru') || evLoc.includes('hub'))) ||
+                            (siteLower.includes('delhi') && (evLoc.includes('delhi') || evLoc.includes('ncr'))) ||
+                            (siteLower.includes('hyderabad') && (evLoc.includes('hyderabad') || evLoc.includes('dc')));
+        if (!matchesSite) return false;
+      }
+
+      // 2. Filter by Search Query
       const matchesSearch = !q || 
         (ev.assetId && ev.assetId.toLowerCase().includes(q)) ||
         (ev.assetName && ev.assetName.toLowerCase().includes(q)) ||
@@ -4934,6 +5816,33 @@ export class App implements AfterViewInit, OnDestroy {
     const stats = this.currentStats();
     const isDark = this.currentTheme() === 'dark';
     
+    // If charts already exist, update dataset values smoothly without destroying canvas context
+    if (this.charts['statusByCategory']) {
+      try {
+        if (this.charts['statusByCategory']) {
+          this.charts['statusByCategory'].data.datasets[0].data = stats.statusCategory;
+          this.charts['statusByCategory'].update('none');
+        }
+        if (this.charts['utilizationOverTime']) {
+          this.charts['utilizationOverTime'].data.datasets[0].data = stats.utilizationOverTime;
+          this.charts['utilizationOverTime'].update('none');
+        }
+        if (this.charts['movementTrends']) {
+          this.charts['movementTrends'].data.datasets[0].data = stats.movementInbound;
+          this.charts['movementTrends'].data.datasets[1].data = stats.movementOutbound;
+          this.charts['movementTrends'].data.datasets[2].data = stats.movementUtilization;
+          this.charts['movementTrends'].update('none');
+        }
+        if (this.charts['topCategories']) {
+          this.charts['topCategories'].data.datasets[0].data = stats.topCategories;
+          this.charts['topCategories'].update('none');
+        }
+        return;
+      } catch (e) {
+        // Fallback to destroy and rebuild if update fails
+      }
+    }
+
     // Destroy existing charts to avoid "Canvas is already in use" errors
     Object.keys(this.charts).forEach(key => {
       if (this.charts[key]) {
@@ -6146,25 +7055,16 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   private getTileLayerConfig(layer: 'satellite' | 'hybrid' | 'street'): { url: string; attribution: string; maxZoom: number; subdomains?: string } {
-    if (layer === 'satellite') {
+    if (layer === 'satellite' || layer === 'hybrid') {
       return {
-        // Esri World Imagery (reliable, no CORS issues)
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
         maxZoom: 19
       };
-    } else if (layer === 'hybrid') {
-      return {
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
-        maxZoom: 19
-      };
     } else {
       return {
-        // CartoDB Voyager - very reliable, works globally, no CORS issues
-        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
+        url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19
       };
     }
@@ -6177,15 +7077,13 @@ export class App implements AfterViewInit, OnDestroy {
       maxZoom: config.maxZoom,
       subdomains: config.subdomains || 'abc'
     });
-    // Log tile errors for debugging
     tileLayer.on('tileerror', (err: any) => {
       console.warn('Tile load error:', err.tile?.src);
     });
     if (layer === 'hybrid') {
-      // Add CartoDB road label overlay on top of satellite for hybrid
       const roadOverlay = L.tileLayer(
         'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
-        { opacity: 0.7, maxZoom: 19, subdomains: 'abcd' }
+        { opacity: 0.85, maxZoom: 19, subdomains: 'abcd' }
       );
       const group = L.layerGroup([tileLayer, roadOverlay]);
       return group;
@@ -6206,15 +7104,22 @@ export class App implements AfterViewInit, OnDestroy {
     this.satelliteMap.setView([config.lat, config.lon], config.zoom, { animate: true, duration: 1.0 });
   }
 
-  private initSatelliteMap(retryCount = 0) {
-    if (typeof window === 'undefined' || !(window as any).L) return;
+  protected initSatelliteMap(retryCount = 0) {
+    if (typeof window === 'undefined') return;
+    
+    // If Leaflet JS CDN script is not loaded yet, retry up to 20 times
+    if (!(window as any).L) {
+      if (retryCount < 20) {
+        setTimeout(() => this.initSatelliteMap(retryCount + 1), 250);
+      }
+      return;
+    }
     const L = (window as any).L;
 
     // Check if the map container DOM element exists yet (Angular @if may not have rendered it)
     const mapContainer = document.getElementById('leaflet-satellite-map');
     if (!mapContainer) {
-      if (retryCount < 10) {
-        // Retry after 200ms if DOM isn't ready yet
+      if (retryCount < 20) {
         setTimeout(() => this.initSatelliteMap(retryCount + 1), 200);
       }
       return;
@@ -6261,25 +7166,18 @@ export class App implements AfterViewInit, OnDestroy {
     this.satelliteTileLayer = this.createTileLayer(L, this.gpsMapLayer());
     this.satelliteTileLayer.addTo(this.satelliteMap);
 
-    // Add zoom control at bottom-right
-    L.control.zoom({ position: 'bottomright' }).addTo(this.satelliteMap);
-
     // Add scale bar
     L.control.scale({ position: 'bottomleft', imperial: false }).addTo(this.satelliteMap);
 
     // Force Leaflet to recalculate container size immediately and after transitions
-    // This fixes the white/blank map issue when rendering inside @if blocks
     this.satelliteMap.invalidateSize(false);
-    setTimeout(() => {
-      if (this.satelliteMap) {
-        this.satelliteMap.invalidateSize(true);
-      }
-    }, 250);
-    setTimeout(() => {
-      if (this.satelliteMap) {
-        this.satelliteMap.invalidateSize(true);
-      }
-    }, 600);
+    [100, 300, 600, 1000].forEach(delay => {
+      setTimeout(() => {
+        if (this.satelliteMap) {
+          this.satelliteMap.invalidateSize(true);
+        }
+      }, delay);
+    });
 
     this.updateSatelliteMarkers();
   }
@@ -6407,13 +7305,16 @@ export class App implements AfterViewInit, OnDestroy {
       }
     }
 
-    // Draw trail polyline
+    // Draw route trail polyline
     if (this.satelliteTrailPolyline) {
       this.satelliteTrailPolyline.remove();
       this.satelliteTrailPolyline = null;
     }
 
-    const trailPoints = this.gpsAssetHistory();
+    const trailPoints = (this.isGpsPlaybackActive() && this.gpsPlaybackTrail.length > 0) 
+      ? this.gpsPlaybackTrail 
+      : this.gpsAssetHistory();
+
     if (trailPoints && trailPoints.length > 0) {
       const latLngs = trailPoints
         .map((pt: any) => {
@@ -6426,30 +7327,30 @@ export class App implements AfterViewInit, OnDestroy {
         .filter((pt: any): pt is [number, number] => pt !== null);
 
       if (latLngs.length > 0) {
-        // Draw route trail with thick visible polyline
+        // Draw bright glowing route trail with thick visible polyline
         this.satelliteTrailPolyline = L.polyline(latLngs, {
-          color: '#2563eb',
-          weight: 5,
-          opacity: 0.9,
+          color: '#3b82f6',
+          weight: 6,
+          opacity: 0.95,
           lineCap: 'round',
           lineJoin: 'round'
         }).addTo(this.satelliteMap);
 
-        // Start marker (first point)
+        // Start marker pin (first point)
         if (latLngs.length > 1) {
           const startIcon = L.divIcon({
-            html: `<div style="width:12px;height:12px;border-radius:50%;background:#10b981;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.4);"></div>`,
+            html: `<div style="width:14px;height:14px;border-radius:50%;background:#10b981;border:2.5px solid white;box-shadow:0 0 8px rgba(16,185,129,0.8);"></div>`,
             className: '',
-            iconSize: [12, 12],
-            iconAnchor: [6, 6]
+            iconSize: [14, 14],
+            iconAnchor: [7, 7]
           });
           L.marker(latLngs[0], { icon: startIcon, interactive: false }).addTo(this.satelliteMap);
         }
 
         // Fit map bounds to encompass the full GPS route
-        if (latLngs.length > 1) {
+        if (latLngs.length > 1 && this.isGpsPlaybackActive()) {
           try {
-            this.satelliteMap.fitBounds(this.satelliteTrailPolyline.getBounds(), { padding: [50, 50], maxZoom: 17 });
+            this.satelliteMap.fitBounds(this.satelliteTrailPolyline.getBounds(), { padding: [40, 40], maxZoom: 17 });
           } catch (e) {
             console.warn('fitBounds warning:', e);
           }
@@ -6656,6 +7557,9 @@ export class App implements AfterViewInit, OnDestroy {
     this.formUserPassword = '';
     this.formUserRole = 'Viewer';
     this.formUserSiteId = '';
+    this.formUserWarehouseId = '';
+    this.formUserSelectedSiteIds.set([]);
+    this.formUserSelectedWarehouseIds.set([]);
     this.formUserIsActive = true;
     this.isUserModalOpen.set(true);
   }
@@ -6667,6 +7571,9 @@ export class App implements AfterViewInit, OnDestroy {
     this.formUserEmail = user.email;
     this.formUserPassword = '';
     this.formUserSiteId = user.siteId || '';
+    this.formUserWarehouseId = user.warehouseId || '';
+    this.formUserSelectedSiteIds.set(user.selectedSiteIds || (user.siteId ? [user.siteId] : []));
+    this.formUserSelectedWarehouseIds.set(user.selectedWarehouseIds || (user.warehouseId ? [user.warehouseId] : []));
     if (user.roles && user.roles.length > 0) {
       this.formUserRole = user.roles[0];
     } else {
