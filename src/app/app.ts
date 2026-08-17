@@ -266,13 +266,16 @@ export class App implements AfterViewInit, OnDestroy {
           localStorage.setItem('isLoggedIn', 'true');
         }
 
-        // Auto-select first site set in token / profile
-        const userSites = this.allowedUserSites();
-        if (userSites && userSites.length > 0) {
-          const firstSite = userSites[0];
-          if (firstSite && firstSite.name) {
-            this.selectSite(firstSite.name, firstSite.id);
-            return;
+        // Auto-select first site set in token / profile if no site is saved
+        const savedSite = isPlatformBrowser(this.platformId) ? localStorage.getItem('selected_site_name') : null;
+        if (!savedSite) {
+          const userSites = this.allowedUserSites();
+          if (userSites && userSites.length > 0) {
+            const firstSite = userSites[0];
+            if (firstSite && firstSite.name) {
+              this.selectSite(firstSite.name, firstSite.id);
+              return;
+            }
           }
         }
         this.loadAllApiData();
@@ -552,8 +555,12 @@ export class App implements AfterViewInit, OnDestroy {
       .filter((item): item is typeof this.navItems[0] => item !== null && allowedNames.includes(item.name));
   });
 
-  protected readonly selectedSite = signal<string>('');
-  protected readonly selectedSiteId = signal<string | null>(null);
+  protected readonly selectedSite = signal<string>(
+    isPlatformBrowser(this.platformId) ? (localStorage.getItem('selected_site_name') || '') : ''
+  );
+  protected readonly selectedSiteId = signal<string | null>(
+    isPlatformBrowser(this.platformId) ? (localStorage.getItem('selected_site_id') || null) : null
+  );
   protected readonly selectedWarehouseId = signal<string | null>(null);
   protected readonly isSiteDropdownOpen = signal<boolean>(false);
 
@@ -574,6 +581,15 @@ export class App implements AfterViewInit, OnDestroy {
 
     this.selectedSiteId.set(resolvedSiteId || null);
     this.selectedWarehouseId.set(warehouseId || null);
+
+    if (isPlatformBrowser(this.platformId)) {
+      localStorage.setItem('selected_site_name', siteName);
+      if (resolvedSiteId) {
+        localStorage.setItem('selected_site_id', resolvedSiteId);
+      } else {
+        localStorage.removeItem('selected_site_id');
+      }
+    }
 
     // Call backend API /api/auth/switch-context to issue a NEW CONTEXT TOKEN for selected site/warehouse!
     this.authService.switchContext(resolvedSiteId, warehouseId).subscribe({
@@ -3459,9 +3475,13 @@ export class App implements AfterViewInit, OnDestroy {
       const sites = this.allowedUserSites();
       if (sites && sites.length > 0) {
         const current = this.selectedSite();
-        if (!current || current === 'All Sites') {
+        if (!current) {
           this.selectedSite.set(sites[0].name);
           this.selectedSiteId.set(sites[0].id);
+          if (isPlatformBrowser(this.platformId)) {
+            localStorage.setItem('selected_site_name', sites[0].name);
+            localStorage.setItem('selected_site_id', sites[0].id);
+          }
         }
       }
     });

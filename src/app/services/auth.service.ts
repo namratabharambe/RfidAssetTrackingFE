@@ -157,6 +157,8 @@ export class AuthService {
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('activeNav');
     localStorage.removeItem('activeSubNav');
+    localStorage.removeItem('selected_site_name');
+    localStorage.removeItem('selected_site_id');
     
     this.token.set(null);
     this.refreshToken.set(null);
