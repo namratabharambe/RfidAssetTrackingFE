@@ -3883,15 +3883,22 @@ export class App implements AfterViewInit, OnDestroy {
     this.formIndustry.set('');
     this.formBusinessUnit.set('');
     
-    // Pre-populate with currently selected global site
-    const currentSiteName = this.selectedSite();
-    const userSite = this.allowedUserSites().find((s: any) => s.name === currentSiteName);
-    const apiSite = this.apiSites().find((s: any) => s.name === currentSiteName);
-    const resolvedSiteGuid = userSite?.id || apiSite?.id || this.selectedSiteId() || '';
-    this.formSiteId.set(resolvedSiteGuid);
+    // Pre-populate with currently selected site/warehouse context
+    const currentName = this.selectedSite();
+    const activeWh = this.allowedUserWarehouses().find((w: any) => w.name === currentName || w.id === this.selectedWarehouseId());
+    
+    if (activeWh) {
+      this.formWarehouseId.set(activeWh.id);
+      this.formSiteId.set(activeWh.siteId || this.selectedSiteId() || '');
+    } else {
+      const userSite = this.allowedUserSites().find((s: any) => s.name === currentName);
+      const apiSite = this.apiSites().find((s: any) => s.name === currentName);
+      const resolvedSiteGuid = userSite?.id || apiSite?.id || this.selectedSiteId() || '';
+      this.formSiteId.set(resolvedSiteGuid);
+      this.formWarehouseId.set(this.selectedWarehouseId() || '');
+    }
 
     this.formZoneId.set('');
-    this.formWarehouseId.set('');
     this.formAssetType.set('Serialized');
     this.isModalOpen.set(true);
   }
