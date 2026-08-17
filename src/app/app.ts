@@ -367,23 +367,9 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   // Returns true if a record's site matches the current site filter.
+  // Returns true for all records; filtering is strictly performed by the backend API using JWT token claims.
   protected siteMatchesFilter(recordSite: string | null | undefined): boolean {
-    const sel = this.selectedSite();
-    if (!sel || sel === 'All Sites' || sel === 'All Devam Sites') {
-      const userSites = this.allowedUserSites();
-      if (userSites && userSites.length > 0 && userSites[0].name) {
-        const first = userSites[0].name.toLowerCase();
-        return (recordSite || '').toLowerCase().includes(first);
-      }
-      return true;
-    }
-
-    if (!recordSite || recordSite === '—') return true;
-
-    const selLower = sel.toLowerCase();
-    const recLower = recordSite.toLowerCase();
-
-    return recLower === selLower || recLower.includes(selLower) || selLower.includes(recLower);
+    return true;
   }
 
   // System Settings: Module Access Config Signals
@@ -3683,29 +3669,12 @@ export class App implements AfterViewInit, OnDestroy {
           };
         });
 
-        // ── Org-level isolation: Devam users only see assets from their sites ──
-        const currentUser = this.authService.currentUser();
-        const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
-        let filteredMapped = mapped;
-        if (userEmail.includes('devam')) {
-          const allowedSiteIds = new Set(this.apiSites().map((s: any) => s.id?.toLowerCase()));
-          filteredMapped = mapped.filter(a => {
-            // If asset has no siteId it's unassigned, keep it only if there's no restriction
-            if (!a.id) return false;
-            // Try matching via the raw item's siteId stored in the mapped object
-            const rawItem = data.find((d: any) => d.id === a.id);
-            if (!rawItem) return false;
-            const assetSiteId = (rawItem.siteId || '').toLowerCase();
-            if (!assetSiteId) return false;
-            return allowedSiteIds.has(assetSiteId);
-          });
-        }
-
-        this.assets.set(filteredMapped);
+        // Pure Backend Scoping: Set assets directly from API response filtered by JWT token claims
+        this.assets.set(mapped);
         this.fetchScanEvents();
         this.fetchRealEvents();
         this.fetchInventoryScans();
-        const allAssets = filteredMapped;
+        const allAssets = mapped;
 
         const computeStatusCategory = (assetList: Asset[]) => [
           assetList.filter(a => a.status === 'In Use' || a.status === 'Assigned').length,
