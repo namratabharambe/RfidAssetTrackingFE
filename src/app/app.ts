@@ -3907,8 +3907,10 @@ export class App implements AfterViewInit, OnDestroy {
     
     // Pre-populate with currently selected global site
     const currentSiteName = this.selectedSite();
-    const currentSite = this.apiSites().find(s => s.name === currentSiteName);
-    this.formSiteId.set(currentSite ? currentSite.id : '');
+    const userSite = this.allowedUserSites().find((s: any) => s.name === currentSiteName);
+    const apiSite = this.apiSites().find((s: any) => s.name === currentSiteName);
+    const resolvedSiteGuid = userSite?.id || apiSite?.id || this.selectedSiteId() || '';
+    this.formSiteId.set(resolvedSiteGuid);
 
     this.formZoneId.set('');
     this.formWarehouseId.set('');
