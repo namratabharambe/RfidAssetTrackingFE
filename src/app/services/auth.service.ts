@@ -20,6 +20,8 @@ export class AuthService {
   readonly sessionExpiredReason = signal<string>('Your session has expired. Please log in again to continue.');
   readonly isLoggedIn = signal<boolean>(!!this.token() && !this.isTokenExpired(this.token()));
 
+  readonly initialAllowedSites = signal<any[]>(JSON.parse(localStorage.getItem('initial_allowed_sites') || '[]'));
+
   constructor() {
     const currentToken = this.token();
     if (currentToken && this.isTokenExpired(currentToken)) {
@@ -63,6 +65,10 @@ export class AuthService {
         localStorage.setItem('jwt_token', res.token);
         localStorage.setItem('refresh_token', res.refreshToken);
         localStorage.setItem('current_user', JSON.stringify(res.user));
+        if (res.user?.allowedSites && Array.isArray(res.user.allowedSites)) {
+          localStorage.setItem('initial_allowed_sites', JSON.stringify(res.user.allowedSites));
+          this.initialAllowedSites.set(res.user.allowedSites);
+        }
         
         this.token.set(res.token);
         this.refreshToken.set(res.refreshToken);
@@ -124,12 +130,14 @@ export class AuthService {
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('current_user');
+    localStorage.removeItem('initial_allowed_sites');
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('activeNav');
     localStorage.removeItem('activeSubNav');
     
     this.token.set(null);
     this.refreshToken.set(null);
+    this.initialAllowedSites.set([]);
     this.currentUser.set(null);
     this.isLoggedIn.set(false);
   }
