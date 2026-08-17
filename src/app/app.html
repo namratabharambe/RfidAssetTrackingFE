@@ -352,8 +352,8 @@
               <span class="material-symbols-outlined check">check</span>
               }
             </li>
-            @for (site of apiSites(); track site.id) {
-            <li (click)="selectSite(site.name)" [class.selected]="selectedSite() === site.name">
+            @for (site of allowedUserSites(); track site.id) {
+            <li (click)="selectSite(site.name, site.id)" [class.selected]="selectedSite() === site.name">
               <span style="font-size: 1.1rem; margin-right: 6px; line-height: 1;">🇮🇳</span>
               {{ site.name }}
               @if (selectedSite() === site.name) {
@@ -361,12 +361,12 @@
               }
             </li>
             }
-            @if (apiWarehouses().length > 0) {
+            @if (allowedUserWarehouses().length > 0) {
             <li style="padding: 4px 12px; font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; border-top: 1px solid var(--border-color); margin-top: 4px; pointer-events: none; cursor: default; background: transparent;">
-              <span class="material-symbols-outlined" style="font-size: 0.85rem; vertical-align: middle; margin-right: 4px;">warehouse</span>Warehouses
+              <span class="material-symbols-outlined" style="font-size: 0.85rem; vertical-align: middle; margin-right: 4px;">warehouse</span>Assigned Warehouses
             </li>
-            @for (wh of apiWarehouses(); track wh.id) {
-            <li (click)="selectSite(wh.name)" [class.selected]="selectedSite() === wh.name"
+            @for (wh of allowedUserWarehouses(); track wh.id) {
+            <li (click)="selectSite(wh.name, wh.siteId, wh.id)" [class.selected]="selectedSite() === wh.name"
               style="padding-left: 1.5rem;">
               <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #2563eb;">warehouse</span>
               {{ wh.name }}

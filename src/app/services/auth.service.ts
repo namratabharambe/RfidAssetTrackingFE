@@ -101,6 +101,25 @@ export class AuthService {
     );
   }
 
+  switchContext(siteId?: string, warehouseId?: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/switch-context`, { siteId, warehouseId }).pipe(
+      tap(res => {
+        if (res.token) {
+          localStorage.setItem('jwt_token', res.token);
+          this.token.set(res.token);
+        }
+        if (res.refreshToken) {
+          localStorage.setItem('refresh_token', res.refreshToken);
+          this.refreshToken.set(res.refreshToken);
+        }
+        if (res.user) {
+          localStorage.setItem('current_user', JSON.stringify(res.user));
+          this.currentUser.set(res.user);
+        }
+      })
+    );
+  }
+
   clearStorage() {
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('refresh_token');
