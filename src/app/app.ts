@@ -296,42 +296,150 @@ export class App implements AfterViewInit, OnDestroy {
     return email.includes('devam');
   });
 
-  // Returns sites assigned to logged in user from claims/user profile
+  private getJwtClaims(): any {
+    const token = this.authService.token();
+    if (!token) return null;
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return null;
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  private deduplicateBy<T>(array: T[], key: keyof T): T[] {
+    const seen = new Set();
+    return array.filter(item => {
+      const val = (item[key] || '').toString().toLowerCase();
+      if (!val || seen.has(val)) return false;
+      seen.add(val);
+      return true;
+    });
+  }
+
+  // Returns sites assigned to logged in user from access token claims / user profile
   protected readonly allowedUserSites = computed(() => {
     const user = this.authService.currentUser();
-    if (!user) return this.apiSites();
+    const claims = this.getJwtClaims();
 
-    if (user.allowedSites && Array.isArray(user.allowedSites) && user.allowedSites.length > 0) {
-      return user.allowedSites;
+    // 1. Check user.allowedSites from login DTO response
+    if (user?.allowedSites && Array.isArray(user.allowedSites) && user.allowedSites.length > 0) {
+      const mapped = user.allowedSites.map((s: any) => ({
+        id: s.id || s.Id,
+        code: s.code || s.Code,
+        name: s.name || s.Name,
+        location: s.address || s.Address || s.location || s.Location
+      }));
+      return this.deduplicateBy(mapped, 'name');
     }
-    if (user.sites_json) {
+
+    // 2. Check JWT token sites_json claim
+    const sitesJsonStr = claims?.sites_json || user?.sites_json;
+    if (sitesJsonStr) {
       try {
-        const parsed = JSON.parse(user.sites_json);
+        const parsed = typeof sitesJsonStr === 'string' ? JSON.parse(sitesJsonStr) : sitesJsonStr;
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((s: any) => ({
+          const mapped = parsed.map((s: any) => ({
             id: s.Id || s.id,
             code: s.Code || s.code,
-            name: s.Name || s.name
+            name: s.Name || s.name,
+            location: s.Address || s.address
           }));
+          return this.deduplicateBy(mapped, 'name');
         }
       } catch (e) {}
     }
-    if (user.sites && Array.isArray(user.sites) && user.sites.length > 0) {
-      const siteGuids = user.sites.map((s: any) => typeof s === 'string' ? s : s.id || s.Id);
-      const matched = this.apiSites().filter((s: any) => siteGuids.includes(s.id));
-      if (matched.length > 0) return matched;
+
+    // 3. Check JWT token allowed_site_names / allowed_site_ids claims
+    const siteNames = claims?.allowed_site_names || user?.allowed_site_names;
+    if (siteNames) {
+      let namesArr: string[] = [];
+      if (Array.isArray(siteNames)) namesArr = siteNames;
+      else if (typeof siteNames === 'string') {
+        try { namesArr = JSON.parse(siteNames); } catch { namesArr = [siteNames]; }
+      }
+      if (namesArr.length > 0) {
+        const dbSites = this.apiSites();
+        const matched = dbSites.filter((s: any) => namesArr.includes(s.name) || namesArr.includes(s.id));
+        if (matched.length > 0) return this.deduplicateBy(matched, 'name');
+
+        const constructed = namesArr.map((name: string, i: number) => ({
+          id: claims?.allowed_site_ids?.[i] || `site-${i}`,
+          code: `SITE-${i+1}`,
+          name: name
+        }));
+        return this.deduplicateBy(constructed, 'name');
+      }
     }
+
+    // 4. Fallback for Devam users
+    if (this.isDevamUser()) {
+      const matchedDevam = this.apiSites().filter((s: any) =>
+        (s.name && s.name.toLowerCase().includes('devam')) ||
+        (s.code && s.code.toLowerCase().includes('devam'))
+      );
+      if (matchedDevam.length > 0) return this.deduplicateBy(matchedDevam, 'name');
+    }
+
     return this.apiSites();
   });
 
-  // Returns warehouses assigned to logged in user from claims/user profile
+  // Returns warehouses assigned to logged in user from access token claims / user profile
   protected readonly allowedUserWarehouses = computed(() => {
     const user = this.authService.currentUser();
-    if (!user) return this.apiWarehouses();
+    const claims = this.getJwtClaims();
 
-    if (user.allowedWarehouses && Array.isArray(user.allowedWarehouses) && user.allowedWarehouses.length > 0) {
-      return user.allowedWarehouses;
+    // 1. Check user.allowedWarehouses from login DTO response
+    if (user?.allowedWarehouses && Array.isArray(user.allowedWarehouses) && user.allowedWarehouses.length > 0) {
+      const mapped = user.allowedWarehouses.map((w: any) => ({
+        id: w.id || w.Id,
+        code: w.code || w.Code,
+        name: w.name || w.Name,
+        siteId: w.siteId || w.SiteId,
+        siteName: w.siteName || w.SiteName
+      }));
+      return this.deduplicateBy(mapped, 'name');
     }
+
+    // 2. Check JWT token warehouses_json claim
+    const whJsonStr = claims?.warehouses_json || user?.warehouses_json;
+    if (whJsonStr) {
+      try {
+        const parsed = typeof whJsonStr === 'string' ? JSON.parse(whJsonStr) : whJsonStr;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const mapped = parsed.map((w: any) => ({
+            id: w.Id || w.id,
+            code: w.Code || w.code,
+            name: w.Name || w.name,
+            siteId: w.SiteId || w.siteId
+          }));
+          return this.deduplicateBy(mapped, 'name');
+        }
+      } catch (e) {}
+    }
+
+    // 3. Filter apiWarehouses for allowed sites
+    const allowedSites = this.allowedUserSites();
+    if (allowedSites && allowedSites.length > 0) {
+      const siteIds = new Set(allowedSites.map((s: any) => (s.id || '').toLowerCase()));
+      const siteNames = new Set(allowedSites.map((s: any) => (s.name || '').toLowerCase()));
+      const matched = this.apiWarehouses().filter((w: any) =>
+        (w.siteId && siteIds.has(w.siteId.toLowerCase())) ||
+        (w.siteName && siteNames.has(w.siteName.toLowerCase())) ||
+        (w.name && w.name.toLowerCase().includes('devam'))
+      );
+      if (matched.length > 0) return this.deduplicateBy(matched, 'name');
+    }
+
     return this.apiWarehouses();
   });
 
@@ -3514,6 +3622,30 @@ export class App implements AfterViewInit, OnDestroy {
         }
       }
     });
+  protected fetchSites(callback?: () => void) {
+    if (!this.isLoggedIn()) return;
+    this.http.get<any[]>(`${environment.apiUrl}/sites?page=1&size=200`).subscribe({
+      next: (data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          this.apiSites.set(data);
+        }
+        if (callback) callback();
+      },
+      error: (err) => console.error('Failed to fetch sites', err)
+    });
+  }
+
+  protected fetchWarehouses(callback?: () => void) {
+    if (!this.isLoggedIn()) return;
+    this.http.get<any[]>(`${environment.apiUrl}/warehouses?page=1&size=200`).subscribe({
+      next: (data) => {
+        if (Array.isArray(data)) {
+          this.apiWarehouses.set(data);
+        }
+        if (callback) callback();
+      },
+      error: (err) => console.error('Failed to fetch warehouses', err)
+    });
   }
 
   protected fetchCategories(callback?: () => void) {
@@ -4681,35 +4813,38 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected loadAllApiData() {
-    const currentUser = this.authService.currentUser();
-    const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
+    this.fetchSites();
+    this.fetchWarehouses();
 
-    // Automatic Site Isolation: If user is devam@gmail.com (or newly provisioned user), isolate to clean new site
-    if (userEmail.includes('devam')) {
-      const devamSiteName = currentUser?.siteName && currentUser.siteName !== 'Global / All Sites' ? currentUser.siteName : 'Devam Site';
-      if (!this.siteData[devamSiteName]) {
-        this.siteData[devamSiteName] = {
-          totalAssets: 0, activeAssets: 0, activePct: '0%',
-          assetsInUse: 0, inUsePct: '0%', checkedOut: 0,
-          underMaintenance: 0, maintenancePct: '0%', lowBatteryGps: 0,
-          rfidReadsToday: 0, gpsPingsToday: 0, exceptionAlerts: 0, complianceTasks: 0,
-          utilizationSpark: [0, 0, 0, 0, 0, 0, 0],
-          accuracySpark: [0, 0, 0, 0, 0, 0, 0],
-          savingsSpark: [0, 0, 0, 0, 0, 0, 0],
-          turnaroundSpark: [0, 0, 0, 0, 0, 0, 0],
-          utilizationOverTime: [0, 0, 0, 0, 0, 0, 0],
-          statusCategory: [0, 0, 0, 0, 0],
-          movementInbound: [0, 0, 0, 0, 0, 0],
-          movementOutbound: [0, 0, 0, 0, 0, 0],
-          movementUtilization: [0, 0, 0, 0, 0, 0],
-          topCategories: [0, 0, 0, 0, 0, 0]
-        };
-      }
-      this.selectedSite.set(devamSiteName);
-    } else {
-      // For master admin trackit@prosper.com, restore main site if needed
-      if (this.selectedSite() === 'Devam Site') {
-        this.selectedSite.set('Pune DC');
+    const allowedSites = this.allowedUserSites();
+    if (allowedSites && allowedSites.length > 0) {
+      allowedSites.forEach((siteObj: any) => {
+        const sName = siteObj.name || siteObj.Name;
+        if (sName && !this.siteData[sName]) {
+          this.siteData[sName] = {
+            totalAssets: 0, activeAssets: 0, activePct: '0%',
+            assetsInUse: 0, inUsePct: '0%', checkedOut: 0,
+            underMaintenance: 0, maintenancePct: '0%', lowBatteryGps: 0,
+            rfidReadsToday: 0, gpsPingsToday: 0, exceptionAlerts: 0, complianceTasks: 0,
+            utilizationSpark: [0, 0, 0, 0, 0, 0, 0],
+            accuracySpark: [0, 0, 0, 0, 0, 0, 0],
+            savingsSpark: [0, 0, 0, 0, 0, 0, 0],
+            turnaroundSpark: [0, 0, 0, 0, 0, 0, 0],
+            utilizationOverTime: [0, 0, 0, 0, 0, 0, 0],
+            statusCategory: [0, 0, 0, 0, 0],
+            movementInbound: [0, 0, 0, 0, 0, 0],
+            movementOutbound: [0, 0, 0, 0, 0, 0],
+            movementUtilization: [0, 0, 0, 0, 0, 0],
+            topCategories: [0, 0, 0, 0, 0, 0]
+          };
+        }
+      });
+
+      if (this.selectedSite() === 'All Sites' || this.selectedSite() === 'Devam Site') {
+        const firstSiteName = allowedSites[0].name || allowedSites[0].Name;
+        if (firstSiteName) {
+          this.selectedSite.set(firstSiteName);
+        }
       }
     }
 
