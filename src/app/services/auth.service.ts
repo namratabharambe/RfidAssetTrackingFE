@@ -21,6 +21,7 @@ export class AuthService {
   readonly isLoggedIn = signal<boolean>(!!this.token() && !this.isTokenExpired(this.token()));
 
   readonly initialAllowedSites = signal<any[]>(JSON.parse(localStorage.getItem('initial_allowed_sites') || '[]'));
+  readonly initialAllowedWarehouses = signal<any[]>(JSON.parse(localStorage.getItem('initial_allowed_warehouses') || '[]'));
 
   constructor() {
     const currentToken = this.token();
@@ -68,6 +69,10 @@ export class AuthService {
         if (res.user?.allowedSites && Array.isArray(res.user.allowedSites)) {
           localStorage.setItem('initial_allowed_sites', JSON.stringify(res.user.allowedSites));
           this.initialAllowedSites.set(res.user.allowedSites);
+        }
+        if (res.user?.allowedWarehouses && Array.isArray(res.user.allowedWarehouses)) {
+          localStorage.setItem('initial_allowed_warehouses', JSON.stringify(res.user.allowedWarehouses));
+          this.initialAllowedWarehouses.set(res.user.allowedWarehouses);
         }
         
         this.token.set(res.token);

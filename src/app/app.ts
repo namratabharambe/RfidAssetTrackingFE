@@ -298,6 +298,11 @@ export class App implements AfterViewInit, OnDestroy {
 
   // Returns sites assigned to logged in user from claims/user profile
   protected readonly allowedUserSites = computed(() => {
+    const initial = this.authService.initialAllowedSites();
+    if (initial && Array.isArray(initial) && initial.length > 0) {
+      return initial;
+    }
+
     const user = this.authService.currentUser();
     if (!user) return this.apiSites();
 
@@ -326,6 +331,11 @@ export class App implements AfterViewInit, OnDestroy {
 
   // Returns warehouses assigned to logged in user from claims/user profile
   protected readonly allowedUserWarehouses = computed(() => {
+    const initialWh = this.authService.initialAllowedWarehouses();
+    if (initialWh && Array.isArray(initialWh) && initialWh.length > 0) {
+      return initialWh;
+    }
+
     const user = this.authService.currentUser();
     if (!user) return this.apiWarehouses();
 
