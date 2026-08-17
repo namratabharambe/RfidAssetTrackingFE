@@ -3618,11 +3618,10 @@ export class App implements AfterViewInit, OnDestroy {
         if (this.gpsTimerInterval) {
           clearInterval(this.gpsTimerInterval);
         }
-        if (autoRefresh && nav === 'GPS Tracking') {
-          this.startGpsAutoRefreshInterval();
-        }
       }
     });
+  }
+
   protected fetchSites(callback?: () => void) {
     if (!this.isLoggedIn()) return;
     this.http.get<any[]>(`${environment.apiUrl}/sites?page=1&size=200`).subscribe({
