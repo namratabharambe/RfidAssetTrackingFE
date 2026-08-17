@@ -4745,7 +4745,7 @@ export class App implements AfterViewInit, OnDestroy {
 
     // Automatic Site Isolation: If user is devam@gmail.com (or newly provisioned user), isolate to clean new site
     if (userEmail.includes('devam')) {
-      const devamSiteName = currentUser?.siteName && currentUser.siteName !== 'Global / All Sites' ? currentUser.siteName : 'Devam Site';
+      const devamSiteName = currentUser?.siteName && currentUser.siteName !== 'Global / All Sites' ? currentUser.siteName : 'Devam Central Store Site Alpha';
       if (!this.siteData[devamSiteName]) {
         this.siteData[devamSiteName] = {
           totalAssets: 0, activeAssets: 0, activePct: '0%',
@@ -4763,12 +4763,6 @@ export class App implements AfterViewInit, OnDestroy {
           movementUtilization: [0, 0, 0, 0, 0, 0],
           topCategories: [0, 0, 0, 0, 0, 0]
         };
-      }
-      this.selectedSite.set(devamSiteName);
-    } else {
-      // For master admin trackit@prosper.com, restore main site if needed
-      if (this.selectedSite() === 'Devam Site') {
-        this.selectedSite.set('Pune DC');
       }
     }
 
@@ -4998,10 +4992,6 @@ export class App implements AfterViewInit, OnDestroy {
             name: (userSiteName && userSiteName !== 'Global / All Sites') ? userSiteName : 'Devam Central Store Site Alpha',
             address: 'Devam Logistics Central Depot, Pune'
           }];
-
-          // Keep selectedSite as 'All Sites' so the user sees their scoped data by default.
-          // The allowedSiteNames computed ensures only Devam data is shown.
-          this.selectedSite.set('All Sites');
         }
 
         this.apiSites.set(sites);
