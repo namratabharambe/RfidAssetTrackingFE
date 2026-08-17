@@ -537,7 +537,7 @@ export class App implements AfterViewInit, OnDestroy {
       .filter((item): item is typeof this.navItems[0] => item !== null && allowedNames.includes(item.name));
   });
 
-  protected readonly selectedSite = signal<string>('All Sites');
+  protected readonly selectedSite = signal<string>('');
   protected readonly selectedSiteId = signal<string | null>(null);
   protected readonly selectedWarehouseId = signal<string | null>(null);
   protected readonly isSiteDropdownOpen = signal<boolean>(false);
@@ -3439,6 +3439,18 @@ export class App implements AfterViewInit, OnDestroy {
 
     this.fetchCategories();
     
+    // Auto-select first allowed site if none is selected
+    effect(() => {
+      const sites = this.allowedUserSites();
+      if (sites && sites.length > 0) {
+        const current = this.selectedSite();
+        if (!current || current === 'All Sites' || !sites.some(s => s.name === current)) {
+          this.selectedSite.set(sites[0].name);
+          this.selectedSiteId.set(sites[0].id);
+        }
+      }
+    });
+
     // Set default selected GPS asset
     if (this.gpsAssets().length > 0) {
       this.gpsSelectedAsset.set(this.gpsAssets()[0]);

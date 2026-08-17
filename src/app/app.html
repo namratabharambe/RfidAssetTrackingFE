@@ -345,13 +345,6 @@
           @if (isSiteDropdownOpen()) {
           <ul class="dropdown-menu" id="site-selector-menu"
             style="border-radius: 12px; box-shadow: var(--shadow-lg);">
-            <li (click)="selectSite('All Sites')" [class.selected]="selectedSite() === 'All Sites'">
-              <span class="material-symbols-outlined">public</span>
-              @if (isDevamUser()) { All Devam Sites } @else { All Sites }
-              @if (selectedSite() === 'All Sites') {
-              <span class="material-symbols-outlined check">check</span>
-              }
-            </li>
             @for (site of allowedUserSites(); track site.id) {
             <li (click)="selectSite(site.name, site.id)" [class.selected]="selectedSite() === site.name">
               <span style="font-size: 1.1rem; margin-right: 6px; line-height: 1;">🇮🇳</span>
