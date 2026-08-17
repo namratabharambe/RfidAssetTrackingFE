@@ -368,13 +368,18 @@ export class App implements AfterViewInit, OnDestroy {
     const sel = this.selectedSite();
     const allowed = this.allowedSiteNames();
 
-    if (sel === 'All Sites') {
+    if (!sel || sel === 'All Sites') {
       if (!allowed) return true;
-      if (!recordSite) return false;
+      if (!recordSite) return true;
       return allowed.has(recordSite);
     }
 
-    return recordSite === sel;
+    if (!recordSite || recordSite === '—') return true;
+
+    const selLower = sel.toLowerCase();
+    const recLower = recordSite.toLowerCase();
+
+    return recLower === selLower || recLower.includes(selLower) || selLower.includes(recLower);
   }
 
   // System Settings: Module Access Config Signals
@@ -3619,16 +3624,15 @@ export class App implements AfterViewInit, OnDestroy {
             industry: item.industry || '—',
             businessUnit: item.businessUnit || '—',
             site: (() => {
+              if (item.siteName) return item.siteName;
+              if (item.site) return item.site;
               if (item.siteId) {
-                const matchedSite = this.apiSites().find(s => s.id && s.id.toLowerCase() === item.siteId.toLowerCase());
-                if (matchedSite) return matchedSite.name;
-                
-                // Fallback for hardcoded IDs
-                return item.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91' ? 'Pune DC' :
-                       item.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c92' ? 'Mumbai Warehouse' :
-                       item.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93' ? 'Chennai Plant' : 'Bengaluru Hub';
+                const userSite = this.allowedUserSites().find((s: any) => s.id && s.id.toLowerCase() === item.siteId.toLowerCase());
+                if (userSite && userSite.name) return userSite.name;
+                const apiSite = this.apiSites().find((s: any) => s.id && s.id.toLowerCase() === item.siteId.toLowerCase());
+                if (apiSite && apiSite.name) return apiSite.name;
               }
-              return '—';
+              return this.selectedSite() || '—';
             })(),
             zone: item.zoneId ? 'Zone A' : '—',
             assetType: item.assetType || 'Serialized',
@@ -3754,8 +3758,9 @@ export class App implements AfterViewInit, OnDestroy {
 
         // Build per-site data for all known sites (including dynamic Devam sites)
         const staticSites = ['Pune DC', 'Mumbai Warehouse', 'Chennai Plant', 'Bengaluru Hub'];
-        const dynamicSiteNames = this.apiSites().map((s: any) => s.name).filter((n: string) => !staticSites.includes(n));
-        const sites = [...staticSites, ...dynamicSiteNames];
+        const userSiteNames = this.allowedUserSites().map((s: any) => s.name).filter(Boolean);
+        const apiSiteNames = this.apiSites().map((s: any) => s.name).filter(Boolean);
+        const sites = Array.from(new Set([...staticSites, ...userSiteNames, ...apiSiteNames]));
         sites.forEach(siteName => {
           const siteAssets = allAssets.filter(a => a.site === siteName);
           const totalS = siteAssets.length;
