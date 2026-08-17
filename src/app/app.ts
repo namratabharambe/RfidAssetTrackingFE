@@ -371,7 +371,7 @@ export class App implements AfterViewInit, OnDestroy {
     const sel = this.selectedSite();
     const allowed = this.allowedSiteNames();
 
-    if (!sel || sel === 'All Sites') {
+    if (!sel || sel === 'All Sites' || sel === 'All Devam Sites' || sel.toLowerCase().startsWith('all')) {
       if (!allowed) return true;
       if (!recordSite) return true;
       return allowed.has(recordSite);
