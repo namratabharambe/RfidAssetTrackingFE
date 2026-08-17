@@ -369,12 +369,13 @@ export class App implements AfterViewInit, OnDestroy {
   // Returns true if a record's site matches the current site filter.
   protected siteMatchesFilter(recordSite: string | null | undefined): boolean {
     const sel = this.selectedSite();
-    const allowed = this.allowedSiteNames();
-
-    if (!sel || sel === 'All Sites') {
-      if (!allowed) return true;
-      if (!recordSite) return true;
-      return allowed.has(recordSite);
+    if (!sel || sel === 'All Sites' || sel === 'All Devam Sites') {
+      const userSites = this.allowedUserSites();
+      if (userSites && userSites.length > 0 && userSites[0].name) {
+        const first = userSites[0].name.toLowerCase();
+        return (recordSite || '').toLowerCase().includes(first);
+      }
+      return true;
     }
 
     if (!recordSite || recordSite === '—') return true;
@@ -556,7 +557,12 @@ export class App implements AfterViewInit, OnDestroy {
   });
 
   protected readonly selectedSite = signal<string>(
-    isPlatformBrowser(this.platformId) ? (localStorage.getItem('selected_site_name') || '') : ''
+    (() => {
+      if (!isPlatformBrowser(this.platformId)) return '';
+      const saved = localStorage.getItem('selected_site_name');
+      if (saved && saved !== 'All Sites' && saved !== 'All Devam Sites') return saved;
+      return '';
+    })()
   );
   protected readonly selectedSiteId = signal<string | null>(
     isPlatformBrowser(this.platformId) ? (localStorage.getItem('selected_site_id') || null) : null
