@@ -124,8 +124,26 @@ export class AuthService {
           this.refreshToken.set(res.refreshToken);
         }
         if (res.user) {
-          localStorage.setItem('current_user', JSON.stringify(res.user));
-          this.currentUser.set(res.user);
+          const existingUser = this.currentUser();
+          const initialSites = this.initialAllowedSites();
+          const initialWhs = this.initialAllowedWarehouses();
+
+          const preservedSites = (initialSites && initialSites.length > 0)
+            ? initialSites
+            : ((existingUser?.allowedSites && existingUser.allowedSites.length > 1) ? existingUser.allowedSites : res.user.allowedSites);
+
+          const preservedWarehouses = (initialWhs && initialWhs.length > 0)
+            ? initialWhs
+            : ((existingUser?.allowedWarehouses && existingUser.allowedWarehouses.length > 1) ? existingUser.allowedWarehouses : res.user.allowedWarehouses);
+
+          const updatedUser = {
+            ...res.user,
+            allowedSites: preservedSites,
+            allowedWarehouses: preservedWarehouses
+          };
+
+          localStorage.setItem('current_user', JSON.stringify(updatedUser));
+          this.currentUser.set(updatedUser);
         }
       })
     );
