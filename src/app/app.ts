@@ -371,7 +371,7 @@ export class App implements AfterViewInit, OnDestroy {
     const sel = this.selectedSite();
     const allowed = this.allowedSiteNames();
 
-    if (!sel || sel === 'All Sites' || sel === 'All Devam Sites' || sel.toLowerCase().startsWith('all')) {
+    if (!sel || sel === 'All Sites') {
       if (!allowed) return true;
       if (!recordSite) return true;
       return allowed.has(recordSite);
@@ -3476,13 +3476,9 @@ export class App implements AfterViewInit, OnDestroy {
       const sites = this.allowedUserSites();
       if (sites && sites.length > 0) {
         const current = this.selectedSite();
-        if (!current) {
-          this.selectedSite.set(sites[0].name);
-          this.selectedSiteId.set(sites[0].id);
-          if (isPlatformBrowser(this.platformId)) {
-            localStorage.setItem('selected_site_name', sites[0].name);
-            localStorage.setItem('selected_site_id', sites[0].id);
-          }
+        if (!current || current === 'All Sites' || current === 'All Devam Sites') {
+          const first = sites[0];
+          this.selectSite(first.name, first.id);
         }
       }
     });
