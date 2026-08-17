@@ -574,9 +574,13 @@ export class App implements AfterViewInit, OnDestroy {
     this.selectedSite.set(siteName);
 
     let resolvedSiteId = siteId;
-    if (!resolvedSiteId && siteName !== 'All Sites') {
-      const match = this.apiSites().find((s: any) => s.name.toLowerCase() === siteName.toLowerCase());
-      if (match) resolvedSiteId = match.id;
+    if (!resolvedSiteId) {
+      const userMatch = this.allowedUserSites().find((s: any) => s.name && s.name.toLowerCase() === siteName.toLowerCase());
+      if (userMatch) resolvedSiteId = userMatch.id;
+      else {
+        const apiMatch = this.apiSites().find((s: any) => s.name && s.name.toLowerCase() === siteName.toLowerCase());
+        if (apiMatch) resolvedSiteId = apiMatch.id;
+      }
     }
 
     this.selectedSiteId.set(resolvedSiteId || null);
@@ -3470,17 +3474,20 @@ export class App implements AfterViewInit, OnDestroy {
 
     this.fetchCategories();
     
-    // Auto-select first allowed site if none is selected
-    effect(() => {
-      const sites = this.allowedUserSites();
-      if (sites && sites.length > 0) {
-        const current = this.selectedSite();
-        if (!current || current === 'All Sites' || current === 'All Devam Sites') {
+    // Set default selected site on initial load if none is stored
+    if (isPlatformBrowser(this.platformId)) {
+      const savedSite = localStorage.getItem('selected_site_name');
+      if (!savedSite) {
+        const sites = this.allowedUserSites();
+        if (sites && sites.length > 0) {
           const first = sites[0];
-          this.selectSite(first.name, first.id);
+          this.selectedSite.set(first.name);
+          this.selectedSiteId.set(first.id);
+          localStorage.setItem('selected_site_name', first.name);
+          localStorage.setItem('selected_site_id', first.id);
         }
       }
-    });
+    }
 
     // Set default selected GPS asset
     if (this.gpsAssets().length > 0) {
