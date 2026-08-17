@@ -3454,7 +3454,7 @@ export class App implements AfterViewInit, OnDestroy {
       const sites = this.allowedUserSites();
       if (sites && sites.length > 0) {
         const current = this.selectedSite();
-        if (!current || current === 'All Sites' || !sites.some((s: any) => s.name === current)) {
+        if (!current || current === 'All Sites') {
           this.selectedSite.set(sites[0].name);
           this.selectedSiteId.set(sites[0].id);
         }
