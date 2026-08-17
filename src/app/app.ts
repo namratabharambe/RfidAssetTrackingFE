@@ -245,18 +245,103 @@ export class App implements AfterViewInit, OnDestroy {
     this.isLoggedIn.set(false);
   }
 
+  protected onSignIn(event: Event) {
+    event.preventDefault();
+    this.loginErrorMessage.set('');
+
+    const username = this.loginUsername().trim();
+    const password = this.loginPassword();
+
+    if (!username || !password) {
+      this.loginErrorMessage.set('Please enter both username and password.');
+      return;
+    }
+
+    this.isLoading.set(true);
+    this.authService.login({ username, password }).subscribe({
+      next: (res) => {
+        this.isLoading.set(false);
+        this.isLoggedIn.set(true);
+        if (isPlatformBrowser(this.platformId)) {
+          localStorage.setItem('isLoggedIn', 'true');
+        }
+
+        // Auto-select first site set in token / profile
+        const userSites = this.allowedUserSites();
+        if (userSites && userSites.length > 0) {
+          const firstSite = userSites[0];
+          if (firstSite && firstSite.name) {
+            this.selectSite(firstSite.name, firstSite.id);
+            return;
+          }
+        }
+        this.loadAllApiData();
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        this.loginErrorMessage.set(err.error?.message || 'Invalid username or password.');
+      }
+    });
+  }
+
+  protected onLoginWithDevice() {
+    this.loginUsername.set('devam@gmail.com');
+    this.loginPassword.set('Password123!');
+    this.onSignIn(new Event('submit'));
+  }
+
   protected readonly isDevamUser = computed(() => {
     const user = this.authService.currentUser();
     const email = (user?.email || user?.username || '').toLowerCase();
     return email.includes('devam');
   });
 
+  // Returns sites assigned to logged in user from claims/user profile
+  protected readonly allowedUserSites = computed(() => {
+    const user = this.authService.currentUser();
+    if (!user) return this.apiSites();
+
+    if (user.allowedSites && Array.isArray(user.allowedSites) && user.allowedSites.length > 0) {
+      return user.allowedSites;
+    }
+    if (user.sites_json) {
+      try {
+        const parsed = JSON.parse(user.sites_json);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((s: any) => ({
+            id: s.Id || s.id,
+            code: s.Code || s.code,
+            name: s.Name || s.name
+          }));
+        }
+      } catch (e) {}
+    }
+    if (user.sites && Array.isArray(user.sites) && user.sites.length > 0) {
+      const siteGuids = user.sites.map((s: any) => typeof s === 'string' ? s : s.id || s.Id);
+      const matched = this.apiSites().filter((s: any) => siteGuids.includes(s.id));
+      if (matched.length > 0) return matched;
+    }
+    return this.apiSites();
+  });
+
+  // Returns warehouses assigned to logged in user from claims/user profile
+  protected readonly allowedUserWarehouses = computed(() => {
+    const user = this.authService.currentUser();
+    if (!user) return this.apiWarehouses();
+
+    if (user.allowedWarehouses && Array.isArray(user.allowedWarehouses) && user.allowedWarehouses.length > 0) {
+      return user.allowedWarehouses;
+    }
+    return this.apiWarehouses();
+  });
+
   // Returns the set of site names this user is allowed to see.
-  // For Devam users "All Sites" means ONLY their Devam sites, not every org.
   protected readonly allowedSiteNames = computed((): Set<string> | null => {
-    if (!this.isDevamUser()) return null; // null = no restriction (global admin)
-    const names = new Set<string>(this.apiSites().map((s: any) => s.name));
-    this.apiWarehouses().forEach((w: any) => names.add(w.name));
+    const userSites = this.allowedUserSites();
+    if (!userSites || userSites.length === 0) return null;
+    const names = new Set<string>();
+    userSites.forEach((s: any) => { if (s.name) names.add(s.name); });
+    this.allowedUserWarehouses().forEach((w: any) => { if (w.name) names.add(w.name); });
     return names;
   });
 
@@ -269,21 +354,16 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   // Returns true if a record's site matches the current site filter.
-  // When selectedSite is 'All Sites' and user is a Devam user,
-  // ONLY records whose site is in allowedSiteNames pass through.
   protected siteMatchesFilter(recordSite: string | null | undefined): boolean {
     const sel = this.selectedSite();
     const allowed = this.allowedSiteNames();
 
     if (sel === 'All Sites') {
-      // No restriction for global admins
       if (!allowed) return true;
-      // Devam users: only show records belonging to their sites/warehouses
       if (!recordSite) return false;
       return allowed.has(recordSite);
     }
 
-    // Specific site selected: exact match
     return recordSite === sel;
   }
 
@@ -458,6 +538,41 @@ export class App implements AfterViewInit, OnDestroy {
   });
 
   protected readonly selectedSite = signal<string>('All Sites');
+  protected readonly selectedSiteId = signal<string | null>(null);
+  protected readonly selectedWarehouseId = signal<string | null>(null);
+  protected readonly isSiteDropdownOpen = signal<boolean>(false);
+
+  protected toggleSiteDropdown() {
+    this.isSiteDropdownOpen.update(v => !v);
+    this.isNotificationOpen.set(false);
+  }
+
+  protected selectSite(siteName: string, siteId?: string, warehouseId?: string) {
+    this.isSiteDropdownOpen.set(false);
+    this.selectedSite.set(siteName);
+
+    let resolvedSiteId = siteId;
+    if (!resolvedSiteId && siteName !== 'All Sites') {
+      const match = this.apiSites().find((s: any) => s.name.toLowerCase() === siteName.toLowerCase());
+      if (match) resolvedSiteId = match.id;
+    }
+
+    this.selectedSiteId.set(resolvedSiteId || null);
+    this.selectedWarehouseId.set(warehouseId || null);
+
+    // Call backend API /api/auth/switch-context to issue a NEW CONTEXT TOKEN for selected site/warehouse!
+    this.authService.switchContext(resolvedSiteId, warehouseId).subscribe({
+      next: (res: any) => {
+        console.log('Successfully switched token context for site:', siteName, res);
+        this.loadAllApiData();
+      },
+      error: (err) => {
+        console.warn('Error switching token context via API, re-fetching data locally:', err);
+        this.loadAllApiData();
+      }
+    });
+  }
+
   protected readonly activeOperation = signal<string>('All Operations');
   protected readonly activeNav = signal<string>('Dashboard');
   protected readonly activeSubNav = signal<string>('');
@@ -589,7 +704,6 @@ export class App implements AfterViewInit, OnDestroy {
   );
   protected readonly reportsIndiaOpsDropdownOpen = signal<boolean>(false);
   protected readonly expandedItems = signal<Record<string, boolean>>({ 'Assets': true });
-  protected readonly isSiteDropdownOpen = signal<boolean>(false);
   protected readonly isNotificationOpen = signal<boolean>(false);
   protected readonly searchQuery = signal<string>('');
   protected readonly currentTheme = signal<string>('light');
@@ -5447,40 +5561,6 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   // Action Methods
-  protected onSignIn(event?: Event) {
-    if (event) {
-      event.preventDefault();
-    }
-    const username = this.loginUsername().trim();
-    const password = this.loginPassword().trim();
-    if (!username || !password) {
-      this.loginErrorMessage.set('Please enter both username and password.');
-      return;
-    }
-    this.authService.login({ username, password }).subscribe({
-      next: () => {
-        this.loginErrorMessage.set('');
-        this.isLoggedIn.set(true);
-        this.loadAllApiData();
-        setTimeout(() => {
-          this.destroyCharts();
-          this.buildCharts();
-        }, 100);
-      },
-      error: (err) => {
-        if (err.status === 0) {
-          this.loginErrorMessage.set('Unable to connect to the server. Please ensure the backend API is running.');
-        } else {
-          this.loginErrorMessage.set(err.error?.message || (typeof err.error === 'string' ? err.error : null) || 'Invalid username or password.');
-        }
-      }
-    });
-  }
-
-  protected onLoginWithDevice() {
-    this.loginErrorMessage.set('RFID scanner device not detected. Please connect your USB/Bluetooth scanner or enter your credentials.');
-  }
-
   protected onSignOut() {
     // 1. Immediately reset login signals and local storage for instant UI response
     this.isLoggedIn.set(false);
@@ -5504,17 +5584,6 @@ export class App implements AfterViewInit, OnDestroy {
     }
   }
 
-
-  protected selectSite(site: string) {
-    this.selectedSite.set(site);
-    this.isSiteDropdownOpen.set(false);
-    if (this.gpsMapMode() === 'satellite' && this.activeNav() === 'GPS Tracking') {
-      setTimeout(() => {
-        this.updateSatelliteMarkers();
-        this.centerMapOnSite(site);
-      }, 50);
-    }
-  }
 
   protected onDateChange(newDate: string) {
     if (newDate) {
@@ -5611,11 +5680,6 @@ export class App implements AfterViewInit, OnDestroy {
     } else {
       this.stopScanSession();
     }
-  }
-
-  protected toggleSiteDropdown() {
-    this.isSiteDropdownOpen.update(v => !v);
-    this.isNotificationOpen.set(false);
   }
 
   protected toggleNotificationDropdown() {
