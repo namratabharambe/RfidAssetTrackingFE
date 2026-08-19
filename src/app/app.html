@@ -1632,6 +1632,22 @@
 
             <div class="badge-divider"></div>
 
+            <div class="badge-group" style="align-items: center;">
+              <span style="font-size: 0.72rem; font-weight: 700; color: #2563eb; margin-right: 4px; display: flex; align-items: center; gap: 2px;">
+                <span class="material-symbols-outlined" style="font-size: 0.95rem;">key</span> Asset Code:
+              </span>
+              <select [ngModel]="selectedAssetCodeContext()" (ngModelChange)="onAssetCodeContextChange($event)"
+                style="padding: 4px 10px; border-radius: 6px; border: 1.5px solid #2563eb; background: #eff6ff; color: #1e40af; font-size: 0.78rem; font-weight: 700; outline: none; cursor: pointer;">
+                @for (opt of assetCodeDropdownOptions(); track opt.id) {
+                <option [value]="opt.code">
+                  {{ opt.type === 'warehouse' ? 'Warehouse Code: ' : 'Site Number: ' }}{{ opt.code }}
+                </option>
+                }
+              </select>
+            </div>
+
+            <div class="badge-divider"></div>
+
             <div class="badge-group">
               <!-- Group 2: Statuses -->
               <button [class.active]="activeAssetStatus() === 'In Use'" (click)="selectAssetStatus('In Use')"
@@ -8473,12 +8489,26 @@
           </div>
 
           <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 0.75rem; font-weight: 700; color: #2563eb; display: flex; align-items: center; gap: 4px;">
+              <span class="material-symbols-outlined" style="font-size: 0.95rem;">pin</span> Asset Code Location (From Switch-Context Token) *
+            </label>
+            <select [ngModel]="selectedAssetCodeContext()" (ngModelChange)="onAssetCodeContextChange($event)" name="selectedAssetCodeContext"
+              style="padding: 8px 12px; border-radius: 6px; border: 1.5px solid #2563eb; background: #eff6ff; color: #1e40af; font-size: 0.8rem; font-weight: 700; width: 100%; box-sizing: border-box; cursor: pointer;">
+              @for (opt of assetCodeDropdownOptions(); track opt.id) {
+              <option [value]="opt.code">
+                {{ opt.type === 'warehouse' ? '📦 Warehouse Code: ' : '🏗️ Site Number: ' }}{{ opt.code }}
+              </option>
+              }
+            </select>
+          </div>
+
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-main, #0f172a);">Site</label>
             <select [ngModel]="formSiteId()" (ngModelChange)="formSiteId.set($event)" name="formSiteId"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Select Site —</option>
-              @for (site of apiSites(); track site.id) {
-              <option [value]="site.id">{{ site.name }}</option>
+              @for (site of allowedUserSites(); track site.id) {
+              <option [value]="site.id">{{ site.name }} ({{ site.code }})</option>
               }
             </select>
           </div>
@@ -8489,8 +8519,8 @@
             <select [ngModel]="formWarehouseId()" (ngModelChange)="formWarehouseId.set($event)" name="formWarehouseId"
               style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0); background: var(--input-bg, #ffffff); color: var(--text-main, #0f172a); font-size: 0.8rem; width: 100%; box-sizing: border-box;">
               <option value="">— Select Warehouse —</option>
-              @for (wh of filteredWarehouses(); track wh.id) {
-              <option [value]="wh.id">{{ wh.name }}</option>
+              @for (wh of allowedUserWarehouses(); track wh.id) {
+              <option [value]="wh.id">{{ wh.name }} ({{ wh.code }})</option>
               }
             </select>
           </div>
