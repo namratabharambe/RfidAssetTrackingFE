@@ -554,6 +554,124 @@ export class App implements AfterViewInit, OnDestroy {
     isPlatformBrowser(this.platformId) ? (localStorage.getItem('selected_site_id') || null) : null
   );
   protected readonly selectedWarehouseId = signal<string | null>(null);
+
+  protected readonly apiAssetCodes = signal<any>(null);
+
+  protected fetchAssetCodes() {
+    if (!this.isLoggedIn()) return;
+    this.http.get<any>(`${environment.apiUrl}/assets/asset-codes`).subscribe({
+      next: (res) => {
+        console.log('Asset Codes response from GET /api/assets/asset-codes:', res);
+        this.apiAssetCodes.set(res);
+        if (res && res.code) {
+          this.selectedAssetCodeContext.set(res.code);
+        }
+      },
+      error: (err) => {
+        console.warn('Failed to fetch asset codes from API:', err);
+      }
+    });
+  }
+
+  // Dynamic Asset Code dropdown options based strictly on switch-context token or GET /api/assets/asset-codes
+  protected readonly assetCodeDropdownOptions = computed(() => {
+    const apiRes = this.apiAssetCodes();
+    if (apiRes && apiRes.options && Array.isArray(apiRes.options) && apiRes.options.length > 0) {
+      return apiRes.options.map((opt: any) => ({
+        id: opt.id,
+        code: opt.code,
+        label: opt.displayLabel || (opt.type === 'Warehouse' ? `Warehouse Code: ${opt.code} (${opt.name})` : `Site Number: ${opt.code} (${opt.name})`),
+        type: opt.type.toLowerCase() as 'site' | 'warehouse',
+        raw: opt
+      }));
+    }
+
+    const tokenCtx = this.authService.currentTokenContext();
+    const userSites = this.allowedUserSites();
+    const userWarehouses = this.allowedUserWarehouses();
+    const apiSites = this.apiSites();
+    const apiWarehouses = this.apiWarehouses();
+
+    const options: { id: string; code: string; label: string; type: 'site' | 'warehouse'; raw: any }[] = [];
+
+    if (tokenCtx && tokenCtx.isWarehouseContext && tokenCtx.warehouseId) {
+      // Token contains Warehouse -> Show corresponding Warehouse Code in Asset Code dropdown
+      const whMatch = userWarehouses.find((w: any) => w.id === tokenCtx.warehouseId || w.code === tokenCtx.warehouseId)
+                   || apiWarehouses.find((w: any) => w.id === tokenCtx.warehouseId || w.code === tokenCtx.warehouseId);
+
+      const whCode = whMatch ? (whMatch.code || whMatch.warehouseCode || whMatch.name) : `WH-CODE-${tokenCtx.warehouseId.substring(0, 6).toUpperCase()}`;
+      const whName = whMatch ? whMatch.name : 'Selected Warehouse';
+
+      options.push({
+        id: whMatch ? whMatch.id : tokenCtx.warehouseId,
+        code: whCode,
+        label: `Warehouse Code: ${whCode} (${whName})`,
+        type: 'warehouse',
+        raw: whMatch
+      });
+    } else if (tokenCtx && tokenCtx.siteId) {
+      // Token contains Site -> Show corresponding Site Number in Asset Code dropdown
+      const siteMatch = userSites.find((s: any) => s.id === tokenCtx.siteId || s.code === tokenCtx.siteId)
+                     || apiSites.find((s: any) => s.id === tokenCtx.siteId || s.code === tokenCtx.siteId);
+
+      const siteNumber = siteMatch ? (siteMatch.code || siteMatch.siteCode || siteMatch.siteNumber || siteMatch.name) : `SITE-NO-${tokenCtx.siteId.substring(0, 6).toUpperCase()}`;
+      const siteName = siteMatch ? siteMatch.name : 'Selected Site';
+
+      options.push({
+        id: siteMatch ? siteMatch.id : tokenCtx.siteId,
+        code: siteNumber,
+        label: `Site Number: ${siteNumber} (${siteName})`,
+        type: 'site',
+        raw: siteMatch
+      });
+    } else {
+      // Fallback if no specific claims in token payload: use active selected site/warehouse
+      const currentName = this.selectedSite();
+      const whMatch = userWarehouses.find((w: any) => w.name === currentName);
+      if (whMatch) {
+        const whCode = whMatch.code || whMatch.name;
+        options.push({
+          id: whMatch.id,
+          code: whCode,
+          label: `Warehouse Code: ${whCode} (${whMatch.name})`,
+          type: 'warehouse',
+          raw: whMatch
+        });
+      } else {
+        const siteMatch = userSites.find((s: any) => s.name === currentName);
+        if (siteMatch) {
+          const siteNum = siteMatch.code || siteMatch.name;
+          options.push({
+            id: siteMatch.id,
+            code: siteNum,
+            label: `Site Number: ${siteNum} (${siteMatch.name})`,
+            type: 'site',
+            raw: siteMatch
+          });
+        }
+      }
+    }
+
+    return options;
+  });
+
+  protected readonly selectedAssetCodeContext = signal<string>('');
+
+  protected onAssetCodeContextChange(code: string) {
+    this.selectedAssetCodeContext.set(code);
+    const opts = this.assetCodeDropdownOptions();
+    const opt = opts.find((o: any) => o.code === code) || opts[0];
+    if (opt) {
+      if (opt.type === 'warehouse') {
+        this.selectedWarehouseId.set(opt.id);
+        if (opt.raw?.siteId) this.selectedSiteId.set(opt.raw.siteId);
+      } else {
+        this.selectedSiteId.set(opt.id);
+        this.selectedWarehouseId.set(null);
+      }
+    }
+  }
+
   protected readonly isSiteDropdownOpen = signal<boolean>(false);
 
   protected toggleSiteDropdown() {
@@ -1347,7 +1465,7 @@ export class App implements AfterViewInit, OnDestroy {
     };
   });
 
-  protected fetchTags() {
+  protected fetchTags(callback?: () => void) {
     if (!this.isLoggedIn()) return;
     import('rxjs').then(({ forkJoin }) => {
       forkJoin({
@@ -1425,9 +1543,12 @@ export class App implements AfterViewInit, OnDestroy {
           }
 
           this.tagsList.set(list);
-          this.fetchAssets();
+          if (callback) callback();
         },
-        error: (err) => console.error('Failed to load tags from backend', err)
+        error: (err) => {
+          console.error('Failed to load tags from backend', err);
+          if (callback) callback();
+        }
       });
     });
   }
@@ -3440,7 +3561,6 @@ export class App implements AfterViewInit, OnDestroy {
     if (isPlatformBrowser(this.platformId)) {
       this.isLoggedIn.set(true);
       localStorage.setItem('isLoggedIn', 'true');
-      this.loadAllApiData();
       
       const savedNav = localStorage.getItem('activeNav');
       if (savedNav) {
@@ -3456,6 +3576,8 @@ export class App implements AfterViewInit, OnDestroy {
         this.activeSubNav.set(savedSubNav);
       }
 
+      this.loadDataForActivePage();
+
       // Restore persisted custom groups
       const savedGroups = localStorage.getItem('customGroups');
       if (savedGroups) {
@@ -3464,8 +3586,6 @@ export class App implements AfterViewInit, OnDestroy {
         } catch { /* ignore */ }
       }
     }
-
-    this.fetchCategories();
     
     // Set default selected site on initial load if none is stored
     if (isPlatformBrowser(this.platformId)) {
@@ -3567,7 +3687,6 @@ export class App implements AfterViewInit, OnDestroy {
           this.apiCategories.set(data);
         }
         if (callback) callback();
-        else this.fetchAssets(); // always reload assets after categories update
       },
       error: (err) => console.error('Failed to fetch categories', err)
     });
@@ -3672,9 +3791,6 @@ export class App implements AfterViewInit, OnDestroy {
 
         // Pure Backend Scoping: Set assets directly from API response filtered by JWT token claims
         this.assets.set(mapped);
-        this.fetchScanEvents();
-        this.fetchRealEvents();
-        this.fetchInventoryScans();
         const allAssets = mapped;
 
         const computeStatusCategory = (assetList: Asset[]) => [
@@ -3857,7 +3973,15 @@ export class App implements AfterViewInit, OnDestroy {
   protected openAddAssetModal() {
     this.modalMode.set('add');
     this.modalAssetId.set('');
-    this.formAssetNumber.set('AST-' + Math.floor(100000 + Math.random() * 900000));
+
+    const tokenOpts = this.assetCodeDropdownOptions();
+    if (tokenOpts && tokenOpts.length > 0) {
+      const activeOpt = tokenOpts[0];
+      this.selectedAssetCodeContext.set(activeOpt.code);
+      this.formAssetNumber.set(`${activeOpt.code}-AST-${Math.floor(100000 + Math.random() * 900000)}`);
+    } else {
+      this.formAssetNumber.set('AST-' + Math.floor(100000 + Math.random() * 900000));
+    }
     this.formName.set('');
     const cats = this.apiCategories();
     if (cats.length > 0) {
@@ -4566,6 +4690,10 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected async fetchRealEvents() {
+    const active = this.activeNav();
+    if (active !== 'Dashboard' && active !== 'RFID Operations') {
+      return;
+    }
     try {
       const scansRes = await firstValueFrom(this.apiService.getScanEvents()).catch(() => null);
       const readersRes = await firstValueFrom(this.apiService.getReaders()).catch(() => null);
@@ -4699,12 +4827,13 @@ export class App implements AfterViewInit, OnDestroy {
         this.scanSessionTime.set(`${pad(hrs)}:${pad(mins)}:${pad(secs)}`);
       }, 1000);
 
-      // 2. Real Scan Events Fetching Interval — always refreshes (every 15s idle, 2s during active scan)
+      // 2. Real Scan Events Fetching Interval — refreshes only when in RFID Operations view or during active scan session
       this.scanSessionInterval = setInterval(() => {
-        // Always refresh scan events and real events regardless of session state
-        this.fetchScanEvents();
-        this.fetchRealEvents();
-      }, 15000); // refresh every 15 seconds always
+        if (this.isScanSessionRunning() || this.activeNav() === 'RFID Operations') {
+          this.fetchScanEvents();
+          this.fetchRealEvents();
+        }
+      }, 15000);
 
       // 3. Fast refresh during active scan session
       setInterval(() => {
@@ -4715,219 +4844,155 @@ export class App implements AfterViewInit, OnDestroy {
     }
   }
 
-  protected loadAllApiData() {
-    const currentUser = this.authService.currentUser();
-    const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
+  protected loadDataForActivePage(navName?: string, subnavName?: string) {
+    if (!this.isLoggedIn()) return;
 
-    // Automatic Site Isolation: If user is devam@gmail.com (or newly provisioned user), isolate to clean new site
-    if (userEmail.includes('devam')) {
-      const devamSiteName = currentUser?.siteName && currentUser.siteName !== 'Global / All Sites' ? currentUser.siteName : 'Devam Central Store Site Alpha';
-      if (!this.siteData[devamSiteName]) {
-        this.siteData[devamSiteName] = {
-          totalAssets: 0, activeAssets: 0, activePct: '0%',
-          assetsInUse: 0, inUsePct: '0%', checkedOut: 0,
-          underMaintenance: 0, maintenancePct: '0%', lowBatteryGps: 0,
-          rfidReadsToday: 0, gpsPingsToday: 0, exceptionAlerts: 0, complianceTasks: 0,
-          utilizationSpark: [0, 0, 0, 0, 0, 0, 0],
-          accuracySpark: [0, 0, 0, 0, 0, 0, 0],
-          savingsSpark: [0, 0, 0, 0, 0, 0, 0],
-          turnaroundSpark: [0, 0, 0, 0, 0, 0, 0],
-          utilizationOverTime: [0, 0, 0, 0, 0, 0, 0],
-          statusCategory: [0, 0, 0, 0, 0],
-          movementInbound: [0, 0, 0, 0, 0, 0],
-          movementOutbound: [0, 0, 0, 0, 0, 0],
-          movementUtilization: [0, 0, 0, 0, 0, 0],
-          topCategories: [0, 0, 0, 0, 0, 0]
-        };
-      }
-    }
+    const nav = navName || this.activeNav();
+    const sub = subnavName !== undefined ? subnavName : this.activeSubNav();
 
-    this.apiService.getUsers().subscribe({
-      next: (res) => {
-        const list = res.body || res;
-        if (Array.isArray(list)) {
-          this.adminUsers.set(list.map(u => ({
-            id: u.id,
-            name: u.username,
-            username: u.username,
-            email: u.email,
-            role: u.roles && u.roles.length ? u.roles.join(', ') : 'Viewer',
-            roles: u.roles || [],
-            siteId: u.siteId,
-            siteName: u.siteName || 'Global / All Sites',
-            status: u.isActive ? 'Active' : 'Inactive',
-            lastLogin: 'Just now'
-          })));
-        }
-      }
-    });
+    if (nav === 'Dashboard') {
+      this.apiService.getDashboardData().subscribe({
+        next: (res) => {
+          if (res && res.siteStats && Array.isArray(res.siteStats)) {
+            res.siteStats.forEach((s: any) => {
+              const uiSiteName = s.siteName;
+              if (this.siteData[uiSiteName]) {
+                const active = s.inUse + s.available + s.maintenance;
+                const activePct = s.total > 0 ? ((active / s.total) * 100).toFixed(1) + '%' : '0%';
+                const inUsePct = s.total > 0 ? ((s.inUse / s.total) * 100).toFixed(1) + '%' : '0%';
+                const maintPct = s.total > 0 ? ((s.maintenance / s.total) * 100).toFixed(1) + '%' : '0%';
 
-    this.apiService.getReaders().subscribe({
-      next: (res) => {
-        const list = res.body || res;
-        if (Array.isArray(list)) {
-          this.adminReaders.set(list.map(r => ({
-            id: r.id || r.name,
-            model: r.model || 'Zebra FX9600',
-            location: r.name,
-            antennas: r.antennaCount !== undefined ? r.antennaCount : (r.antennas || 4),
-            powerDbm: r.powerDbm || 30,
-            ipAddress: r.ipAddress,
-            status: r.status || 'Online',
-            siteId: r.siteId,
-            port: r.port
-          })));
-
-          this.fixedReadersList.set(list.map(r => {
-            const antCount = r.antennaCount !== undefined ? r.antennaCount : (r.antennas || 4);
-            return {
-              id: r.id,
-              name: r.name,
-              model: r.model || 'Zebra FX9600',
-              status: r.status || 'Online',
-              ipAddress: r.ipAddress,
-              macAddress: r.macAddress || '00:11:22:33:44:55',
-              powerLevel: (r.powerDbm || 30) + ' dBm',
-              lastActive: 'Just now',
-              antennas: Array.from({ length: antCount }, (_, i) => `Antenna ${i + 1}: OK`)
-            };
-          }));
-        }
-      }
-    });
-
-    this.apiService.getAudits().subscribe({
-      next: (res) => {
-        const list = res.body || res;
-        if (Array.isArray(list)) {
-          this.complianceAudits.set(list.map(a => ({
-            id: a.id,
-            name: a.title,
-            date: new Date(a.auditDate).toLocaleDateString(),
-            status: a.status,
-            score: 100,
-            inspector: a.auditorName || 'System',
-            checkedAssets: 0,
-            failedAssets: 0
-          })));
-        }
-      }
-    });
-
-    this.apiService.getDashboardData().subscribe({
-      next: (res) => {
-        if (res && res.siteStats && Array.isArray(res.siteStats)) {
-          res.siteStats.forEach((s: any) => {
-            const uiSiteName = s.siteName;
-            if (this.siteData[uiSiteName]) {
-              const active = s.inUse + s.available + s.maintenance;
-              const activePct = s.total > 0 ? ((active / s.total) * 100).toFixed(1) + '%' : '0%';
-              const inUsePct = s.total > 0 ? ((s.inUse / s.total) * 100).toFixed(1) + '%' : '0%';
-              const maintPct = s.total > 0 ? ((s.maintenance / s.total) * 100).toFixed(1) + '%' : '0%';
-
-              this.siteData[uiSiteName] = {
-                ...this.siteData[uiSiteName],
-                totalAssets: s.total,
-                activeAssets: active,
-                activePct: activePct,
-                assetsInUse: s.inUse,
-                inUsePct: inUsePct,
-                underMaintenance: s.maintenance,
-                maintenancePct: maintPct,
-                rfidReadsToday: s.rfidReadsToday || 0,
-                gpsPingsToday: s.gpsPingsToday || 0,
-                exceptionAlerts: s.exceptionAlerts || 0,
-                complianceTasks: s.complianceTasks || 0
-              };
-            }
-          });
-
-          // Aggregate All Sites stats dynamically
-          let aggTotal = 0;
-          let aggInUse = 0;
-          let aggAvailable = 0;
-          let aggMaintenance = 0;
-          let aggRfidReads = 0;
-          let aggGpsPings = 0;
-          let aggExceptionAlerts = 0;
-          let aggComplianceTasks = 0;
-          res.siteStats.forEach((s: any) => {
-            aggTotal += s.total;
-            aggInUse += s.inUse;
-            aggAvailable += s.available;
-            aggMaintenance += s.maintenance;
-            aggRfidReads += s.rfidReadsToday || 0;
-            aggGpsPings += s.gpsPingsToday || 0;
-            aggExceptionAlerts += s.exceptionAlerts || 0;
-            aggComplianceTasks += s.complianceTasks || 0;
-          });
-
-          const aggActive = aggInUse + aggAvailable + aggMaintenance;
-          const aggActivePct = aggTotal > 0 ? ((aggActive / aggTotal) * 100).toFixed(1) + '%' : '0%';
-          const aggInUsePct = aggTotal > 0 ? ((aggInUse / aggTotal) * 100).toFixed(1) + '%' : '0%';
-          const aggMaintPct = aggTotal > 0 ? ((aggMaintenance / aggTotal) * 100).toFixed(1) + '%' : '0%';
-
-          this.siteData['All Sites'] = {
-            ...this.siteData['All Sites'],
-            totalAssets: aggTotal,
-            activeAssets: aggActive,
-            activePct: aggActivePct,
-            assetsInUse: aggInUse,
-            inUsePct: aggInUsePct,
-            underMaintenance: aggMaintenance,
-            maintenancePct: aggMaintPct,
-            rfidReadsToday: aggRfidReads,
-            gpsPingsToday: aggGpsPings,
-            exceptionAlerts: aggExceptionAlerts,
-            complianceTasks: aggComplianceTasks
-          };
-
-          const selected = this.selectedSite();
-          if (this.siteData[selected]) {
-            if (isPlatformBrowser(this.platformId) && Object.keys(this.charts).length > 0) {
-              this.destroyCharts();
-              this.buildCharts();
+                this.siteData[uiSiteName] = {
+                  ...this.siteData[uiSiteName],
+                  totalAssets: s.total,
+                  activeAssets: active,
+                  activePct: activePct,
+                  assetsInUse: s.inUse,
+                  inUsePct: inUsePct,
+                  underMaintenance: s.maintenance,
+                  maintenancePct: maintPct,
+                  rfidReadsToday: s.rfidReadsToday || 0,
+                  gpsPingsToday: s.gpsPingsToday || 0,
+                  exceptionAlerts: s.exceptionAlerts || 0,
+                  complianceTasks: s.complianceTasks || 0
+                };
+              }
+            });
+          }
+        },
+        error: (err) => console.error('Failed to load dashboard data', err)
+      });
+      this.fetchSitesZonesWarehouses();
+      this.fetchCategories(() => this.fetchAssets());
+      this.fetchAssignments();
+    } else if (nav === 'Assets') {
+      this.fetchSitesZonesWarehouses();
+      this.fetchCategories(() => {
+        this.fetchTags(() => {
+          this.fetchAssets();
+        });
+      });
+    } else if (nav === 'Check in/Check out') {
+      this.fetchAssignments();
+      this.startAssignmentPolling();
+    } else if (nav === 'RFID Operations') {
+      if (sub === 'Fixed Reader Monitor') {
+        this.apiService.getReaders().subscribe({
+          next: (res) => {
+            const list = res.body || res;
+            if (Array.isArray(list)) {
+              this.adminReaders.set(list);
             }
           }
-        }
-      },
-      error: (err) => {
-        console.error('Failed to load dashboard statistics from backend', err);
+        });
+      } else if (sub === 'Tag Management') {
+        this.fetchTags();
+      } else if (sub === 'Scan Session Monitor') {
+        this.fetchScanEvents();
+        this.startScanSession();
+      } else if (sub === 'Handheld Sessions') {
+        this.apiService.getHandheldSessions().subscribe({
+          next: (res) => {
+            const list = res.body || res;
+            if (Array.isArray(list)) this.handheldSessionsList.set(list);
+          }
+        });
+        this.apiService.getHandhelds().subscribe({
+          next: (res) => {
+            const list = res.body || res;
+            if (Array.isArray(list)) this.adminHandhelds.set(list);
+          }
+        });
+      } else if (sub === 'RFID Events') {
+        this.fetchRfidEvents();
+      } else {
+        this.fetchScanEvents();
       }
-    });
-
-    this.apiService.getHandhelds().subscribe({
-      next: (res) => {
-        const list = res.body || res;
-        if (Array.isArray(list)) {
-          this.adminHandhelds.set(list);
+    } else if (nav === 'GPS Tracking') {
+      this.fetchLiveGpsLocations();
+    } else if (nav === 'Inventory') {
+      this.fetchInventoryScans();
+      this.fetchAssets();
+    } else if (nav === 'Maintenance') {
+      this.fetchAlerts();
+    } else if (nav === 'Reports & Analytics') {
+      this.fetchCategories(() => this.fetchAssets());
+      this.apiService.getDashboardData().subscribe();
+    } else if (nav === 'Compliance') {
+      this.apiService.getAudits().subscribe({
+        next: (res) => {
+          const list = res.body || res;
+          if (Array.isArray(list)) {
+            this.complianceAudits.set(list.map((a: any) => ({
+              id: a.id,
+              name: a.title,
+              date: new Date(a.auditDate).toLocaleDateString(),
+              status: a.status,
+              score: 100,
+              inspector: a.auditorName || 'System',
+              checkedAssets: 0,
+              failedAssets: 0
+            })));
+          }
         }
-      },
-      error: (err) => console.error('Failed to load handheld devices from backend', err)
-    });
+      });
+    } else if (nav === 'Admin' || nav === 'Settings') {
+      if (sub === 'User Management') {
+        this.apiService.getUsers().subscribe({
+          next: (res) => {
+            const list = res.body || res;
+            if (Array.isArray(list)) {
+              this.adminUsers.set(list.map((u: any) => ({
+                id: u.id,
+                name: u.username,
+                username: u.username,
+                email: u.email,
+                role: u.roles && u.roles.length ? u.roles.join(', ') : 'Viewer',
+                roles: u.roles || [],
+                siteId: u.siteId,
+                siteName: u.siteName || 'Global / All Sites',
+                status: u.isActive ? 'Active' : 'Inactive',
+                lastLogin: 'Just now'
+              })));
+            }
+          }
+        });
+      } else if (sub === 'Site & Warehouse Management') {
+        this.fetchSitesZonesWarehouses();
+      } else if (sub === 'Reader Profiles') {
+        this.apiService.getReaders().subscribe();
+      } else if (sub === 'System Settings') {
+        this.fetchModulePermissionsFromApi();
+      } else {
+        this.apiService.getUsers().subscribe();
+        this.fetchSitesZonesWarehouses();
+      }
+    }
+  }
 
-    this.apiService.getHandheldSessions().subscribe({
-      next: (res) => {
-        const list = res.body || res;
-        if (Array.isArray(list)) {
-          this.handheldSessionsList.set(list);
-        }
-      },
-      error: (err) => console.error('Failed to load handheld sessions from backend', err)
-    });
-
-    this.fetchAssignments();
-    this.fetchAlerts();
-    this.fetchSitesZonesWarehouses();
-    this.fetchScanEvents();
-    this.fetchRealEvents();
-    // Categories must load first, which then triggers fetchAssets
-    this.fetchCategories(() => {
-      // After categories are loaded, load tags then assets (so tag pools are ready for asset mapping)
-      this.fetchTagsThenAssets();
-    });
-
-
+  protected loadAllApiData() {
+    this.fetchAssetCodes();
+    this.loadDataForActivePage();
   }
 
   protected fetchSitesZonesWarehouses() {
@@ -5047,47 +5112,12 @@ export class App implements AfterViewInit, OnDestroy {
     });
   }
 
-  protected fetchTagsThenAssets() {
-    import('rxjs').then(({ forkJoin }) => {
-      forkJoin({
-        rfid: this.http.get<any>(`${environment.apiUrl}/rfidtags?page=1&size=200`),
-        barcode: this.http.get<any>(`${environment.apiUrl}/barcodes?page=1&size=200`),
-        gps: this.http.get<any>(`${environment.apiUrl}/gpsdevices?page=1&size=200`)
-      }).subscribe({
-        next: (res) => {
-          const rfidList: any[] = Array.isArray(res.rfid) ? res.rfid : (res.rfid?.body ?? []);
-          const bcList: any[] = Array.isArray(res.barcode) ? res.barcode : (res.barcode?.body ?? []);
-          const gpsList: any[] = Array.isArray(res.gps) ? res.gps : (res.gps?.body ?? []);
 
-          this.rfidTagsPool.set(rfidList);
-          this.barcodesPool.set(bcList);
-          this.gpsDevicesPool.set(gpsList);
 
-          // Now fetch assets — pools are ready for tag resolution
-          this.fetchAssets();
-          this.fetchLiveGpsLocations();
-          this.fetchHandheldSessions();
-          this.fetchRfidEvents();
-
-          // Also populate tagsList for Tag Management view
-          const list: any[] = [];
-          rfidList.forEach(t => {
-            list.push({ id: t.id, epc: t.epcCode, assetNumber: '-', assetName: 'Loading...', type: 'RFID Pass-Metal', RSSI: '-64 dBm', battery: '100%', lastSeen: 'Gate 2 Reader', time: 'Just now', status: t.status || 'Active', rawType: 'RFID' });
-          });
-          bcList.forEach(b => {
-            list.push({ id: b.id, epc: b.barcodeValue, assetNumber: '-', assetName: 'Loading...', type: 'Barcode ' + b.format, RSSI: '-', battery: '-', lastSeen: 'Staging Scan', time: 'Just now', status: b.isActive ? 'Active' : 'Inactive', rawType: 'Barcode' });
-          });
-          gpsList.forEach(g => {
-            list.push({ id: g.id, epc: g.imei, assetNumber: '-', assetName: 'Loading...', type: 'GPS Active Device', RSSI: '-72 dBm', battery: g.batteryLevel + '%', lastSeen: 'GPS Network', time: 'Just now', status: g.status === 'Online' ? 'Active' : 'Inactive', rawType: 'GPS' });
-          });
-          this.tagsList.set(list);
-        },
-        error: (err) => {
-          console.error('Failed to load tags, fetching assets anyway', err);
-          this.fetchAssets();
-          this.fetchLiveGpsLocations();
-        }
-      });
+  protected fetchTagsThenAssets(callback?: () => void) {
+    this.fetchTags(() => {
+      this.fetchAssets();
+      if (callback) callback();
     });
   }
 
@@ -5621,11 +5651,15 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected selectNav(nav: string) {
     const item = this.filteredNavItems().find(n => n.name === nav);
+    let targetSub = '';
     if (item?.submenus) {
       this.toggleExpanded(nav);
       this.activeNav.set(nav);
       if (item.submenus.length > 0 && !item.submenus.includes(this.activeSubNav())) {
-        this.activeSubNav.set(item.submenus[0]);
+        targetSub = item.submenus[0];
+        this.activeSubNav.set(targetSub);
+      } else {
+        targetSub = this.activeSubNav();
       }
     } else {
       this.activeNav.set(nav);
@@ -5640,32 +5674,24 @@ export class App implements AfterViewInit, OnDestroy {
       }, 100);
     }
 
-    if (nav === 'Check in/Check out') {
-      this.fetchAssignments();
-      this.startAssignmentPolling();
-    } else {
+    if (nav !== 'Check in/Check out') {
       this.stopAssignmentPolling();
     }
 
-    if (nav === 'RFID Operations') {
-      this.fetchTagsThenAssets();
-      this.startScanSession();
-    } else {
+    if (nav !== 'RFID Operations' || targetSub !== 'Scan Session Monitor') {
       this.stopScanSession();
     }
 
-    if (nav === 'Dashboard') {
-      this.loadAllApiData();
-    } else if (nav === 'Assets') {
+    if (nav === 'Assets') {
       this.selectedAsset.set(null); // Clear detail panel — only shows when user clicks a row
-      this.fetchAssets();
     } else if (nav === 'GPS Tracking') {
-      this.fetchLiveGpsLocations();
       if (this.gpsMapMode() === 'satellite') {
         // Wait for Angular @if block to render GPS section DOM before initializing Leaflet
         setTimeout(() => this.initSatelliteMap(), 500);
       }
     }
+
+    this.loadDataForActivePage(nav, targetSub);
   }
 
   protected isExpanded(name: string): boolean {
@@ -5683,27 +5709,12 @@ export class App implements AfterViewInit, OnDestroy {
   protected selectSubNav(sub: string, parentName: string) {
     this.activeSubNav.set(sub);
     this.activeNav.set(parentName);
-    if (parentName === 'Assets') {
-      this.fetchAssets();
-    } else if (parentName === 'RFID Operations') {
-      this.fetchTagsThenAssets();
-      if (sub === 'Tag Management') {
-        this.fetchTags();
-      }
-      if (sub === 'Scan Session Monitor') {
-        this.startScanSession();
-      } else {
-        this.stopScanSession();
-      }
-      if (sub === 'Handheld Sessions') {
-        this.fetchHandheldSessions();
-      }
-      if (sub === 'RFID Events') {
-        this.fetchRfidEvents();
-      }
-    } else {
+
+    if (parentName !== 'RFID Operations' || sub !== 'Scan Session Monitor') {
       this.stopScanSession();
     }
+
+    this.loadDataForActivePage(parentName, sub);
   }
 
   protected toggleNotificationDropdown() {

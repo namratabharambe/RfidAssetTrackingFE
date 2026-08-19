@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap, catchError } from 'rxjs/operators';
 import { Observable, throwError } from 'rxjs';
@@ -22,6 +22,36 @@ export class AuthService {
 
   readonly initialAllowedSites = signal<any[]>(JSON.parse(localStorage.getItem('initial_allowed_sites') || '[]'));
   readonly initialAllowedWarehouses = signal<any[]>(JSON.parse(localStorage.getItem('initial_allowed_warehouses') || '[]'));
+
+  readonly currentTokenContext = computed(() => {
+    const token = this.token();
+    if (!token) return null;
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return null;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+
+      const siteId = payload.siteId || payload.sites || payload.site_id;
+      const warehouseId = payload.warehouseId || payload.warehouses || payload.warehouse_id;
+
+      const singleWh = (typeof warehouseId === 'string' && warehouseId.length > 10)
+        ? warehouseId
+        : (Array.isArray(warehouseId) && warehouseId.length === 1 ? warehouseId[0] : null);
+
+      const singleSite = typeof siteId === 'string'
+        ? siteId
+        : (Array.isArray(siteId) && siteId.length > 0 ? siteId[0] : null);
+
+      return {
+        siteId: singleSite,
+        warehouseId: singleWh,
+        isWarehouseContext: !!singleWh,
+        payload
+      };
+    } catch {
+      return null;
+    }
+  });
 
   constructor() {
     const currentToken = this.token();
@@ -130,16 +160,16 @@ export class AuthService {
 
           const preservedSites = (initialSites && initialSites.length > 0)
             ? initialSites
-            : ((existingUser?.allowedSites && existingUser.allowedSites.length > 1) ? existingUser.allowedSites : res.user.allowedSites);
+            : ((res.user.allowedSites && res.user.allowedSites.length > 0) ? res.user.allowedSites : existingUser?.allowedSites);
 
-          const preservedWarehouses = (initialWhs && initialWhs.length > 0)
-            ? initialWhs
-            : ((existingUser?.allowedWarehouses && existingUser.allowedWarehouses.length > 1) ? existingUser.allowedWarehouses : res.user.allowedWarehouses);
+          const updatedWarehouses = (res.user.allowedWarehouses && res.user.allowedWarehouses.length > 0)
+            ? res.user.allowedWarehouses
+            : (initialWhs && initialWhs.length > 0 ? initialWhs : existingUser?.allowedWarehouses);
 
           const updatedUser = {
             ...res.user,
             allowedSites: preservedSites,
-            allowedWarehouses: preservedWarehouses
+            allowedWarehouses: updatedWarehouses
           };
 
           localStorage.setItem('current_user', JSON.stringify(updatedUser));
