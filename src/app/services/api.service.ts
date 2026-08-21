@@ -60,7 +60,7 @@ export class ApiService {
   }
 
   // Roles
-  getRoles(page = 1, size = 10, search?: string): Observable<any> {
+  getRoles(page = 1, size = 100, search?: string): Observable<any> {
     const params = this.getPagedParams(page, size, search);
     return this.http.get<any>(`${this.baseUrl}/roles`, { params, observe: 'response' });
   }
@@ -235,7 +235,12 @@ export class ApiService {
   }
 
   // Reports
-  downloadReport(reportType: string): Observable<Blob> {
-    return this.http.get(`${this.baseUrl}/reports/${reportType}`, { responseType: 'blob' });
+  downloadReport(reportType: string, startDate?: string, endDate?: string, siteId?: string, siteName?: string): Observable<Blob> {
+    let params = new HttpParams();
+    if (startDate) params = params.set('startDate', startDate);
+    if (endDate) params = params.set('endDate', endDate);
+    if (siteId) params = params.set('siteId', siteId);
+    if (siteName) params = params.set('siteName', siteName);
+    return this.http.get(`${this.baseUrl}/reports/${reportType}`, { params, responseType: 'blob' });
   }
 }

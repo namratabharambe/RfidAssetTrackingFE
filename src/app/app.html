@@ -7521,11 +7521,9 @@
                 <select [ngModel]="configModuleRole()" (ngModelChange)="configModuleRole.set($event)"
                   style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 0.75rem; font-weight: 600; outline: none;">
                   <option value="All Roles">All Roles</option>
-                  <option value="Super Admin">Super Admin</option>
-                  <option value="Site Admin">Site Admin</option>
-                  <option value="Warehouse Manager">Warehouse Manager</option>
-                  <option value="Operator">Operator</option>
-                  <option value="Auditor">Auditor</option>
+                  @for (role of apiRoles(); track role.id) {
+                  <option [value]="role.name">{{ role.name }}</option>
+                  }
                 </select>
               </div>
             </div>
@@ -7939,11 +7937,9 @@
         <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Role</label>
         <select [(ngModel)]="formUserRole" name="formUserRole"
           style="padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-main); font-size: 0.875rem; width: 100%; box-sizing: border-box;">
-          <option value="Super Admin">Super Admin</option>
-          <option value="Site Admin">Site Admin</option>
-          <option value="Supervisor">Supervisor</option>
-          <option value="Driver">Driver</option>
-          <option value="Viewer">Viewer</option>
+          @for (role of apiRoles(); track role.id) {
+          <option [value]="role.name">{{ role.name }}</option>
+          }
         </select>
       </div>
       <!-- Primary Site Scope -->

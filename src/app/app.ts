@@ -988,8 +988,20 @@ export class App implements AfterViewInit, OnDestroy {
         if (Array.isArray(data)) {
           const currentUser = this.authService.currentUser();
           const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
+          const isSuperAdmin = currentUser?.roles?.some((r: any) => typeof r === 'string' ? (r.includes('Super') || r.includes('System Admin')) : (r.name?.includes('Super') || r.name?.includes('System Admin')));
+
+          const userAllowedWarehouses = this.allowedUserWarehouses();
+          const userAllowedSites = this.allowedUserSites();
+
           let filtered = data;
-          if (userEmail.includes('devam')) {
+          if (userAllowedWarehouses && userAllowedWarehouses.length > 0) {
+            const allowedWhIds = new Set(userAllowedWarehouses.map((w: any) => w.id));
+            const allowedWhNames = new Set(userAllowedWarehouses.map((w: any) => (w.name || '').toLowerCase()));
+            filtered = data.filter((w: any) => allowedWhIds.has(w.id) || allowedWhNames.has((w.name || '').toLowerCase()));
+          } else if (userAllowedSites && userAllowedSites.length > 0) {
+            const allowedSiteIds = new Set(userAllowedSites.map((s: any) => s.id));
+            filtered = data.filter((w: any) => allowedSiteIds.has(w.siteId));
+          } else if (userEmail.includes('devam')) {
             const allowedSiteIds = new Set(this.adminSites().map((s: any) => s.id));
             filtered = data.filter((w: any) => 
               allowedSiteIds.has(w.siteId) || 
@@ -1074,6 +1086,18 @@ export class App implements AfterViewInit, OnDestroy {
   private scanPollingInterval: any;
   protected readonly isLoading = signal<boolean>(false);
   protected readonly isMobileSidebarOpen = signal<boolean>(false);
+
+  // Roles State
+  protected readonly apiRoles = signal<any[]>([
+    { id: 'e1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62', name: 'Super Admin' },
+    { id: 'e2a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62', name: 'Site Admin' },
+    { id: '0e9d0e01-c0a0-438d-a823-0544dc67ad6f', name: 'Project Manager' },
+    { id: 'e68f87f4-8b80-4d37-b787-a660dc0f8a56', name: 'Store Keeper' },
+    { id: 'a5736683-b651-4b38-aa67-5a07baa4d156', name: 'Safety' },
+    { id: 'e3a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62', name: 'Supervisor' },
+    { id: 'e4a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62', name: 'Driver' },
+    { id: 'e5a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62', name: 'Viewer' }
+  ]);
 
   // User Modal State
   protected readonly isUserModalOpen = signal<boolean>(false);
@@ -4992,7 +5016,20 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected loadAllApiData() {
     this.fetchAssetCodes();
+    this.fetchRolesFromApi();
     this.loadDataForActivePage();
+  }
+
+  protected fetchRolesFromApi() {
+    this.apiService.getRoles(1, 100).subscribe({
+      next: (res) => {
+        const data = res?.body || res;
+        if (Array.isArray(data) && data.length > 0) {
+          this.apiRoles.set(data);
+        }
+      },
+      error: (err) => console.warn('Failed to load roles from API', err)
+    });
   }
 
   protected fetchSitesZonesWarehouses() {
@@ -5010,29 +5047,24 @@ export class App implements AfterViewInit, OnDestroy {
     this.apiService.getSites(1, 200).subscribe({
       next: (res) => { 
         const data = res?.body || res;
-        let sites = (Array.isArray(data) && data.length > 0) ? data : defaultSites;
+        let sites = (Array.isArray(data) && data.length > 0) ? data : [];
         
         const currentUser = this.authService.currentUser();
         const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
-        const userSiteId = currentUser?.siteId;
-        const userSiteName = currentUser?.siteName;
+        const isSuperAdmin = currentUser?.roles?.some((r: any) => typeof r === 'string' ? (r.includes('Super') || r.includes('System Admin')) : (r.name?.includes('Super') || r.name?.includes('System Admin')));
 
-        if (userEmail.includes('devam')) {
+        const userAllowedSites = this.allowedUserSites();
+        if (userAllowedSites && userAllowedSites.length > 0) {
+          const allowedSiteIds = new Set(userAllowedSites.map((s: any) => s.id));
+          const allowedSiteNames = new Set(userAllowedSites.map((s: any) => (s.name || '').toLowerCase()));
+          sites = sites.filter((s: any) => allowedSiteIds.has(s.id) || allowedSiteNames.has((s.name || '').toLowerCase()));
+        } else if (userEmail.includes('devam')) {
           const filtered = sites.filter((s: any) => {
             const name = (s.name || '').toLowerCase();
             const code = (s.code || '').toLowerCase();
-            if (userSiteId && s.id === userSiteId) return true;
-            if (userSiteName && userSiteName !== 'Global / All Sites' && name.includes(userSiteName.toLowerCase())) return true;
-            if (name.includes('devam') || code.includes('devam') || name.includes('central store')) return true;
-            return false;
+            return name.includes('devam') || code.includes('devam') || name.includes('central store');
           });
-
-          sites = filtered.length > 0 ? filtered : [{
-            id: userSiteId || 'devam-site-id',
-            code: 'SITE-DEVAM-01',
-            name: (userSiteName && userSiteName !== 'Global / All Sites') ? userSiteName : 'Devam Central Store Site Alpha',
-            address: 'Devam Logistics Central Depot, Pune'
-          }];
+          sites = filtered.length > 0 ? filtered : sites;
         }
 
         this.apiSites.set(sites);
@@ -5078,18 +5110,28 @@ export class App implements AfterViewInit, OnDestroy {
         if (Array.isArray(data)) {
           const currentUser = this.authService.currentUser();
           const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
-          if (userEmail.includes('devam')) {
+
+          const userAllowedWarehouses = this.allowedUserWarehouses();
+          const userAllowedSites = this.allowedUserSites();
+
+          let filteredWhs = data;
+          if (userAllowedWarehouses && userAllowedWarehouses.length > 0) {
+            const allowedWhIds = new Set(userAllowedWarehouses.map((w: any) => w.id));
+            const allowedWhNames = new Set(userAllowedWarehouses.map((w: any) => (w.name || '').toLowerCase()));
+            filteredWhs = data.filter((w: any) => allowedWhIds.has(w.id) || allowedWhNames.has((w.name || '').toLowerCase()));
+          } else if (userAllowedSites && userAllowedSites.length > 0) {
+            const allowedSiteIds = new Set(userAllowedSites.map((s: any) => s.id));
+            filteredWhs = data.filter((w: any) => allowedSiteIds.has(w.siteId));
+          } else if (userEmail.includes('devam')) {
             const allowedSiteIds = new Set(this.apiSites().map((s: any) => s.id));
-            const filteredWhs = data.filter((w: any) => 
+            filteredWhs = data.filter((w: any) => 
               allowedSiteIds.has(w.siteId) || 
               (w.name && w.name.toLowerCase().includes('devam')) || 
               (w.code && w.code.toLowerCase().includes('devam')) ||
               (w.name && w.name.toLowerCase().includes('central store'))
             );
-            this.apiWarehouses.set(filteredWhs);
-          } else {
-            this.apiWarehouses.set(data);
           }
+          this.apiWarehouses.set(filteredWhs);
         }
       },
       error: (err) => console.error('Failed to load warehouses', err)
@@ -7684,22 +7726,47 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected saveUser() {
-    let roleId = 'e5a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62'; // default Viewer
-    if (this.formUserRole === 'Super Admin' || this.formUserRole === 'Administrator') {
-      roleId = 'e1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62';
-    } else if (this.formUserRole === 'Site Admin') {
-      roleId = 'e2a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62';
-    } else if (this.formUserRole === 'Supervisor') {
-      roleId = 'e3a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62';
-    } else if (this.formUserRole === 'Driver') {
-      roleId = 'e4a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62';
+    const matchedRole = this.apiRoles().find(r => (r.name || '').toLowerCase() === (this.formUserRole || '').toLowerCase());
+    let roleId = matchedRole ? matchedRole.id : 'e5a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62';
+    if (!matchedRole) {
+      if (this.formUserRole === 'Super Admin' || this.formUserRole === 'Administrator') {
+        roleId = 'e1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62';
+      } else if (this.formUserRole === 'Site Admin') {
+        roleId = 'e2a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62';
+      } else if (this.formUserRole === 'Project Manager') {
+        roleId = '0e9d0e01-c0a0-438d-a823-0544dc67ad6f';
+      } else if (this.formUserRole === 'Store Keeper') {
+        roleId = 'e68f87f4-8b80-4d37-b787-a660dc0f8a56';
+      } else if (this.formUserRole === 'Safety') {
+        roleId = 'a5736683-b651-4b38-aa67-5a07baa4d156';
+      } else if (this.formUserRole === 'Supervisor') {
+        roleId = 'e3a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62';
+      } else if (this.formUserRole === 'Driver') {
+        roleId = 'e4a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62';
+      }
     }
+
+    let selectedSites = [...this.formUserSelectedSiteIds()];
+    if (this.formUserSiteId && !selectedSites.includes(this.formUserSiteId)) {
+      selectedSites.push(this.formUserSiteId);
+    }
+
+    let selectedWhs = [...this.formUserSelectedWarehouseIds()];
+    if (this.formUserWarehouseId && !selectedWhs.includes(this.formUserWarehouseId)) {
+      selectedWhs.push(this.formUserWarehouseId);
+    }
+
+    const primarySiteId = this.formUserSiteId || (selectedSites.length > 0 ? selectedSites[0] : null);
 
     const payload: any = {
       username: this.formUserUsername,
       email: this.formUserEmail,
       roleIds: [roleId],
-      siteId: this.formUserSiteId ? this.formUserSiteId : null
+      roles: [this.formUserRole],
+      role: this.formUserRole,
+      siteId: primarySiteId,
+      allowedSiteIds: selectedSites,
+      allowedWarehouseIds: selectedWhs
     };
 
     if (this.userModalMode() === 'add') {
