@@ -317,7 +317,6 @@
       </div>
 
       <!-- Sub Header Toolbar Row (Site Selector & Segment Filters) -->
-      @if (activeNav() === 'Dashboard' || activeNav() === 'RFID Operations') {
       <div class="top-header-row-sub">
         <!-- Site Dropdown Selector -->
         <div class="dropdown-wrapper">
@@ -410,7 +409,6 @@
           </button>
         </div>
       </div>
-      }
     </header>
 
     <!-- Main Content Container -->
@@ -2357,7 +2355,7 @@
                     <td>{{ asset.category }}</td>
                     <td [class.text-danger]="!asset.isRfidValid">{{ asset.rfidTag || '—' }}</td>
                     <td>{{ asset.gpsId || '—' }}</td>
-                    <td>{{ asset.site || 'Pune DC' }} / {{ asset.zone || 'Zone A' }}</td>
+                    <td>{{ asset.site || selectedSite() || '—' }} / {{ asset.zone || '—' }}</td>
                     <td>
                       <span class="status-pill" [class.available]="asset.status === 'Available'"
                         [class.assigned]="asset.status === 'In Use' || asset.status === 'Assigned'"
@@ -7331,9 +7329,11 @@
                   <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">
                     User Profile</th>
                   <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">
-                    Role / Permission</th>
+                    Role & Permissions</th>
                   <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">
-                    Site Scope</th>
+                    Site Access Scope</th>
+                  <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">
+                    Warehouse Scope</th>
                   <th style="padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color);">
                     Account Status</th>
                   <th
@@ -7348,20 +7348,50 @@
                 @for (user of filteredAdminUsers(); track user.id) {
                 <tr style="border-bottom: 1px solid var(--border-light);">
                   <td style="padding: 0.55rem 0.75rem; font-weight: 700; color: var(--text-primary);">
-                    <div style="display: flex; flex-direction: column;">
-                      <span>{{ user.name }}</span>
-                      <span style="font-size: 0.6rem; color: var(--text-muted); font-family: monospace;">{{
+                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                      <span style="font-size: 0.76rem;">{{ user.name }}</span>
+                      <span style="font-size: 0.62rem; color: var(--text-muted); font-family: monospace;">{{
                         user.username }} • {{ user.email }}</span>
                     </div>
                   </td>
-                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary); font-weight: 600;">{{ user.role }}
+                  <td style="padding: 0.55rem 0.75rem;">
+                    <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
+                      <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 12px; font-size: 0.65rem; font-weight: 700; background: rgba(37,99,235,0.1); color: #2563eb; border: 1px solid rgba(37,99,235,0.25);">
+                        <span class="material-symbols-outlined" style="font-size: 0.75rem;">badge</span>
+                        {{ user.role }}
+                      </span>
+                      @if (user.permissions && user.permissions.length > 0) {
+                        <span style="font-size: 0.58rem; color: var(--text-muted); font-weight: 600;">
+                          {{ user.permissions.length }} active permissions
+                        </span>
+                      }
+                    </div>
                   </td>
-                  <td style="padding: 0.55rem 0.75rem; color: var(--text-secondary); font-weight: 600;">
-                    <span style="display: inline-flex; align-items: center; gap: 4px;">
-                      <span class="material-symbols-outlined"
-                        style="font-size: 0.85rem; color: var(--text-secondary);">storefront</span>
-                      {{ user.siteName }}
-                    </span>
+                  <td style="padding: 0.55rem 0.75rem;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 220px;">
+                      @for (siteName of getUserSiteNames(user); track siteName) {
+                        <span style="display: inline-flex; align-items: center; gap: 3px; background: rgba(13,148,136,0.09); color: #0f766e; border: 1px solid rgba(13,148,136,0.25); border-radius: 4px; padding: 2px 6px; font-size: 0.64rem; font-weight: 600;">
+                          <span class="material-symbols-outlined" style="font-size: 0.75rem;">domain</span>
+                          {{ siteName }}
+                        </span>
+                      }
+                    </div>
+                  </td>
+                  <td style="padding: 0.55rem 0.75rem;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 200px;">
+                      @if (getUserWarehouseNames(user).length > 0) {
+                        @for (whName of getUserWarehouseNames(user); track whName) {
+                          <span style="display: inline-flex; align-items: center; gap: 3px; background: rgba(59,130,246,0.08); color: #1d4ed8; border: 1px solid rgba(59,130,246,0.22); border-radius: 4px; padding: 2px 6px; font-size: 0.64rem; font-weight: 600;">
+                            <span class="material-symbols-outlined" style="font-size: 0.75rem;">warehouse</span>
+                            {{ whName }}
+                          </span>
+                        }
+                      } @else {
+                        <span style="color: var(--text-muted); font-size: 0.63rem; font-style: italic;">
+                          All Warehouses / Central
+                        </span>
+                      }
+                    </div>
                   </td>
                   <td style="padding: 0.55rem 0.75rem;">
                     <span class="status-pill" [class.available]="user.status === 'Active'"
