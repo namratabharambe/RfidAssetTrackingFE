@@ -13,11 +13,15 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
       return authService.refresh().pipe(
         switchMap(() => {
           const newToken = authService.token();
-          const authReq = req.clone({
-            setHeaders: {
-              Authorization: `Bearer ${newToken}`
-            }
-          });
+          const headers: Record<string, string> = {
+            Authorization: `Bearer ${newToken}`
+          };
+          const ctx = authService.currentTokenContext();
+          if (ctx?.siteId) headers['X-Site-Id'] = ctx.siteId;
+          if (ctx?.warehouseId) headers['X-Warehouse-Id'] = ctx.warehouseId;
+          if (ctx?.role) headers['X-Role'] = ctx.role;
+
+          const authReq = req.clone({ setHeaders: headers });
           return next(authReq);
         }),
         catchError((err) => {
@@ -33,11 +37,15 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
 
   let authReq = req;
   if (token) {
-    authReq = req.clone({
-      setHeaders: {
-        Authorization: `Bearer ${token}`
-      }
-    });
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`
+    };
+    const ctx = authService.currentTokenContext();
+    if (ctx?.siteId) headers['X-Site-Id'] = ctx.siteId;
+    if (ctx?.warehouseId) headers['X-Warehouse-Id'] = ctx.warehouseId;
+    if (ctx?.role) headers['X-Role'] = ctx.role;
+
+    authReq = req.clone({ setHeaders: headers });
   }
 
   return next(authReq).pipe(
@@ -46,11 +54,15 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
         return authService.refresh().pipe(
           switchMap(() => {
             const newToken = authService.token();
-            const retryReq = req.clone({
-              setHeaders: {
-                Authorization: `Bearer ${newToken}`
-              }
-            });
+            const headers: Record<string, string> = {
+              Authorization: `Bearer ${newToken}`
+            };
+            const ctx = authService.currentTokenContext();
+            if (ctx?.siteId) headers['X-Site-Id'] = ctx.siteId;
+            if (ctx?.warehouseId) headers['X-Warehouse-Id'] = ctx.warehouseId;
+            if (ctx?.role) headers['X-Role'] = ctx.role;
+
+            const retryReq = req.clone({ setHeaders: headers });
             return next(retryReq);
           }),
           catchError((refreshErr) => {

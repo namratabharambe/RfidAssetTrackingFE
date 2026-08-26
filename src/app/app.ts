@@ -288,9 +288,8 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected onLoginWithDevice() {
-    this.loginUsername.set('devam@gmail.com');
-    this.loginPassword.set('Password123!');
-    this.onSignIn(new Event('submit'));
+    this.loginUsername.set('');
+    this.loginPassword.set('');
   }
 
   protected readonly isDevamUser = computed(() => {
@@ -367,9 +366,11 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   // Returns true if a record's site matches the current site filter.
-  // Returns true for all records; filtering is strictly performed by the backend API using JWT token claims.
   protected siteMatchesFilter(recordSite: string | null | undefined): boolean {
-    return true;
+    const selected = this.selectedSite();
+    if (!selected || selected === 'All Sites' || selected === 'Global') return true;
+    if (!recordSite || recordSite === '—') return true;
+    return recordSite.trim().toLowerCase() === selected.trim().toLowerCase();
   }
 
   // System Settings: Module Access Config Signals
@@ -508,11 +509,24 @@ export class App implements AfterViewInit, OnDestroy {
     }
 
     // Check custom System Settings module permissions for the selected site/warehouse/role
-    const currentSite = this.selectedSite();
+    const currentSite = this.selectedSite() || 'All Sites';
+    const whId = this.selectedWarehouseId();
+    const activeWh = whId ? (this.allowedUserWarehouses().find((w: any) => w.id === whId) || this.apiWarehouses().find((w: any) => w.id === whId)) : null;
+    const currentWh = activeWh ? activeWh.name : 'All Warehouses';
+    const currentRole = (user.role || (Array.isArray(user.roles) ? (typeof user.roles[0] === 'string' ? user.roles[0] : user.roles[0]?.name) : null) || 'All Roles');
+
     const permissionsMap = this.siteModulePermissions();
-    const matchingKey = Object.keys(permissionsMap).find(k => k.startsWith(currentSite) || k.startsWith('All Sites'));
-    if (matchingKey && permissionsMap[matchingKey]) {
-      const configuredModules = permissionsMap[matchingKey];
+    const exactKey = `${currentSite}_${currentWh}_${currentRole}`;
+    const siteWhKey = `${currentSite}_${currentWh}_All Roles`;
+    const siteKey = `${currentSite}_All Warehouses_All Roles`;
+    const globalKey = `All Sites_All Warehouses_All Roles`;
+
+    const configuredModules = permissionsMap[exactKey] || 
+                              permissionsMap[siteWhKey] || 
+                              permissionsMap[siteKey] || 
+                              permissionsMap[globalKey];
+
+    if (configuredModules && Array.isArray(configuredModules) && configuredModules.length > 0) {
       allowedNames = allowedNames.filter(name => configuredModules.includes(name) || name === 'Settings' || name === 'Admin');
     }
 
@@ -684,17 +698,26 @@ export class App implements AfterViewInit, OnDestroy {
     this.selectedSite.set(siteName);
 
     let resolvedSiteId = siteId;
-    if (!resolvedSiteId) {
-      const userMatch = this.allowedUserSites().find((s: any) => s.name && s.name.toLowerCase() === siteName.toLowerCase());
-      if (userMatch) resolvedSiteId = userMatch.id;
-      else {
-        const apiMatch = this.apiSites().find((s: any) => s.name && s.name.toLowerCase() === siteName.toLowerCase());
-        if (apiMatch) resolvedSiteId = apiMatch.id;
+    let resolvedWarehouseId = warehouseId;
+
+    if (!resolvedSiteId && !resolvedWarehouseId) {
+      const whMatch = this.allowedUserWarehouses().find((w: any) => w.name && w.name.toLowerCase() === siteName.toLowerCase())
+                   || this.apiWarehouses().find((w: any) => w.name && w.name.toLowerCase() === siteName.toLowerCase());
+      if (whMatch) {
+        resolvedWarehouseId = whMatch.id;
+        resolvedSiteId = whMatch.siteId || null;
+      } else {
+        const userMatch = this.allowedUserSites().find((s: any) => s.name && s.name.toLowerCase() === siteName.toLowerCase());
+        if (userMatch) resolvedSiteId = userMatch.id;
+        else {
+          const apiMatch = this.apiSites().find((s: any) => s.name && s.name.toLowerCase() === siteName.toLowerCase());
+          if (apiMatch) resolvedSiteId = apiMatch.id;
+        }
       }
     }
 
     this.selectedSiteId.set(resolvedSiteId || null);
-    this.selectedWarehouseId.set(warehouseId || null);
+    this.selectedWarehouseId.set(resolvedWarehouseId || null);
 
     if (isPlatformBrowser(this.platformId)) {
       localStorage.setItem('selected_site_name', siteName);
@@ -703,16 +726,23 @@ export class App implements AfterViewInit, OnDestroy {
       } else {
         localStorage.removeItem('selected_site_id');
       }
+      if (resolvedWarehouseId) {
+        localStorage.setItem('selected_warehouse_id', resolvedWarehouseId);
+      } else {
+        localStorage.removeItem('selected_warehouse_id');
+      }
     }
 
     // Call backend API /api/auth/switch-context to issue a NEW CONTEXT TOKEN for selected site/warehouse!
-    this.authService.switchContext(resolvedSiteId, warehouseId).subscribe({
+    this.authService.switchContext(resolvedSiteId, resolvedWarehouseId).subscribe({
       next: (res: any) => {
-        console.log('Successfully switched token context for site:', siteName, res);
+        console.log('Successfully switched token context for site/warehouse:', siteName, res);
+        this.fetchModulePermissionsFromApi();
         this.loadAllApiData();
       },
       error: (err) => {
         console.warn('Error switching token context via API, re-fetching data locally:', err);
+        this.fetchModulePermissionsFromApi();
         this.loadAllApiData();
       }
     });
@@ -875,7 +905,6 @@ export class App implements AfterViewInit, OnDestroy {
     return list.length;
   });
 
-  // Integrations State
   protected readonly integrations = signal<any[]>([]);
 
   // Admin State
@@ -886,19 +915,14 @@ export class App implements AfterViewInit, OnDestroy {
     if (!currentUser) return list;
 
     const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
-    const isDevam = userEmail.includes('devam');
     const allowedSiteNames = this.allowedSiteNames();
 
-    if (!isDevam && !allowedSiteNames && !currentUser.siteId) {
+    if (!allowedSiteNames && !currentUser.siteId) {
       return list;
     }
 
     return list.filter(u => {
       const uEmail = (u.email || u.username || u.name || '').toLowerCase();
-
-      if (isDevam && uEmail.includes('devam')) {
-        return true;
-      }
 
       if (allowedSiteNames && u.siteName && allowedSiteNames.has(u.siteName)) {
         return true;
@@ -919,12 +943,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly adminApiKeys = signal<any[]>([]);
 
   // Site & Warehouse Admin State
-  protected readonly adminSites = signal<any[]>([
-    { id: 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91', code: 'SITE-CS-00', name: 'Pune DC / Central Store Warehouse', address: 'Plot 42, Central Logistics Park, Pune' },
-    { id: 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c92', code: 'SITE-ALP-01', name: 'Mumbai Warehouse / Site Alpha', address: 'Sector 14, Metro Pier 12, Mumbai' },
-    { id: 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93', code: 'SITE-BET-02', name: 'Chennai Plant / Site Beta', address: 'Plot 88, IT Park Zone, Chennai' },
-    { id: 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c94', code: 'SITE-GAM-03', name: 'Bengaluru Hub / Site Gamma', address: 'KM 44, Expressway Project, Bengaluru' }
-  ]);
+  protected readonly adminSites = signal<any[]>([]);
   protected readonly isCreateSiteModalOpen = signal<boolean>(false);
   protected readonly formSiteCode = signal<string>('');
   protected readonly formSiteName = signal<string>('');
@@ -965,9 +984,7 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   // Warehouse Admin State
-  protected readonly adminWarehouses = signal<any[]>([
-    { id: 'wh-cs-01', code: 'WH-CS-01', name: 'Devam Central Store Warehouse', address: 'Plot 42, Central Logistics Park, Pune', siteId: 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91', siteName: 'Pune DC / Central Store Warehouse' }
-  ]);
+  protected readonly adminWarehouses = signal<any[]>([]);
   protected readonly isCreateWarehouseModalOpen = signal<boolean>(false);
   protected readonly formWarehouseCode = signal<string>('');
   protected readonly formWarehouseName = signal<string>('');
@@ -998,25 +1015,14 @@ export class App implements AfterViewInit, OnDestroy {
             const allowedWhIds = new Set(userAllowedWarehouses.map((w: any) => w.id));
             const allowedWhNames = new Set(userAllowedWarehouses.map((w: any) => (w.name || '').toLowerCase()));
             filtered = data.filter((w: any) => allowedWhIds.has(w.id) || allowedWhNames.has((w.name || '').toLowerCase()));
-          } else if (userAllowedSites && userAllowedSites.length > 0) {
-            const allowedSiteIds = new Set(userAllowedSites.map((s: any) => s.id));
-            filtered = data.filter((w: any) => allowedSiteIds.has(w.siteId));
-          } else if (userEmail.includes('devam')) {
-            const allowedSiteIds = new Set(this.adminSites().map((s: any) => s.id));
-            filtered = data.filter((w: any) => 
-              allowedSiteIds.has(w.siteId) || 
-              (w.name && w.name.toLowerCase().includes('devam')) || 
-              (w.code && w.code.toLowerCase().includes('devam')) ||
-              (w.name && w.name.toLowerCase().includes('central store'))
-            );
           }
           this.adminWarehouses.set(filtered.map((w: any) => ({
             id: w.id,
             code: w.code || 'WH-01',
             name: w.name,
             address: w.address || 'Warehouse Location',
-            siteId: w.siteId,
-            siteName: w.siteName || (this.adminSites().find(s => s.id === w.siteId)?.name || 'Assigned Site')
+            siteId: w.siteId || null,
+            siteName: w.siteName || ''
           })));
         }
       },
@@ -1151,7 +1157,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected formReaderPort = 5084;
   protected formReaderAntennaCount = 4;
   protected formReaderPowerDbm = 30;
-  protected formReaderSiteId = 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91';
+  protected formReaderSiteId = '';
   protected formReaderStatus = 'Online';
 
   // Handheld Modal State
@@ -1754,7 +1760,7 @@ export class App implements AfterViewInit, OnDestroy {
           port: 5084,
           antennaCount: reader.antennas.length,
           powerDbm: parseInt(reader.powerLevel) || 30,
-          siteId: 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91', // default site Pune DC
+          siteId: reader.siteId || this.selectedSiteId() || null,
           model: reader.model,
           status: 'Online'
         };
@@ -1821,7 +1827,7 @@ export class App implements AfterViewInit, OnDestroy {
           this.rfidEventsList.set(movements.map((m: any) => {
             const date = new Date(m.movementDate);
             const source = m.handheldDeviceName ? 'Scan from Handheld' : (m.readerName ? 'Scanned through Fixed Reader' : 'System');
-            const location = m.remarks || m.destinationLocationName || 'Pune DC';
+            const location = m.destinationLocationName || m.remarks || '—';
             return {
               id: m.id,
               severity: 'Info',
@@ -2669,23 +2675,19 @@ export class App implements AfterViewInit, OnDestroy {
       (cat.description || '').toLowerCase().includes(search)
     );
   });
-  protected readonly apiSites = signal<any[]>([
-    { id: '1', name: 'Pune DC', location: 'Pune, Maharashtra' },
-    { id: '2', name: 'Mumbai Warehouse', location: 'Mumbai, Maharashtra' },
-    { id: '3', name: 'Chennai Plant', location: 'Chennai, Tamil Nadu' },
-    { id: '4', name: 'Bengaluru Hub', location: 'Bengaluru, Karnataka' },
-    { id: '5', name: 'Delhi NCR', location: 'Delhi NCR' },
-    { id: '6', name: 'Hyderabad DC', location: 'Hyderabad, Telangana' }
-  ]);
+  protected readonly allMasterSites = signal<any[]>([]);
+  protected readonly allMasterWarehouses = signal<any[]>([]);
+  protected readonly knownSiteMap: Record<string, string> = {};
+  protected readonly knownWarehouseMap: Record<string, string> = {};
+
+  protected readonly apiSites = signal<any[]>([]);
   protected readonly apiWarehouses = signal<any[]>([]);
   protected readonly apiZones = signal<any[]>([]);
   protected readonly apiLocations = signal<any[]>([]);
 
-  // Warehouses filtered by selected site
+  // Warehouses
   protected readonly filteredWarehouses = computed(() => {
-    const siteId = this.formSiteId();
-    if (!siteId) return this.apiWarehouses();
-    return this.apiWarehouses().filter(w => w.siteId === siteId);
+    return this.apiWarehouses();
   });
 
   // Zones filtered by selected warehouse
@@ -3071,7 +3073,7 @@ export class App implements AfterViewInit, OnDestroy {
           const category = row[categoryIdx] || '';
           const rfidTag = row[rfidIdx] || '';
           const gpsId = row[gpsIdx] || '';
-          const site = row[siteIdx] || 'Pune DC';
+          const site = row[siteIdx] || this.selectedSite() || '—';
           const zone = row[zoneIdx] || 'Zone A';
           const status = row[statusIdx] || 'Available';
           const serialNumber = row[serialIdx] || '';
@@ -3130,12 +3132,12 @@ export class App implements AfterViewInit, OnDestroy {
     const currentUser = this.authService.currentUser();
     const currentSiteName = this.selectedSite();
 
-    // Resolve current active site Guid for Devam / active organization fallback
+    // Resolve current active site Guid for active organization fallback
     let defaultSiteObj = this.apiSites().find(s => s.name.toLowerCase() === currentSiteName.toLowerCase());
     if (!defaultSiteObj && currentUser?.siteId) {
       defaultSiteObj = this.apiSites().find(s => s.id?.toLowerCase() === currentUser.siteId.toLowerCase());
     }
-    const defaultSiteId = defaultSiteObj ? defaultSiteObj.id : (currentUser?.siteId || 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91');
+    const defaultSiteId = defaultSiteObj ? defaultSiteObj.id : (currentUser?.siteId || (this.apiSites().length > 0 ? this.apiSites()[0].id : null));
 
     // Map fields to CreateAssetCommand matching the backend Command schema
     const commands = list.map(a => {
@@ -3718,7 +3720,13 @@ export class App implements AfterViewInit, OnDestroy {
 
   protected fetchAssets() {
     if (!this.isLoggedIn()) return;
-    this.http.get<any[]>(`${environment.apiUrl}/assets?page=1&size=1000`).subscribe({
+    let url = `${environment.apiUrl}/assets?page=1&size=1000`;
+    if (this.selectedWarehouseId()) {
+      url += `&warehouseId=${encodeURIComponent(this.selectedWarehouseId()!)}`;
+    } else if (this.selectedSiteId()) {
+      url += `&siteId=${encodeURIComponent(this.selectedSiteId()!)}`;
+    }
+    this.http.get<any[]>(url).subscribe({
       next: (data) => {
         const rfidPool = this.rfidTagsPool();
         const bcPool = this.barcodesPool();
@@ -3774,8 +3782,14 @@ export class App implements AfterViewInit, OnDestroy {
             warranty: item.warrantyExpiryDate ? new Date(item.warrantyExpiryDate).toLocaleDateString() : '—',
             status: status,
             currentLocation: (() => {
-              const matchedLoc = this.apiLocations().find(l => l.id && item.locationId && l.id.toLowerCase() === item.locationId.toLowerCase());
-              return matchedLoc ? matchedLoc.name : (item.currentLocation || 'Pune DC');
+              if (item.currentLocation && item.currentLocation !== 'Pune DC') return item.currentLocation;
+              if (item.locationName) return item.locationName;
+              if (item.location) return item.location;
+              if (item.locationId) {
+                const matchedLoc = this.apiLocations().find(l => l.id && l.id.toLowerCase() === item.locationId.toLowerCase());
+                if (matchedLoc && matchedLoc.name) return matchedLoc.name;
+              }
+              return '—';
             })(),
             custodian: item.currentCustodian || 'Unassigned',
             currentCustodian: item.currentCustodian || 'Unassigned',
@@ -3784,14 +3798,27 @@ export class App implements AfterViewInit, OnDestroy {
             businessUnit: item.businessUnit || '—',
             site: (() => {
               if (item.siteName) return item.siteName;
-              if (item.site) return item.site;
+              if (item.site && typeof item.site === 'string') return item.site;
+              if (item.site && typeof item.site === 'object' && item.site.name) return item.site.name;
               if (item.siteId) {
                 const userSite = this.allowedUserSites().find((s: any) => s.id && s.id.toLowerCase() === item.siteId.toLowerCase());
                 if (userSite && userSite.name) return userSite.name;
                 const apiSite = this.apiSites().find((s: any) => s.id && s.id.toLowerCase() === item.siteId.toLowerCase());
                 if (apiSite && apiSite.name) return apiSite.name;
               }
-              return this.selectedSite() || '—';
+              return '—';
+            })(),
+            warehouse: (() => {
+              if (item.warehouseName) return item.warehouseName;
+              if (item.warehouse && typeof item.warehouse === 'string') return item.warehouse;
+              if (item.warehouse && typeof item.warehouse === 'object' && item.warehouse.name) return item.warehouse.name;
+              if (item.warehouseId) {
+                const userWh = this.allowedUserWarehouses().find((w: any) => w.id && w.id.toLowerCase() === item.warehouseId.toLowerCase());
+                if (userWh && userWh.name) return userWh.name;
+                const apiWh = this.apiWarehouses().find((w: any) => w.id && w.id.toLowerCase() === item.warehouseId.toLowerCase());
+                if (apiWh && apiWh.name) return apiWh.name;
+              }
+              return '—';
             })(),
             zone: item.zoneId ? 'Zone A' : '—',
             assetType: item.assetType || 'Serialized',
@@ -4125,9 +4152,9 @@ export class App implements AfterViewInit, OnDestroy {
       purchaseDate: this.formPurchaseDate() ? new Date(this.formPurchaseDate()).toISOString() : null,
       warrantyExpiryDate: this.formWarranty() ? new Date(this.formWarranty()).toISOString() : null,
       manufacturerId: null,
-      siteId: toGuid(this.formSiteId()),
+      siteId: toGuid(this.formSiteId()) || toGuid(this.selectedSiteId() || ''),
       zoneId: toGuid(this.formZoneId()),
-      warehouseId: toGuid(this.formWarehouseId())
+      warehouseId: toGuid(this.formWarehouseId()) || toGuid(this.selectedWarehouseId() || '')
     };
 
     if (this.modalMode() === 'add') {
@@ -4731,7 +4758,7 @@ export class App implements AfterViewInit, OnDestroy {
       if (Array.isArray(readers)) {
         readers.forEach((r: any) => {
           if (r.id) {
-            readerSiteMap.set(r.id.toLowerCase(), r.siteName || 'Pune DC');
+            readerSiteMap.set(r.id.toLowerCase(), r.siteName || r.site?.name || this.resolveSiteNameById(r.siteId) || '—');
           }
         });
       }
@@ -4744,7 +4771,7 @@ export class App implements AfterViewInit, OnDestroy {
           const dt = new Date(e.timestamp || Date.now());
           const timeStr = dt.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + dt.toLocaleTimeString('en-US', { hour12: true });
           
-          let siteName = 'Pune DC';
+          let siteName = asset?.site || this.selectedSite() || '—';
           if (e.readerId && readerSiteMap.has(e.readerId.toLowerCase())) {
             siteName = readerSiteMap.get(e.readerId.toLowerCase())!;
           }
@@ -4809,7 +4836,7 @@ export class App implements AfterViewInit, OnDestroy {
             assetId: displayAssetId,
             assetName: displayAssetName,
             category: c.category || raw.asset?.category || 'Asset Movement',
-            location: (c.site || 'Pune DC') + ' - ' + (isHandheld ? 'C72 Handheld Reader' : (c.gateName || 'Dispatch Gate')),
+            location: (c.site || raw.asset?.site || this.selectedSite() || '—') + ' - ' + (isHandheld ? 'C72 Handheld Reader' : (c.gateName || 'Dispatch Gate')),
             details: `Purpose: ${c.purpose || 'CheckOut'}, Status: ${c.status || 'Active'}`,
             source: isHandheld ? 'Scan from Handheld' : (c.readerType || 'Fixed Reader Gate'),
             operator: isHandheld ? 'C72 Handheld Reader' : (c.driverName || c.custodian || 'Gate Operator')
@@ -4982,25 +5009,9 @@ export class App implements AfterViewInit, OnDestroy {
       });
     } else if (nav === 'Admin' || nav === 'Settings') {
       if (sub === 'User Management') {
-        this.apiService.getUsers().subscribe({
-          next: (res) => {
-            const list = res.body || res;
-            if (Array.isArray(list)) {
-              this.adminUsers.set(list.map((u: any) => ({
-                id: u.id,
-                name: u.username,
-                username: u.username,
-                email: u.email,
-                role: u.roles && u.roles.length ? u.roles.join(', ') : 'Viewer',
-                roles: u.roles || [],
-                siteId: u.siteId,
-                siteName: u.siteName || 'Global / All Sites',
-                status: u.isActive ? 'Active' : 'Inactive',
-                lastLogin: 'Just now'
-              })));
-            }
-          }
-        });
+        this.fetchSitesZonesWarehouses();
+        this.fetchRolesFromApi();
+        this.fetchAdminUsers();
       } else if (sub === 'Site & Warehouse Management') {
         this.fetchSitesZonesWarehouses();
       } else if (sub === 'Reader Profiles') {
@@ -5008,15 +5019,46 @@ export class App implements AfterViewInit, OnDestroy {
       } else if (sub === 'System Settings') {
         this.fetchModulePermissionsFromApi();
       } else {
-        this.apiService.getUsers().subscribe();
+        this.fetchAdminUsers();
         this.fetchSitesZonesWarehouses();
       }
     }
   }
 
+  protected fetchAdminUsers() {
+    this.apiService.getUsers().subscribe({
+      next: (res) => {
+        const list = res.body || res;
+        if (Array.isArray(list)) {
+          this.adminUsers.set(list.map((u: any) => ({
+            id: u.id,
+            name: u.username,
+            username: u.username,
+            email: u.email,
+            role: u.roles && u.roles.length ? u.roles.join(', ') : (u.role || 'Viewer'),
+            roles: u.roles || (u.role ? [u.role] : []),
+            permissions: u.permissions || [],
+            siteId: u.siteId,
+            siteName: u.siteName || 'Global / All Sites',
+            selectedSiteIds: u.selectedSiteIds || (u.siteId ? [u.siteId] : []),
+            selectedWarehouseIds: u.selectedWarehouseIds || [],
+            allowedSites: u.allowedSites || [],
+            allowedWarehouses: u.allowedWarehouses || [],
+            status: u.isActive ? 'Active' : 'Inactive',
+            isActive: u.isActive,
+            lastLogin: 'Just now'
+          })));
+        }
+      },
+      error: (err) => console.warn('Failed to load users from API', err)
+    });
+  }
+
   protected loadAllApiData() {
     this.fetchAssetCodes();
     this.fetchRolesFromApi();
+    this.fetchModulePermissionsFromApi();
+    this.fetchSitesZonesWarehouses();
     this.loadDataForActivePage();
   }
 
@@ -5047,7 +5089,9 @@ export class App implements AfterViewInit, OnDestroy {
     this.apiService.getSites(1, 200).subscribe({
       next: (res) => { 
         const data = res?.body || res;
-        let sites = (Array.isArray(data) && data.length > 0) ? data : [];
+        const rawSites = (Array.isArray(data) && data.length > 0) ? data : [];
+        this.allMasterSites.set(rawSites);
+        let sites = [...rawSites];
         
         const currentUser = this.authService.currentUser();
         const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
@@ -5058,13 +5102,8 @@ export class App implements AfterViewInit, OnDestroy {
           const allowedSiteIds = new Set(userAllowedSites.map((s: any) => s.id));
           const allowedSiteNames = new Set(userAllowedSites.map((s: any) => (s.name || '').toLowerCase()));
           sites = sites.filter((s: any) => allowedSiteIds.has(s.id) || allowedSiteNames.has((s.name || '').toLowerCase()));
-        } else if (userEmail.includes('devam')) {
-          const filtered = sites.filter((s: any) => {
-            const name = (s.name || '').toLowerCase();
-            const code = (s.code || '').toLowerCase();
-            return name.includes('devam') || code.includes('devam') || name.includes('central store');
-          });
-          sites = filtered.length > 0 ? filtered : sites;
+        } else if (!isSuperAdmin && currentUser?.siteId) {
+          sites = sites.filter((s: any) => s.id === currentUser.siteId);
         }
 
         this.apiSites.set(sites);
@@ -5108,6 +5147,7 @@ export class App implements AfterViewInit, OnDestroy {
       next: (res) => {
         const data = res?.body || res;
         if (Array.isArray(data)) {
+          this.allMasterWarehouses.set(data);
           const currentUser = this.authService.currentUser();
           const userEmail = (currentUser?.email || currentUser?.username || '').toLowerCase();
 
@@ -5119,17 +5159,6 @@ export class App implements AfterViewInit, OnDestroy {
             const allowedWhIds = new Set(userAllowedWarehouses.map((w: any) => w.id));
             const allowedWhNames = new Set(userAllowedWarehouses.map((w: any) => (w.name || '').toLowerCase()));
             filteredWhs = data.filter((w: any) => allowedWhIds.has(w.id) || allowedWhNames.has((w.name || '').toLowerCase()));
-          } else if (userAllowedSites && userAllowedSites.length > 0) {
-            const allowedSiteIds = new Set(userAllowedSites.map((s: any) => s.id));
-            filteredWhs = data.filter((w: any) => allowedSiteIds.has(w.siteId));
-          } else if (userEmail.includes('devam')) {
-            const allowedSiteIds = new Set(this.apiSites().map((s: any) => s.id));
-            filteredWhs = data.filter((w: any) => 
-              allowedSiteIds.has(w.siteId) || 
-              (w.name && w.name.toLowerCase().includes('devam')) || 
-              (w.code && w.code.toLowerCase().includes('devam')) ||
-              (w.name && w.name.toLowerCase().includes('central store'))
-            );
           }
           this.apiWarehouses.set(filteredWhs);
         }
@@ -5289,7 +5318,7 @@ export class App implements AfterViewInit, OnDestroy {
                     time: dtStr,
                     gateStatus: wasReturned ? 'Passed' : 'Pending',
                     checkinTime: '-',
-                    site: 'Pune DC',
+                    site: this.selectedSite() || '—',
                     raw: { id: co.equipmentId }
                   });
                 });
@@ -5321,7 +5350,7 @@ export class App implements AfterViewInit, OnDestroy {
                     epc: ci.tagName || (ci.equipmentId ? 'E200' + ci.equipmentId.substring(0, 8) : 'EPC-UNKNOWN'),
                     gateStatus: (ciEntity === 'ENTRY') ? '-' : (ci.gateStatus === 'Matched' ? 'RETURNED' : (ci.gateStatus || '-')),
                     checkinTime: dtStr,
-                    site: 'Pune DC',
+                    site: this.selectedSite() || '—',
                     raw: { id: ci.equipmentId }
                   });
                 });
@@ -5385,11 +5414,7 @@ export class App implements AfterViewInit, OnDestroy {
               const isMissing = a.status === 'Missing' || (a.notes && a.notes.includes('Missing'));
               const isCompleted = a.status === 'Completed' || (a.notes && (a.notes.includes('Completed') || a.notes.includes('Handheld Inventory')));
 
-              const siteName = a.asset && a.asset.siteId ? (
-                a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91' ? 'Pune DC' :
-                a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c92' ? 'Mumbai Warehouse' :
-                a.asset.siteId === 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c93' ? 'Chennai Plant' : 'Bengaluru Hub'
-              ) : 'Pune DC';
+              const siteName = a.asset?.siteName || (a.asset?.siteId ? this.resolveSiteNameById(a.asset.siteId) : (this.selectedSite() || '—'));
 
               const rawCust = (a.custodianName || a.assignedToUsername || a.assignedToName || '').trim();
               const rawCustLower = rawCust.toLowerCase();
@@ -5463,8 +5488,8 @@ export class App implements AfterViewInit, OnDestroy {
               } else if (isReturned || isCompleted) {
                 checkinGateStatus = isCompleted ? 'COMPLETED' : 'RETURNED';
                 detectedVal = isCompleted ? 'COMPLETED' : 'RETURNED';
-              } else if (isMissing || isAssetMissing || hasCustodianCheckedIn) {
-                checkinGateStatus = 'MISSING';
+              } else if (isMissing || isAssetMissing || hasCustodianCheckedIn || returnedAssetKeys.size > 0 || entitiesWithCheckin.size > 0) {
+                checkinGateStatus = (isMissing || isAssetMissing) ? 'MISSING' : null;
                 detectedVal = 'MISSING';
               } else {
                 detectedVal = '-';
@@ -7044,7 +7069,7 @@ export class App implements AfterViewInit, OnDestroy {
                 lastGpsPing: gpsTimeStr,
                 lastRfidRead: lastRfidRead,
                 exception: exception,
-                site: linkedAsset?.site || 'Pune DC',
+                site: linkedAsset?.site || this.selectedSite() || '—',
                 operator: linkedAsset?.currentCustodian || linkedAsset?.custodian || 'Unassigned',
                 make: linkedAsset?.manufacturer || v.make || '',
                 model: linkedAsset?.model || v.model || '',
@@ -7540,7 +7565,7 @@ export class App implements AfterViewInit, OnDestroy {
             assetId: a.assetName || ('Asset ' + a.assetId),
             assetType: 'Equipment',
             alertType: a.alertType || a.title || 'System Alert',
-            currentSite: a.resolvedByUsername || 'Pune DC',
+            currentSite: a.resolvedByUsername || this.selectedSite() || '—',
             assignedTechnician: 'Technical Support',
             sla: '24 Hours',
             status: a.isResolved ? 'Resolved' : 'Open',
@@ -7589,7 +7614,7 @@ export class App implements AfterViewInit, OnDestroy {
       message: selected.description || 'Maintenance requested',
       isResolved: isResolved,
       resolvedDate: isResolved ? new Date().toISOString() : null,
-      resolvedByUsername: selected.currentSite || 'Pune DC'
+      resolvedByUsername: selected.currentSite || this.selectedSite() || '—'
     };
 
     this.apiService.updateAlert(selected.id, payload).subscribe({
@@ -7657,17 +7682,124 @@ export class App implements AfterViewInit, OnDestroy {
     const user = this.adminUsers().find(u => u.id === id);
     if (!user) return;
     const nextActive = user.status !== 'Active';
-    const roleId = user.role.includes('Admin') ? 'e1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c61' : 'e1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c62';
-    const payload = {
+    const matchedRole = this.apiRoles().find(r => (r.name || '').toLowerCase() === (user.role || '').toLowerCase());
+    const roleId = matchedRole ? matchedRole.id : undefined;
+    const payload: any = {
       username: user.username,
       email: user.email,
       isActive: nextActive,
-      roleIds: [roleId]
+      siteId: user.siteId || null,
+      allowedSiteIds: user.selectedSiteIds || [],
+      allowedWarehouseIds: user.selectedWarehouseIds || [],
+      roleIds: roleId ? [roleId] : undefined,
+      roles: user.roles || [user.role]
     };
     this.apiService.updateUser(id, payload).subscribe({
       next: () => this.loadAllApiData(),
       error: (err) => console.error('Error toggling user status', err)
     });
+  }
+
+  protected resolveSiteNameById(id: string): string {
+    if (!id) return '';
+    const cleanId = id.trim().toLowerCase();
+    
+    if (this.knownSiteMap[cleanId]) return this.knownSiteMap[cleanId];
+    for (const [k, v] of Object.entries(this.knownSiteMap)) {
+      if (k.toLowerCase() === cleanId) return v;
+    }
+
+    const allSites = [
+      ...this.allMasterSites(),
+      ...this.adminSites(),
+      ...this.apiSites(),
+      ...(this.allowedUserSites() || [])
+    ];
+    
+    const match = allSites.find(s => 
+      s && (
+        (s.id && s.id.toString().toLowerCase() === cleanId) ||
+        (s.code && s.code.toString().toLowerCase() === cleanId)
+      )
+    );
+    if (match && match.name) return match.name;
+
+    for (const siteName of Object.keys(this.siteData)) {
+      if (siteName.toLowerCase() === cleanId) return siteName;
+    }
+
+    return id;
+  }
+
+  protected resolveWarehouseNameById(id: string): string {
+    if (!id) return '';
+    const cleanId = id.trim().toLowerCase();
+
+    if (this.knownWarehouseMap[cleanId]) return this.knownWarehouseMap[cleanId];
+    for (const [k, v] of Object.entries(this.knownWarehouseMap)) {
+      if (k.toLowerCase() === cleanId) return v;
+    }
+
+    const allWhs = [
+      ...this.allMasterWarehouses(),
+      ...this.adminWarehouses(),
+      ...this.apiWarehouses(),
+      ...(this.allowedUserWarehouses() || [])
+    ];
+
+    const match = allWhs.find(w =>
+      w && (
+        (w.id && w.id.toString().toLowerCase() === cleanId) ||
+        (w.code && w.code.toString().toLowerCase() === cleanId)
+      )
+    );
+    if (match && match.name) return match.name;
+
+    return id;
+  }
+
+  protected getUserSiteNames(user: any): string[] {
+    if (!user) return ['Global / All Sites'];
+    if (user.allowedSites && Array.isArray(user.allowedSites) && user.allowedSites.length > 0) {
+      const names = user.allowedSites
+        .map((s: any) => {
+          if (typeof s === 'string') return this.resolveSiteNameById(s);
+          return s.name || s.siteName || this.resolveSiteNameById(s.id || s.code) || s.code || s.id;
+        })
+        .filter((n: any) => !!n && n.trim().length > 0);
+      if (names.length > 0) return names;
+    }
+    const siteIds: string[] = user.selectedSiteIds && user.selectedSiteIds.length > 0
+      ? user.selectedSiteIds
+      : (user.siteId ? [user.siteId] : []);
+    
+    if (siteIds.length === 0) {
+      return [user.siteName || 'Global / All Sites'];
+    }
+
+    return siteIds.map(id => this.resolveSiteNameById(id));
+  }
+
+  protected getUserWarehouseNames(user: any): string[] {
+    if (!user) return [];
+    if (user.allowedWarehouses && Array.isArray(user.allowedWarehouses) && user.allowedWarehouses.length > 0) {
+      const names = user.allowedWarehouses
+        .map((w: any) => {
+          if (typeof w === 'string') return this.resolveWarehouseNameById(w);
+          return w.name || w.warehouseName || this.resolveWarehouseNameById(w.id || w.code) || w.code || w.id;
+        })
+        .filter((n: any) => !!n && n.trim().length > 0);
+      if (names.length > 0) return names;
+    }
+    const whIds: string[] = user.selectedWarehouseIds && user.selectedWarehouseIds.length > 0
+      ? user.selectedWarehouseIds
+      : (user.warehouseId ? [user.warehouseId] : []);
+    
+    if (whIds.length === 0) {
+      return [];
+    }
+
+    return whIds.map(id => this.resolveWarehouseNameById(id));
   }
 
   protected toggleReaderStatus(id: string) {
@@ -7680,7 +7812,7 @@ export class App implements AfterViewInit, OnDestroy {
       port: reader.port || 5084,
       antennaCount: reader.antennas,
       powerDbm: reader.powerDbm,
-      siteId: reader.siteId || 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91',
+      siteId: reader.siteId || (this.apiSites().length > 0 ? this.apiSites()[0].id : ''),
       model: reader.model,
       status: nextStatus
     };
@@ -7809,7 +7941,7 @@ export class App implements AfterViewInit, OnDestroy {
     this.formReaderPort = 5084;
     this.formReaderAntennaCount = 4;
     this.formReaderPowerDbm = 30;
-    this.formReaderSiteId = 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91';
+    this.formReaderSiteId = this.apiSites().length > 0 ? this.apiSites()[0].id : '';
     this.formReaderStatus = 'Online';
     this.isReaderModalOpen.set(true);
   }
@@ -7823,7 +7955,7 @@ export class App implements AfterViewInit, OnDestroy {
     this.formReaderPort = reader.port || 5084;
     this.formReaderAntennaCount = reader.antennas || reader.antennaCount || 4;
     this.formReaderPowerDbm = reader.powerDbm;
-    this.formReaderSiteId = reader.siteId || 'f1a2b3c4-d5e6-7a8b-9c0d-1e2f3a4b5c91';
+    this.formReaderSiteId = reader.siteId || (this.apiSites().length > 0 ? this.apiSites()[0].id : '');
     this.formReaderStatus = reader.status;
     this.isReaderModalOpen.set(true);
   }

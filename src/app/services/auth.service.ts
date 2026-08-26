@@ -42,9 +42,12 @@ export class AuthService {
         ? siteId
         : (Array.isArray(siteId) && siteId.length > 0 ? siteId[0] : null);
 
+      const role = payload.role || payload.active_role || (Array.isArray(payload.roles) ? payload.roles[0] : payload.roles);
+
       return {
         siteId: singleSite,
         warehouseId: singleWh,
+        role: role || null,
         isWarehouseContext: !!singleWh,
         payload
       };
@@ -142,8 +145,8 @@ export class AuthService {
     );
   }
 
-  switchContext(siteId?: string, warehouseId?: string): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/switch-context`, { siteId, warehouseId }).pipe(
+  switchContext(siteId?: string, warehouseId?: string, role?: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/switch-context`, { siteId, warehouseId, role }).pipe(
       tap(res => {
         if (res.token) {
           localStorage.setItem('jwt_token', res.token);
