@@ -2767,10 +2767,8 @@
           <div class="stat-col"
             style="border-right: 1px solid var(--border-color, #e2e8f0); padding-right: 16px; padding-left: 8px;">
             <span class="stat-col-lbl"
-              style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted, #64748b); text-transform: uppercase;">Site
-              / Location</span>
-            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-main, #0f172a); margin: 6px 0;">Pune DC
-              - Dispatch Gate</div>
+              style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted, #64748b); text-transform: uppercase;">Site</span>
+            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-main, #0f172a); margin: 6px 0;">{{ selectedSite() === 'All Sites' ? (sitesList()[1] || 'Main Facility') : selectedSite() }} - Main Gate</div>
             <span style="font-size: 0.72rem; color: var(--text-muted, #64748b);">Distribution Center</span>
           </div>
 
@@ -3181,9 +3179,7 @@
             <!-- Live Zone Map Card -->
             <div class="live-map-card"
               style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); display: flex; flex-direction: column;">
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                <h3 style="font-size: 0.85rem; font-weight: 700; color: var(--text-main, #0f172a); margin: 0;">Live Zone
-                  Map - Pune DC</h3>
+                <h3 style="font-size: 0.85rem; font-weight: 700; color: var(--text-main, #0f172a); margin: 0;">Live Zone Map - {{ selectedSite() === 'All Sites' ? 'All Sites' : selectedSite() }}</h3>
                 <div
                   style="display: flex; align-items: center; gap: 8px; font-size: 0.65rem; color: var(--text-muted, #64748b);">
                   <span style="display: inline-flex; align-items: center; gap: 4px;">
@@ -3355,8 +3351,6 @@
           </div>
         </div>
 
-
-      </div>
       } @else if (activeSubNav() === 'Tag Management') {
       <div class="tag-management-view animate-fade-in"
         style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
@@ -4750,11 +4744,11 @@
                 <div style="background: #f8fafc; border-radius: 8px; padding: 6px 10px; border: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 3px;">
                   <div style="font-size: 0.62rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em;">CURRENT LOCATION (WGS84)</div>
                   <div style="display: flex; align-items: center; justify-content: space-between; font-family: monospace; font-size: 0.78rem; font-weight: 800; color: #0f172a;">
-                    <span>18.596566, 73.827216</span>
+                    <span>{{ gpsSelectedAsset()?.latitude ? (gpsSelectedAsset()?.latitude + ', ' + gpsSelectedAsset()?.longitude) : 'GPS Active' }}</span>
                     <span class="material-symbols-outlined" style="font-size: 0.95rem; color: #64748b; cursor: pointer;" title="Copy">content_copy</span>
                   </div>
                   <div style="font-size: 0.7rem; color: #64748b; font-weight: 500;">
-                    Pune DC, Chakan, Pune, Maharashtra 410501, India
+                    {{ gpsSelectedAsset()?.site || gpsSelectedAsset()?.location || selectedSite() }}
                   </div>
                 </div>
                 } @else if (gpsDetailTab() === 'route') {
@@ -5892,7 +5886,7 @@
                       Service Location *</span>
                     <select [ngModel]="selected.serviceLocation" (ngModelChange)="selected.serviceLocation = $event"
                       style="width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); outline: none;">
-                      @for (loc of locationsList; track loc) {
+                      @for (loc of locationsList(); track loc) {
                       <option [value]="loc">{{ loc }}</option>
                       }
                     </select>
@@ -6478,22 +6472,7 @@
               </thead>
               <tbody>
                 <!-- Table Data Rows -->
-                @for (row of [
-                { name: 'India Operations (All Sites)', count: 24758, active: 22341, idle: 1487, lost: 76, accuracy:
-                '94.3%', utilization: '68.0%', turnaround: '1.6', pct: '100%' },
-                { name: 'Pune DC', count: 4560, active: 4112, idle: 388, lost: 60, accuracy: '93.6%', utilization:
-                '72.0%', turnaround: '1.4', pct: '18.4%' },
-                { name: 'Mumbai Warehouse', count: 5921, active: 5298, idle: 561, lost: 62, accuracy: '95.1%',
-                utilization: '68.0%', turnaround: '1.7', pct: '23.9%' },
-                { name: 'Chennai Plant', count: 4128, active: 3812, idle: 256, lost: 60, accuracy: '95.6%', utilization:
-                '85.0%', turnaround: '1.2', pct: '16.7%' },
-                { name: 'Bengaluru Hub', count: 3842, active: 3452, idle: 330, lost: 60, accuracy: '93.2%', utilization:
-                '61.0%', turnaround: '1.8', pct: '15.5%' },
-                { name: 'Delhi NCR', count: 3657, active: 3276, idle: 321, lost: 58, accuracy: '92.8%', utilization:
-                '74.0%', turnaround: '1.6', pct: '14.8%' },
-                { name: 'Hyderabad DC', count: 2650, active: 2391, idle: 211, lost: 56, accuracy: '94.1%', utilization:
-                '63.0%', turnaround: '1.5', pct: '10.7%' }
-                ]; track row.name) {
+                @for (row of sitePerformanceRows(); track row.name) {
                 <!-- Main Site Row -->
                 <tr style="border-bottom: 1px solid var(--border-color);"
                   [style.font-weight]="row.name.includes('All Sites') ? '700' : 'normal'"

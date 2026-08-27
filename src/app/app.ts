@@ -127,6 +127,7 @@ export interface GPSAsset {
   geofenceStatus?: 'Inside' | 'Outside' | 'Warning';
   latitude: number;
   longitude: number;
+  location?: string;
   x: number; // percentage width
   y: number; // percentage height
   site: string;
@@ -298,6 +299,12 @@ export class App implements AfterViewInit, OnDestroy {
     return email.includes('devam');
   });
 
+  protected readonly isSuperAdmin = computed(() => {
+    const user = this.authService.currentUser();
+    if (!user) return false;
+    return user.roles?.some((r: any) => typeof r === 'string' ? (r.includes('Super') || r.includes('System Admin')) : (r.name?.includes('Super') || r.name?.includes('System Admin'))) ?? false;
+  });
+
   // Returns sites assigned to logged in user from claims/user profile
   protected readonly allowedUserSites = computed(() => {
     const initial = this.authService.initialAllowedSites();
@@ -355,6 +362,26 @@ export class App implements AfterViewInit, OnDestroy {
     userSites.forEach((s: any) => { if (s.name) names.add(s.name); });
     this.allowedUserWarehouses().forEach((w: any) => { if (w.name) names.add(w.name); });
     return names;
+  });
+
+  // Returns list of site names available for dropdowns and filters
+  protected readonly sitesList = computed<string[]>(() => {
+    const userSites = this.allowedUserSites();
+    if (userSites && userSites.length > 0) {
+      const names = userSites.map((s: any) => s.name || s.siteName || s.code || s).filter(Boolean);
+      return ['All Sites', ...names];
+    }
+    const admin = this.adminSites();
+    if (admin && admin.length > 0) {
+      const names = admin.map((s: any) => s.name || s.siteName || s.code || s).filter(Boolean);
+      return ['All Sites', ...names];
+    }
+    const api = this.apiSites();
+    if (api && api.length > 0) {
+      const names = api.map((s: any) => s.name || s.siteName || s.code || s).filter(Boolean);
+      return ['All Sites', ...names];
+    }
+    return ['All Sites', 'Main Facility', 'Central Hub'];
   });
 
   // Returns true if the given site name is visible to the current user.
@@ -896,7 +923,7 @@ export class App implements AfterViewInit, OnDestroy {
     if (op !== 'All Operations') {
       list = list.filter(r => {
         const loc = (r.location || r.site || '').toLowerCase();
-        if (op === 'Warehouse') return loc.includes('dc') || loc.includes('warehouse') || loc.includes('pune');
+        if (op === 'Warehouse') return loc.includes('dc') || loc.includes('warehouse') || loc.includes('store');
         if (op === 'Manufacturing') return loc.includes('plant') || loc.includes('mfg');
         if (op === 'Distribution') return loc.includes('hub') || loc.includes('dist');
         return true;
@@ -1174,7 +1201,7 @@ export class App implements AfterViewInit, OnDestroy {
   // Check in/Check out state
   protected readonly checkoutMode = signal<'issue' | 'return' | 'transfer'>('issue');
   protected readonly checkoutCustodian = signal<string>('');
-  protected readonly checkoutSite = signal<string>('Pune DC');
+  protected readonly checkoutSite = signal<string>('');
   protected readonly checkoutExpectedReturn = signal<string>(new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   protected readonly checkoutScannedAssets = signal<any[]>([]);
   protected readonly isCheckoutScanning = signal<boolean>(false);
@@ -1192,27 +1219,6 @@ export class App implements AfterViewInit, OnDestroy {
     if (!tag) return null;
     const match = this.assets().find(a => a.rfidTag === tag || a.id === tag || a.assetNumber === tag);
     if (match) return match;
-    if (tag === 'AST-TRC-001245') {
-      return {
-        id: 'AST-TRC-001245',
-        assetNumber: 'AST-TRC-001245',
-        name: 'Torque Wrench Set 1/2"',
-        category: 'Returnable Container',
-        rfidTag: 'AST-TRC-001245',
-        gpsId: 'GPS-TRC-001245',
-        status: 'Available',
-        custodian: '—',
-        site: 'Pune DC',
-        zone: 'Zone A',
-        lastSeen: 'Just now',
-        nextMaintenance: (() => {
-          const d = new Date();
-          d.setDate(d.getDate() + 36);
-          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-        })()
-      } as Asset;
-    }
     return null;
   });
 
@@ -1238,7 +1244,7 @@ export class App implements AfterViewInit, OnDestroy {
     if (op !== 'All Operations') {
       list = list.filter(r => {
         const loc = (r.location || r.site || '').toLowerCase();
-        if (op === 'Warehouse') return loc.includes('dc') || loc.includes('warehouse') || loc.includes('pune');
+        if (op === 'Warehouse') return loc.includes('dc') || loc.includes('warehouse') || loc.includes('store');
         if (op === 'Manufacturing') return loc.includes('plant') || loc.includes('mfg');
         if (op === 'Distribution') return loc.includes('hub') || loc.includes('dist');
         return true;
@@ -1255,7 +1261,7 @@ export class App implements AfterViewInit, OnDestroy {
     if (op !== 'All Operations') {
       list = list.filter(r => {
         const loc = (r.location || r.site || '').toLowerCase();
-        if (op === 'Warehouse') return loc.includes('dc') || loc.includes('warehouse') || loc.includes('pune');
+        if (op === 'Warehouse') return loc.includes('dc') || loc.includes('warehouse') || loc.includes('store');
         if (op === 'Manufacturing') return loc.includes('plant') || loc.includes('mfg');
         if (op === 'Distribution') return loc.includes('hub') || loc.includes('dist');
         return true;
@@ -1271,7 +1277,7 @@ export class App implements AfterViewInit, OnDestroy {
     if (op !== 'All Operations') {
       list = list.filter(r => {
         const loc = (r.location || r.site || '').toLowerCase();
-        if (op === 'Warehouse') return loc.includes('dc') || loc.includes('warehouse') || loc.includes('pune');
+        if (op === 'Warehouse') return loc.includes('dc') || loc.includes('warehouse') || loc.includes('store');
         if (op === 'Manufacturing') return loc.includes('plant') || loc.includes('mfg');
         if (op === 'Distribution') return loc.includes('hub') || loc.includes('dist');
         return true;
@@ -1434,9 +1440,15 @@ export class App implements AfterViewInit, OnDestroy {
     return list;
   });
 
-  protected readonly techniciansList = ['Sunil Pawar', 'Amit Verma', 'Mahesh Nair', 'Prakash Jadhav', 'Imran Shaikh', 'Karthik R', 'Ravi Singh'];
-  protected readonly vendorsList = ['TechServe Solutions Pvt. Ltd.', 'Global Repairs Co.', 'ProsperSmart Services'];
-  protected readonly locationsList = ['Mumbai - Bhiwandi Service Center', 'Pune DC - Workshop', 'Bengaluru Service Depot', 'Chennai Service Center', 'Delhi Service Center', 'Hyderabad Service Center', 'Ahmedabad Service Depot'];
+  protected readonly locationsList = computed(() => {
+    const sites = this.sitesList().filter(s => s !== 'All Sites');
+    if (sites.length > 0) {
+      return sites.map(s => `${s} - Workshop / Service Center`);
+    }
+    return ['Main Facility - Workshop', 'Central Warehouse - Service Depot'];
+  });
+  protected readonly techniciansList = ['Rajesh Sharma', 'Amit Verma', 'Suresh Kumar', 'Vikram Patel'];
+  protected readonly vendorsList = ['Zebra Technologies', 'Teltonika Telematics', 'Nordic ID', 'Omni-ID', 'SICK Sensor Intelligence'];
   protected readonly sparesList = ['GPS Tracker Battery Pack', 'SIM Data Plan', 'RFID Tag Shell', 'Replacement Bracket'];
   protected readonly selectedCalendarDay = signal<number>(new Date().getDate());
 
@@ -1506,11 +1518,14 @@ export class App implements AfterViewInit, OnDestroy {
         next: (res) => {
           const list: any[] = [];
 
+          const isSuper = this.isSuperAdmin();
+
           // 1. Add RFID tags
           const rfidList: any[] = Array.isArray(res.rfid) ? res.rfid : (res.rfid?.body ?? []);
           if (Array.isArray(rfidList)) {
             rfidList.forEach(t => {
               const asset = this.assets().find(a => (a.id || '').toString().toLowerCase() === (t.assetId || t.AssetId || '').toString().toLowerCase());
+              if (t.assetId && !asset && !isSuper) return;
               list.push({
                 id: t.id,
                 epc: t.epcCode || t.EpcCode,
@@ -1525,7 +1540,7 @@ export class App implements AfterViewInit, OnDestroy {
                 rawType: 'RFID'
               });
             });
-            this.rfidTagsPool.set(rfidList);
+            this.rfidTagsPool.set(rfidList.filter(t => !t.assetId || this.assets().some(a => (a.id || '').toString().toLowerCase() === (t.assetId || '').toString().toLowerCase()) || isSuper));
           }
 
           // 2. Add Barcodes
@@ -1533,6 +1548,7 @@ export class App implements AfterViewInit, OnDestroy {
           if (Array.isArray(bcList)) {
             bcList.forEach(b => {
               const asset = this.assets().find(a => (a.id || '').toString().toLowerCase() === (b.assetId || b.AssetId || '').toString().toLowerCase());
+              if (b.assetId && !asset && !isSuper) return;
               list.push({
                 id: b.id,
                 epc: b.barcodeValue || b.BarcodeValue,
@@ -1547,7 +1563,7 @@ export class App implements AfterViewInit, OnDestroy {
                 rawType: 'Barcode'
               });
             });
-            this.barcodesPool.set(bcList);
+            this.barcodesPool.set(bcList.filter(b => !b.assetId || this.assets().some(a => (a.id || '').toString().toLowerCase() === (b.assetId || '').toString().toLowerCase()) || isSuper));
           }
 
           // 3. Add GPS Devices
@@ -1555,6 +1571,7 @@ export class App implements AfterViewInit, OnDestroy {
           if (Array.isArray(gpsList)) {
             gpsList.forEach(g => {
               const asset = this.assets().find(a => (a.id || '').toString().toLowerCase() === (g.assetId || g.AssetId || '').toString().toLowerCase());
+              if (g.assetId && !asset && !isSuper) return;
               list.push({
                 id: g.id,
                 epc: g.imei || g.Imei,
@@ -1569,7 +1586,7 @@ export class App implements AfterViewInit, OnDestroy {
                 rawType: 'GPS'
               });
             });
-            this.gpsDevicesPool.set(gpsList);
+            this.gpsDevicesPool.set(gpsList.filter(g => !g.assetId || this.assets().some(a => (a.id || '').toString().toLowerCase() === (g.assetId || '').toString().toLowerCase()) || isSuper));
           }
 
           this.tagsList.set(list);
@@ -2424,17 +2441,27 @@ export class App implements AfterViewInit, OnDestroy {
     const type = this.gpsTypeFilter();
     const site = this.selectedSite();
     const op = this.activeOperation();
+    const isSuper = this.isSuperAdmin();
 
-    const activeGpsIds = this.assets()
-      .map(asset => asset.gpsId)
-      .filter(gpsId => gpsId && gpsId !== '—');
-
-    const registeredGpsIds = this.gpsDevicesPool().map(g => g.imei);
-    list = list.filter(a => 
-      activeGpsIds.includes(a.id) || 
-      registeredGpsIds.includes(a.id) || 
-      true // Ensure all live tracking devices are visible
+    const activeGpsIds = new Set(
+      this.assets()
+        .map(asset => asset.gpsId)
+        .filter(gpsId => gpsId && gpsId !== '—')
     );
+
+    const registeredGpsIds = new Set(
+      this.gpsDevicesPool().map(g => g.imei || g.id || g.epc).filter(Boolean)
+    );
+
+    if (!isSuper) {
+      list = list.filter(a => activeGpsIds.has(a.id) || registeredGpsIds.has(a.id));
+    }
+
+    // Site permission check
+    const allowedSites = this.allowedSiteNames();
+    if (allowedSites && allowedSites.size > 0) {
+      list = list.filter(a => !a.site || a.site === '—' || allowedSites.has(a.site));
+    }
 
     if (q) {
       list = list.filter(a =>
@@ -2467,8 +2494,8 @@ export class App implements AfterViewInit, OnDestroy {
       list = list.filter(a => a.type === type);
     }
 
-    if (site !== 'All Sites') {
-      list = list.filter(a => a.site === site);
+    if (site && site !== 'All Sites' && site !== 'All Devam Sites') {
+      list = list.filter(a => a.site === site || this.siteMatchesFilter(a.site));
     }
 
     if (op !== 'All Operations') {
@@ -2933,7 +2960,7 @@ export class App implements AfterViewInit, OnDestroy {
   protected readonly auditMatched = signal<number>(5);
   protected readonly auditDisplaced = signal<number>(1);
   protected readonly auditMissing = signal<number>(2);
-  protected readonly auditLocation = signal<string>('Pune DC');
+  protected readonly auditLocation = signal<string>('');
   protected readonly auditZone = signal<string>('Zone A');
   protected readonly auditReader = signal<string>('Fixed Gate 2 Reader');
   
@@ -3235,6 +3262,7 @@ export class App implements AfterViewInit, OnDestroy {
       'Description'
     ];
 
+    const sampleSite = this.sitesList().find(s => s !== 'All Sites') || 'Main Facility';
     const rows = [
       [
         'AST-TRC-005121',
@@ -3242,7 +3270,7 @@ export class App implements AfterViewInit, OnDestroy {
         'Returnable Container',
         'E280689400107B2A00002A11',
         '-',
-        'Pune DC',
+        sampleSite,
         'Zone B',
         'Available',
         'PB-998231',
@@ -3255,7 +3283,7 @@ export class App implements AfterViewInit, OnDestroy {
         'Vehicle',
         'E28011702000021A3F4B2C91',
         '16512010049',
-        'Pune DC',
+        sampleSite,
         'Yard A',
         'In Use',
         'TY-88746-FL',
@@ -3421,70 +3449,6 @@ export class App implements AfterViewInit, OnDestroy {
 
   // Site Data store
   private readonly siteData: Record<string, SiteStats> = {
-    'Pune DC': {
-      totalAssets: 0, activeAssets: 0, activePct: '0%',
-      assetsInUse: 0, inUsePct: '0%', checkedOut: 0,
-      underMaintenance: 0, maintenancePct: '0%', lowBatteryGps: 0,
-      rfidReadsToday: 0, gpsPingsToday: 0, exceptionAlerts: 0, complianceTasks: 0,
-      utilizationSpark: [0, 0, 0, 0, 0, 0, 0],
-      accuracySpark: [0, 0, 0, 0, 0, 0, 0],
-      savingsSpark: [0, 0, 0, 0, 0, 0, 0],
-      turnaroundSpark: [0, 0, 0, 0, 0, 0, 0],
-      utilizationOverTime: [0, 0, 0, 0, 0, 0, 0],
-      statusCategory: [0, 0, 0, 0, 0],
-      movementInbound: [0, 0, 0, 0, 0, 0],
-      movementOutbound: [0, 0, 0, 0, 0, 0],
-      movementUtilization: [0, 0, 0, 0, 0, 0],
-      topCategories: [0, 0, 0, 0, 0, 0]
-    },
-    'Mumbai Warehouse': {
-      totalAssets: 0, activeAssets: 0, activePct: '0%',
-      assetsInUse: 0, inUsePct: '0%', checkedOut: 0,
-      underMaintenance: 0, maintenancePct: '0%', lowBatteryGps: 0,
-      rfidReadsToday: 0, gpsPingsToday: 0, exceptionAlerts: 0, complianceTasks: 0,
-      utilizationSpark: [0, 0, 0, 0, 0, 0, 0],
-      accuracySpark: [0, 0, 0, 0, 0, 0, 0],
-      savingsSpark: [0, 0, 0, 0, 0, 0, 0],
-      turnaroundSpark: [0, 0, 0, 0, 0, 0, 0],
-      utilizationOverTime: [0, 0, 0, 0, 0, 0, 0],
-      statusCategory: [0, 0, 0, 0, 0],
-      movementInbound: [0, 0, 0, 0, 0, 0],
-      movementOutbound: [0, 0, 0, 0, 0, 0],
-      movementUtilization: [0, 0, 0, 0, 0, 0],
-      topCategories: [0, 0, 0, 0, 0, 0]
-    },
-    'Chennai Plant': {
-      totalAssets: 0, activeAssets: 0, activePct: '0%',
-      assetsInUse: 0, inUsePct: '0%', checkedOut: 0,
-      underMaintenance: 0, maintenancePct: '0%', lowBatteryGps: 0,
-      rfidReadsToday: 0, gpsPingsToday: 0, exceptionAlerts: 0, complianceTasks: 0,
-      utilizationSpark: [0, 0, 0, 0, 0, 0, 0],
-      accuracySpark: [0, 0, 0, 0, 0, 0, 0],
-      savingsSpark: [0, 0, 0, 0, 0, 0, 0],
-      turnaroundSpark: [0, 0, 0, 0, 0, 0, 0],
-      utilizationOverTime: [0, 0, 0, 0, 0, 0, 0],
-      statusCategory: [0, 0, 0, 0, 0],
-      movementInbound: [0, 0, 0, 0, 0, 0],
-      movementOutbound: [0, 0, 0, 0, 0, 0],
-      movementUtilization: [0, 0, 0, 0, 0, 0],
-      topCategories: [0, 0, 0, 0, 0, 0]
-    },
-    'Bengaluru Hub': {
-      totalAssets: 0, activeAssets: 0, activePct: '0%',
-      assetsInUse: 0, inUsePct: '0%', checkedOut: 0,
-      underMaintenance: 0, maintenancePct: '0%', lowBatteryGps: 0,
-      rfidReadsToday: 0, gpsPingsToday: 0, exceptionAlerts: 0, complianceTasks: 0,
-      utilizationSpark: [0, 0, 0, 0, 0, 0, 0],
-      accuracySpark: [0, 0, 0, 0, 0, 0, 0],
-      savingsSpark: [0, 0, 0, 0, 0, 0, 0],
-      turnaroundSpark: [0, 0, 0, 0, 0, 0, 0],
-      utilizationOverTime: [0, 0, 0, 0, 0, 0, 0],
-      statusCategory: [0, 0, 0, 0, 0],
-      movementInbound: [0, 0, 0, 0, 0, 0],
-      movementOutbound: [0, 0, 0, 0, 0, 0],
-      movementUtilization: [0, 0, 0, 0, 0, 0],
-      topCategories: [0, 0, 0, 0, 0, 0]
-    },
     'All Sites': {
       totalAssets: 0, activeAssets: 0, activePct: '0%',
       assetsInUse: 0, inUsePct: '0%', checkedOut: 0,
@@ -3537,7 +3501,7 @@ export class App implements AfterViewInit, OnDestroy {
 
     const currentUtilPctS = totalS > 0 ? Math.round((inUseS / totalS) * 100) : 0;
     const siteName = this.selectedSite();
-    const existing = this.siteData[siteName] || this.siteData['Pune DC'];
+    const existing = this.siteData[siteName] || this.siteData['All Sites'];
 
     return {
       ...existing,
@@ -3561,6 +3525,47 @@ export class App implements AfterViewInit, OnDestroy {
         currentUtilPctS
       ]
     };
+  });
+
+  protected readonly sitePerformanceRows = computed(() => {
+    const allAssets = this.assets();
+    const sites = this.sitesList().filter(s => s !== 'All Sites');
+    const totalCount = allAssets.length;
+    
+    const allRow = {
+      name: 'India Operations (All Sites)',
+      count: totalCount,
+      active: allAssets.filter(a => a.status === 'In Use' || a.status === 'Assigned' || a.status === 'Available').length,
+      idle: allAssets.filter(a => a.status === 'Available').length,
+      lost: allAssets.filter(a => a.status === 'Missing' || a.status === 'Displaced').length,
+      accuracy: '98.5%',
+      utilization: totalCount > 0 ? (Math.round((allAssets.filter(a => a.status === 'In Use' || a.status === 'Assigned').length / totalCount) * 100) + '%') : '0%',
+      turnaround: '1.4',
+      pct: '100%'
+    };
+
+    const rows = sites.map(s => {
+      const sAssets = allAssets.filter(a => a.site === s);
+      const c = sAssets.length;
+      const active = sAssets.filter(a => a.status === 'In Use' || a.status === 'Assigned' || a.status === 'Available').length;
+      const idle = sAssets.filter(a => a.status === 'Available').length;
+      const lost = sAssets.filter(a => a.status === 'Missing' || a.status === 'Displaced').length;
+      const util = c > 0 ? (Math.round((sAssets.filter(a => a.status === 'In Use' || a.status === 'Assigned').length / c) * 100) + '%') : '0%';
+      const pct = totalCount > 0 ? ((c / totalCount) * 100).toFixed(1) + '%' : '0%';
+      return {
+        name: s,
+        count: c,
+        active,
+        idle,
+        lost,
+        accuracy: '98.5%',
+        utilization: util,
+        turnaround: '1.4',
+        pct
+      };
+    });
+
+    return [allRow, ...rows];
   });
 
   // Refs for Chart elements
@@ -3782,7 +3787,7 @@ export class App implements AfterViewInit, OnDestroy {
             warranty: item.warrantyExpiryDate ? new Date(item.warrantyExpiryDate).toLocaleDateString() : '—',
             status: status,
             currentLocation: (() => {
-              if (item.currentLocation && item.currentLocation !== 'Pune DC') return item.currentLocation;
+              if (item.currentLocation) return item.currentLocation;
               if (item.locationName) return item.locationName;
               if (item.location) return item.location;
               if (item.locationId) {
@@ -3922,11 +3927,10 @@ export class App implements AfterViewInit, OnDestroy {
           ]
         };
 
-        // Build per-site data for all known sites (including dynamic Devam sites)
-        const staticSites = ['Pune DC', 'Mumbai Warehouse', 'Chennai Plant', 'Bengaluru Hub'];
+        // Build per-site data for all known sites dynamically from API and user claims
         const userSiteNames = this.allowedUserSites().map((s: any) => s.name).filter(Boolean);
         const apiSiteNames = this.apiSites().map((s: any) => s.name).filter(Boolean);
-        const sites = Array.from(new Set([...staticSites, ...userSiteNames, ...apiSiteNames]));
+        const sites = Array.from(new Set([...userSiteNames, ...apiSiteNames]));
         sites.forEach(siteName => {
           const siteAssets = allAssets.filter(a => a.site === siteName);
           const totalS = siteAssets.length;
@@ -5077,15 +5081,6 @@ export class App implements AfterViewInit, OnDestroy {
   protected fetchSitesZonesWarehouses() {
     if (!this.isLoggedIn()) return;
 
-    const defaultSites = [
-      { id: '1', name: 'Pune DC', location: 'Pune, Maharashtra' },
-      { id: '2', name: 'Mumbai Warehouse', location: 'Mumbai, Maharashtra' },
-      { id: '3', name: 'Chennai Plant', location: 'Chennai, Tamil Nadu' },
-      { id: '4', name: 'Bengaluru Hub', location: 'Bengaluru, Karnataka' },
-      { id: '5', name: 'Delhi NCR', location: 'Delhi NCR' },
-      { id: '6', name: 'Hyderabad DC', location: 'Hyderabad, Telangana' }
-    ];
-
     this.apiService.getSites(1, 200).subscribe({
       next: (res) => { 
         const data = res?.body || res;
@@ -5838,13 +5833,6 @@ export class App implements AfterViewInit, OnDestroy {
   // Simulation of live events
   private simulationInterval: any;
   private startEventSimulation() {
-    const locations = {
-      'Pune DC': ['Pune DC - Gate 2', 'Pune DC Yard', 'Pune DC - IT Store', 'Pune DC - Zone B'],
-      'Mumbai Warehouse': ['Mumbai Warehouse - Dock 4', 'Mumbai Highway NH48', 'Mumbai Store'],
-      'Chennai Plant': ['Chennai Plant - Workshop', 'Chennai Plant Gate 1'],
-      'Bengaluru Hub': ['Bengaluru Hub - Gate 1', 'Bengaluru Hub Yard']
-    } as Record<string, string[]>;
-
     const operators = ['Amit Verma', 'System', 'Rohan Sharma', 'System', 'Karan Johar', 'System'];
     const assetCategories = [
       { cat: 'Returnable Container', name: 'Returnable Container - RC', prefix: 'AST-TRC-' },
@@ -5857,8 +5845,9 @@ export class App implements AfterViewInit, OnDestroy {
     this.simulationInterval = setInterval(() => {
       // 30% chance to spawn an event every 5 seconds
       if (Math.random() > 0.6) {
-        const site = this.selectedSite() === 'All Sites' ? 'Pune DC' : this.selectedSite();
-        const siteLocs = locations[site] || ['Pune DC - Gate 2'];
+        const availableSites = this.sitesList().filter(s => s !== 'All Sites');
+        const site = this.selectedSite() === 'All Sites' ? (availableSites[0] || 'Main Facility') : this.selectedSite();
+        const siteLocs = [`${site} - Gate 1`, `${site} - Yard A`, `${site} - Dispatch Dock`, `${site} - IT Store`];
         const loc = siteLocs[Math.floor(Math.random() * siteLocs.length)];
         
         const catObj = assetCategories[Math.floor(Math.random() * assetCategories.length)];
@@ -5919,7 +5908,7 @@ export class App implements AfterViewInit, OnDestroy {
         
         // Bump site stats slightly in siteData
         const selSite = this.selectedSite();
-        const s = this.siteData[selSite] || this.siteData['Pune DC'];
+        const s = this.siteData[selSite] || this.siteData['All Sites'];
         let rfidCount = s.rfidReadsToday;
         let gpsCount = s.gpsPingsToday;
         let excCount = s.exceptionAlerts;
@@ -5954,8 +5943,7 @@ export class App implements AfterViewInit, OnDestroy {
         const siteLower = site.toLowerCase();
         
         const matchesSite = evLoc.includes(siteLower) || 
-                            evSource.includes(siteLower) || 
-                            (siteLower.includes('pune') && (evLoc.includes('pune') || evLoc.includes('zone') || evLoc.includes('gate'))) ||
+                            evSource.includes(siteLower) ||
                             (siteLower.includes('chennai') && (evLoc.includes('chennai') || evLoc.includes('mfg') || evLoc.includes('plant'))) ||
                             (siteLower.includes('mumbai') && (evLoc.includes('mumbai') || evLoc.includes('wh') || evLoc.includes('warehouse'))) ||
                             (siteLower.includes('bengaluru') && (evLoc.includes('bengaluru') || evLoc.includes('hub'))) ||
@@ -6475,13 +6463,16 @@ export class App implements AfterViewInit, OnDestroy {
     }
 
     if (this.reportsZoneOccupancyCanvas && this.reportsZoneOccupancyCanvas.nativeElement) {
+      const activeSiteNames = this.sitesList().filter((s: string) => s !== 'All Sites');
+      const chartLabels = activeSiteNames.length > 0 ? activeSiteNames.slice(0, 6) : ['Main Facility', 'Central Hub'];
+      const chartData = chartLabels.map((_: string, i: number) => [72, 68, 85, 61, 74, 63][i % 6]);
       this.charts['reportsZoneOccupancy'] = new Chart(this.reportsZoneOccupancyCanvas.nativeElement, {
         type: 'bar',
         data: {
-          labels: ['Pune DC', 'Mumbai WH', 'Chennai Plant', 'Bengaluru Hub', 'Delhi NCR', 'Hyderabad DC'],
+          labels: chartLabels,
           datasets: [{
             label: 'Occupancy (%)',
-            data: [72, 68, 85, 61, 74, 63],
+            data: chartData,
             backgroundColor: '#00b4d8',
             borderRadius: 4,
             barThickness: 16
@@ -6544,15 +6535,9 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   protected reportsExpandAll() {
-    this.reportsExpandedSites.set({
-      'India Operations (All Sites)': true,
-      'Pune DC': true,
-      'Mumbai Warehouse': true,
-      'Chennai Plant': true,
-      'Bengaluru Hub': true,
-      'Delhi NCR': true,
-      'Hyderabad DC': true
-    });
+    const map: Record<string, boolean> = { 'India Operations (All Sites)': true };
+    this.sitesList().forEach(s => { map[s] = true; });
+    this.reportsExpandedSites.set(map);
   }
 
   protected reportsCollapseAll() {
@@ -6691,15 +6676,7 @@ export class App implements AfterViewInit, OnDestroy {
       ['Site', 'Asset Category', 'Total Assets (Count)', 'Total Assets (%)', 'Active Assets (Count)', 'Active Assets (%)', 'Idle Assets (Count)', 'Idle Assets (%)', 'Lost Assets (Count)', 'Lost Assets (%)', 'Inventory Accuracy (%)', 'Utilization (%)', 'Avg. Turnaround (Days)']
     ];
     
-    const rows = [
-      { name: 'India Operations (All Sites)', count: 24758, active: 22341, idle: 1487, lost: 76, accuracy: 94.3, utilization: 68.0, turnaround: 1.6, pct: 100 },
-      { name: 'Pune DC', count: 4560, active: 4112, idle: 388, lost: 60, accuracy: 93.6, utilization: 72.0, turnaround: 1.4, pct: 18.4 },
-      { name: 'Mumbai Warehouse', count: 5921, active: 5298, idle: 561, lost: 62, accuracy: 95.1, utilization: 68.0, turnaround: 1.7, pct: 23.9 },
-      { name: 'Chennai Plant', count: 4128, active: 3812, idle: 256, lost: 60, accuracy: 95.6, utilization: 85.0, turnaround: 1.2, pct: 16.7 },
-      { name: 'Bengaluru Hub', count: 3842, active: 3452, idle: 330, lost: 60, accuracy: 93.2, utilization: 61.0, turnaround: 1.8, pct: 15.5 },
-      { name: 'Delhi NCR', count: 3657, active: 3276, idle: 321, lost: 58, accuracy: 92.8, utilization: 74.0, turnaround: 1.6, pct: 14.8 },
-      { name: 'Hyderabad DC', count: 2650, active: 2391, idle: 211, lost: 56, accuracy: 94.1, utilization: 63.0, turnaround: 1.5, pct: 10.7 }
-    ];
+    const rows = this.sitePerformanceRows();
     
     rows.forEach(r => {
       data.push([
@@ -6770,8 +6747,15 @@ export class App implements AfterViewInit, OnDestroy {
       else if (reportName === 'GPS Route Summary') endpoint = 'gps';
       else if (reportName === 'Reader Performance' || reportName === 'Tag Read Accuracy') endpoint = 'rfid';
       else if (reportName === 'User Activity') endpoint = 'users';
+      else if (reportName === 'Asset Transfers' || reportName === 'Transfers') endpoint = 'transfers';
+      else if (reportName === 'Asset Issuance' || reportName === 'Issuances') endpoint = 'issuances';
 
-      this.apiService.downloadReport(endpoint).subscribe({
+      const startDate = this.reportsStartDate() || undefined;
+      const endDate = this.reportsEndDate() || undefined;
+      const selectedSite = this.reportsSelectedSite();
+      const siteName = (selectedSite && selectedSite !== 'All Sites' && selectedSite !== 'All') ? selectedSite : undefined;
+
+      this.apiService.downloadReport(endpoint, startDate, endDate, undefined, siteName).subscribe({
         next: async (blob) => {
           try {
             const csvText = await blob.text();
@@ -6811,33 +6795,38 @@ export class App implements AfterViewInit, OnDestroy {
     let headers: string[] = [];
     let rows: string[][] = [];
     
+    const activeSites = this.sitesList().filter(s => s !== 'All Sites');
+    const s1 = activeSites[0] || 'Main Facility';
+    const s2 = activeSites[1] || 'Central Hub';
+    const s3 = activeSites[2] || 'Store Depot';
+
     if (reportName === 'Inventory Accuracy') {
       headers = ['Site', 'Zone', 'RFID Expected Count', 'RFID Read Count', 'Variance', 'Accuracy (%)', 'Auditor'];
       rows = [
-        ['Pune DC', 'Dock Door A', '125', '124', '-1', '99.2%', 'R. Kumar'],
-        ['Pune DC', 'Aisle 4', '542', '538', '-4', '99.2%', 'R. Kumar'],
-        ['Mumbai Warehouse', 'Receiving Bay', '224', '221', '-3', '98.6%', 'P. Patel'],
-        ['Chennai Plant', 'Staging Zone', '180', '180', '0', '100.0%', 'A. Selvam'],
-        ['Bengaluru Hub', 'Buffer Yard', '412', '398', '-14', '96.6%', 'M. Gowda'],
-        ['Delhi NCR', 'Sorting Area', '320', '311', '-9', '97.2%', 'V. Sharma']
+        [s1, 'Dock Door A', '125', '124', '-1', '99.2%', 'R. Kumar'],
+        [s1, 'Aisle 4', '542', '538', '-4', '99.2%', 'R. Kumar'],
+        [s2, 'Receiving Bay', '224', '221', '-3', '98.6%', 'P. Patel'],
+        [s3, 'Staging Zone', '180', '180', '0', '100.0%', 'A. Selvam'],
+        [s1, 'Buffer Yard', '412', '398', '-14', '96.6%', 'M. Gowda'],
+        [s2, 'Sorting Area', '320', '311', '-9', '97.2%', 'V. Sharma']
       ];
     } else if (reportName === 'Asset Utilization') {
       headers = ['Asset ID', 'Category', 'Site', 'Runtime (Hrs)', 'Idle (Hrs)', 'Total Active Time (%)', 'Alerts Triggered'];
       rows = [
-        ['FL-0098', 'Forklift', 'Pune DC', '142.5', '24.1', '85.5%', '2'],
-        ['FL-0099', 'Forklift', 'Pune DC', '128.0', '36.5', '77.8%', '0'],
-        ['TR-102', 'Terminal Tractor', 'Mumbai WH', '98.4', '62.0', '61.3%', '5'],
-        ['CG-556', 'Container Gantry', 'Chennai Plant', '182.3', '10.5', '94.5%', '1'],
-        ['PC-092', 'Platform Cart', 'Bengaluru Hub', '32.1', '128.5', '19.9%', '0'],
-        ['FL-0100', 'Forklift', 'Delhi NCR', '110.4', '42.0', '72.4%', '3']
+        ['FL-0098', 'Forklift', s1, '142.5', '24.1', '85.5%', '2'],
+        ['FL-0099', 'Forklift', s1, '128.0', '36.5', '77.8%', '0'],
+        ['TR-102', 'Terminal Tractor', s2, '98.4', '62.0', '61.3%', '5'],
+        ['CG-556', 'Container Gantry', s3, '182.3', '10.5', '94.5%', '1'],
+        ['PC-092', 'Platform Cart', s1, '32.1', '128.5', '19.9%', '0'],
+        ['FL-0100', 'Forklift', s2, '110.4', '42.0', '72.4%', '3']
       ];
     } else if (reportName === 'Check-In / Check-Out Report') {
       headers = ['Timestamp', 'Asset ID', 'Category', 'Custodian', 'Event Type', 'Destination Site', 'Status'];
       rows = [
-        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:14:02'), 'RM-COIL-402', 'Raw Material', 'Amit Sharma', 'Check-In', 'Pune DC', 'Success'],
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:14:02'), 'RM-COIL-402', 'Raw Material', 'Amit Sharma', 'Check-In', s1, 'Success'],
         [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '09:42:15'), 'FL-0098', 'Forklift', 'Rajesh Kumar', 'Check-Out', 'Maintenance Bay', 'Success'],
-        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '08:31:50',), 'TR-102', 'Trailer', 'Deepak Patil', 'Check-Out', 'Delhi NCR Route', 'Success'],
-        [this.getRelativeDateStr(-1, 'd mmm yyyy, hh:mm:ss', '17:15:33'), 'PL-8890', 'Pallet Pl', 'Karan Singh', 'Check-In', 'Mumbai WH', 'Success'],
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '08:31:50',), 'TR-102', 'Trailer', 'Deepak Patil', 'Check-Out', 'Outbound Route', 'Success'],
+        [this.getRelativeDateStr(-1, 'd mmm yyyy, hh:mm:ss', '17:15:33'), 'PL-8890', 'Pallet Pl', 'Karan Singh', 'Check-In', s2, 'Success'],
         [this.getRelativeDateStr(-1, 'd mmm yyyy, hh:mm:ss', '16:04:12'), 'TOOL-881', 'Calibration Tool', 'Vijay Nair', 'Check-Out', 'Manufacturing Line 2', 'Success']
       ];
     } else if (reportName === 'Movement History') {
@@ -6852,40 +6841,40 @@ export class App implements AfterViewInit, OnDestroy {
     } else if (reportName === 'Zone Occupancy') {
       headers = ['Site', 'Zone Name', 'Current Occupancy', 'Design Capacity', 'Utilization Rate (%)', 'Alert Status'];
       rows = [
-        ['Pune DC', 'Inbound Staging', '84', '100', '84.0%', 'Normal'],
-        ['Pune DC', 'Aisle 4 (High Bay)', '412', '500', '82.4%', 'Normal'],
-        ['Mumbai WH', 'Loading Dock 2', '18', '20', '90.0%', 'Warning - High'],
-        ['Chennai Plant', 'Storage Room B', '98', '100', '98.0%', 'Critical - Overload'],
-        ['Bengaluru Hub', 'Cross Dock', '32', '80', '40.0%', 'Normal'],
-        ['Delhi NCR', 'Main Yard', '110', '150', '73.3%', 'Normal']
+        [s1, 'Inbound Staging', '84', '100', '84.0%', 'Normal'],
+        [s1, 'Aisle 4 (High Bay)', '412', '500', '82.4%', 'Normal'],
+        [s2, 'Loading Dock 2', '18', '20', '90.0%', 'Warning - High'],
+        [s3, 'Storage Room B', '98', '100', '98.0%', 'Critical - Overload'],
+        [s1, 'Cross Dock', '32', '80', '40.0%', 'Normal'],
+        [s2, 'Main Yard', '110', '150', '73.3%', 'Normal']
       ];
     } else if (reportName === 'GPS Route Summary') {
       headers = ['Vehicle', 'SIM IMEI', 'Start Point', 'End Point', 'Distance (km)', 'Travel Time', 'Status'];
       rows = [
-        ['Truck-0098', '864201047712345', 'Mumbai DC', 'Pune WH', '145.2', '3 Hrs 15 Mins', 'Completed'],
-        ['Truck-0102', '864201047712346', 'Delhi NCR Hub', 'Jaipur DC', '260.8', '5 Hrs 10 Mins', 'En Route'],
+        ['Truck-0098', '864201047712345', s2, s1, '145.2', '3 Hrs 15 Mins', 'Completed'],
+        ['Truck-0102', '864201047712346', s1, s3, '260.8', '5 Hrs 10 Mins', 'En Route'],
         ['Forklift-01', '864201047712347', 'Yard A', 'Dock 4', '12.4', '6 Hrs Active', 'Within Geofence'],
-        ['Transit-02', '864201047712348', 'Chennai Plant', 'Bengaluru Hub', '345.5', '7 Hrs 45 Mins', 'Completed'],
-        ['Truck-0110', '864201047712349', 'Hyderabad DC', 'Vijayawada DC', '275.0', '5 Hrs 30 Mins', 'Completed']
+        ['Transit-02', '864201047712348', s3, s2, '345.5', '7 Hrs 45 Mins', 'Completed'],
+        ['Truck-0110', '864201047712349', s1, s2, '275.0', '5 Hrs 30 Mins', 'Completed']
       ];
     } else if (reportName === 'Lost / Missing Asset Report') {
       headers = ['Asset ID', 'Category', 'Site', 'Last Scanned Zone', 'Last Seen Timestamp', 'RFID Tag EPC', 'Flagged By'];
       rows = [
-        ['TOOL-401', 'Calibration Tool', 'Pune DC', 'Lab 2', this.getRelativeDateStr(-2, 'd mmm yyyy, hh:mm:ss', '14:12:00'), 'E28011702000021A3F4B2CA1', 'Admin'],
-        ['PL-0023', 'Pallet Pl', 'Mumbai WH', 'Zone C', this.getRelativeDateStr(-5, 'd mmm yyyy, hh:mm:ss', '08:31:02'), 'E28011702000021A3F4B2CA2', 'System'],
-        ['FL-0097', 'Forklift', 'Bengaluru Hub', 'Main Yard', this.getRelativeDateStr(-10, 'd mmm yyyy, hh:mm:ss', '11:42:15'), 'E28011702000021A3F4B2CA3', 'Supervisor'],
-        ['RM-COIL-102', 'Raw Material', 'Delhi NCR', 'Buffer B', this.getRelativeDateStr(-8, 'd mmm yyyy, hh:mm:ss', '17:33:01'), 'E28011702000021A3F4B2CA4', 'System'],
-        ['RFID-GATE-3', 'Handheld Reader', 'Hyderabad DC', 'Front Desk', this.getRelativeDateStr(-15, 'd mmm yyyy, hh:mm:ss', '09:12:30'), 'E28011702000021A3F4B2CA5', 'S. Kumar']
+        ['TOOL-401', 'Calibration Tool', s1, 'Lab 2', this.getRelativeDateStr(-2, 'd mmm yyyy, hh:mm:ss', '14:12:00'), 'E28011702000021A3F4B2CA1', 'Admin'],
+        ['PL-0023', 'Pallet Pl', s2, 'Zone C', this.getRelativeDateStr(-5, 'd mmm yyyy, hh:mm:ss', '08:31:02'), 'E28011702000021A3F4B2CA2', 'System'],
+        ['FL-0097', 'Forklift', s1, 'Main Yard', this.getRelativeDateStr(-10, 'd mmm yyyy, hh:mm:ss', '11:42:15'), 'E28011702000021A3F4B2CA3', 'Supervisor'],
+        ['RM-COIL-102', 'Raw Material', s3, 'Buffer B', this.getRelativeDateStr(-8, 'd mmm yyyy, hh:mm:ss', '17:33:01'), 'E28011702000021A3F4B2CA4', 'System'],
+        ['RFID-GATE-3', 'Handheld Reader', s2, 'Front Desk', this.getRelativeDateStr(-15, 'd mmm yyyy, hh:mm:ss', '09:12:30'), 'E28011702000021A3F4B2CA5', 'S. Kumar']
       ];
     } else if (reportName === 'Reader Performance') {
       headers = ['Reader Name', 'Location', 'Total Scans (Today)', 'Success Rate (%)', 'Uptime (%)', 'Connection Status', 'Last Activity'];
       rows = [
-        ['Gate Reader 1', 'Pune DC Main Exit', '14,258', '99.8%', '100.0%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:24:02')],
-        ['Forklift Reader 2', 'Pune DC FL-0098', '3,452', '98.5%', '99.2%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:23:45')],
-        ['Dock Reader A', 'Mumbai WH Dock 4', '8,901', '99.2%', '100.0%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:23:12')],
-        ['Staging Reader', 'Chennai Plant Zone A', '5,671', '99.4%', '98.1%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:21:00')],
-        ['Yard Reader 1', 'Bengaluru Hub Yard', '12,982', '97.2%', '99.5%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:24:00')],
-        ['Exit Reader 2', 'Delhi NCR Gate 2', '7,890', '99.7%', '85.4%', 'Warning - High Noise', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:23:59')]
+        ['Gate Reader 1', `${s1} Main Exit`, '14,258', '99.8%', '100.0%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:24:02')],
+        ['Forklift Reader 2', `${s1} FL-0098`, '3,452', '98.5%', '99.2%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:23:45')],
+        ['Dock Reader A', `${s2} Dock 4`, '8,901', '99.2%', '100.0%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:23:12')],
+        ['Staging Reader', `${s3} Zone A`, '5,671', '99.4%', '98.1%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:21:00')],
+        ['Yard Reader 1', `${s1} Yard`, '12,982', '97.2%', '99.5%', 'Online', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:24:00')],
+        ['Exit Reader 2', `${s2} Gate 2`, '7,890', '99.7%', '85.4%', 'Warning - High Noise', this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:23:59')]
       ];
     } else if (reportName === 'Tag Read Accuracy') {
       headers = ['Asset Category', 'Total Read Attempts', 'Missed Read Count', 'Accuracy Rate (%)', 'Uptime (%)', 'RSSI Average (dB)'];
@@ -6911,7 +6900,7 @@ export class App implements AfterViewInit, OnDestroy {
       headers = ['Timestamp', 'Username', 'Role', 'Action Executed', 'IP Address', 'Result Status'];
       rows = [
         [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:24:02'), 'rohit.k', 'Operations Manager', 'Export Reports PDF', '192.168.1.45', 'Success'],
-        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:18:15'), 'rohit.k', 'Operations Manager', 'Apply Report Filter: Pune DC', '192.168.1.45', 'Success'],
+        [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '10:18:15'), 'rohit.k', 'Operations Manager', `Apply Report Filter: ${s1}`, '192.168.1.45', 'Success'],
         [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '09:44:30'), 'karan.s', 'Supervisor', 'Bulk Upload Asset list', '192.168.1.92', 'Success - 124 Items'],
         [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '09:12:11'), 'system_cron', 'Background Service', 'Trigger Auto Backup', '127.0.0.1', 'Success'],
         [this.getRelativeDateStr(0, 'd mmm yyyy, hh:mm:ss', '08:30:00'), 'amit.s', 'Administrator', 'Change Reader Configuration: Gate 1', '192.168.1.12', 'Success'],
@@ -7012,9 +7001,26 @@ export class App implements AfterViewInit, OnDestroy {
         }
 
         if (list.length >= 0) {
+          const isSuper = this.isSuperAdmin();
+          const userAllowedSiteNames = this.allowedSiteNames();
+          const activeGpsIds = new Set(this.assets().map(a => a.gpsId).filter(id => id && id !== '—'));
+          const poolGpsIds = new Set(this.gpsDevicesPool().map(g => g.imei || g.id || g.epc).filter(Boolean));
+
           const filteredMapped = list
             .map((v: any) => {
-              const linkedAsset = this.assets().find(a => a.gpsId === v.deviceNum);
+              const deviceNum = v.deviceNum || v.DeviceNum || '';
+              const linkedAsset = this.assets().find(a => a.gpsId === deviceNum);
+              const inGpsPool = poolGpsIds.has(deviceNum);
+
+              // Non-super admins MUST NOT see GPS devices belonging to other organizations / users
+              if (!isSuper && !linkedAsset && !inGpsPool && !activeGpsIds.has(deviceNum)) {
+                return null;
+              }
+
+              // If linked to an asset with a site not in user's allowed sites, skip
+              if (linkedAsset?.site && userAllowedSiteNames && userAllowedSiteNames.size > 0 && !this.isSiteAllowed(linkedAsset.site)) {
+                return null;
+              }
 
               let assetType: 'Vehicle' | 'Forklift' | 'Pallet/Bin' | 'Container' | 'Tool/Equipment' | 'Mobile Equipment' = 'Vehicle';
               const cat = (linkedAsset?.category || v.regName || '').toLowerCase();
@@ -7052,11 +7058,13 @@ export class App implements AfterViewInit, OnDestroy {
               const gpsTimeRaw = v.gpsTime || v.GpsTime || v.updateTime || v.UpdateTime;
               const gpsTimeStr = gpsTimeRaw ? new Date(gpsTimeRaw).toLocaleTimeString() : new Date().toLocaleTimeString();
 
-              const assetName = linkedAsset?.name || v.regName || ('GPS Asset ' + v.deviceNum);
-              const assetTag = 'Asset: ' + (linkedAsset?.assetNumber || linkedAsset?.id || ('AST-' + (v.deviceNum.length > 4 ? v.deviceNum.substring(v.deviceNum.length - 4) : v.deviceNum)));
+              const assetName = linkedAsset?.name || v.regName || ('GPS Asset ' + deviceNum);
+              const assetTag = 'Asset: ' + (linkedAsset?.assetNumber || linkedAsset?.id || ('AST-' + (deviceNum.length > 4 ? deviceNum.substring(deviceNum.length - 4) : deviceNum)));
+
+              const siteName = linkedAsset?.site || (this.isSiteAllowed(this.selectedSite()) ? this.selectedSite() : '—');
 
               return {
-                id: v.deviceNum,
+                id: deviceNum,
                 name: assetName,
                 tag: assetTag,
                 type: assetType,
@@ -7069,7 +7077,7 @@ export class App implements AfterViewInit, OnDestroy {
                 lastGpsPing: gpsTimeStr,
                 lastRfidRead: lastRfidRead,
                 exception: exception,
-                site: linkedAsset?.site || this.selectedSite() || '—',
+                site: siteName,
                 operator: linkedAsset?.currentCustodian || linkedAsset?.custodian || 'Unassigned',
                 make: linkedAsset?.manufacturer || v.make || '',
                 model: linkedAsset?.model || v.model || '',
@@ -7261,14 +7269,14 @@ export class App implements AfterViewInit, OnDestroy {
   protected centerMapOnSite(site: string) {
     if (!this.satelliteMap) return;
     const siteCoords: Record<string, { lat: number; lon: number; zoom: number }> = {
-      'Pune DC': { lat: 18.6203, lon: 73.8567, zoom: 16 },
-      'Mumbai Warehouse': { lat: 19.2183, lon: 73.0862, zoom: 16 },
-      'Chennai Plant': { lat: 13.0827, lon: 80.2707, zoom: 16 },
-      'Bengaluru Hub': { lat: 12.9716, lon: 77.5946, zoom: 16 },
       'All Sites': { lat: 20.5937, lon: 78.9629, zoom: 5 }
     };
-    const config = siteCoords[site] || siteCoords['Pune DC'];
-    this.satelliteMap.setView([config.lat, config.lon], config.zoom, { animate: true, duration: 1.0 });
+    const firstMatchingAsset = this.filteredGpsAssets().find(a => !site || site === 'All Sites' || a.site === site);
+    let targetLat = firstMatchingAsset?.latitude || (siteCoords[site]?.lat ?? 19.0760);
+    let targetLon = firstMatchingAsset?.longitude || (siteCoords[site]?.lon ?? 72.8777);
+    let targetZoom = site === 'All Sites' ? 5 : (firstMatchingAsset ? 16 : 14);
+
+    this.satelliteMap.setView([targetLat, targetLon], targetZoom, { animate: true, duration: 1.0 });
   }
 
   protected initSatelliteMap(retryCount = 0) {
@@ -7298,13 +7306,9 @@ export class App implements AfterViewInit, OnDestroy {
 
     const site = this.selectedSite();
     const siteCoords: Record<string, { lat: number; lon: number; zoom: number }> = {
-      'Pune DC': { lat: 18.6203, lon: 73.8567, zoom: 16 },
-      'Mumbai Warehouse': { lat: 19.2183, lon: 73.0862, zoom: 16 },
-      'Chennai Plant': { lat: 13.0827, lon: 80.2707, zoom: 16 },
-      'Bengaluru Hub': { lat: 12.9716, lon: 77.5946, zoom: 16 },
       'All Sites': { lat: 20.5937, lon: 78.9629, zoom: 5 }
     };
-    const siteConfig = siteCoords[site] || siteCoords['Pune DC'];
+    const siteConfig = siteCoords[site] || { lat: 19.0760, lon: 72.8777, zoom: 14 };
 
     let centerLat = siteConfig.lat;
     let centerLon = siteConfig.lon;
@@ -8229,10 +8233,7 @@ export class App implements AfterViewInit, OnDestroy {
       department: assigneeType === 'Employee' ? 'Maintenance' : assigneeType === 'Vehicle' ? 'Dispatch' : 'Production',
       purpose: purpose || 'Planned operations',
       expectedReturn: mode === 'transfer' ? '-' : (new Date(this.checkoutExpectedReturnDate()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + this.checkoutExpectedReturnTime()),
-      status: statusText,
-      statusAuthor: 'Manoj Joshi',
-      location: mode === 'transfer' ? 'Pune DC ➔ Baroda Plant' : 'Pune DC Yard',
-      gpsStatus: details && details.gpsId !== '—' ? 'On' : 'Off'
+      location: mode === 'transfer' ? `${this.selectedSite() || 'Main Site'} ➔ Destination` : `${this.selectedSite() || 'Main Site'} Yard`,
     };
 
     this.checkoutTransactions.set([tx, ...this.checkoutTransactions()]);
