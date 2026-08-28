@@ -7852,12 +7852,16 @@ export class App implements AfterViewInit, OnDestroy {
     this.formUserWarehouseId = user.warehouseId || '';
     this.formUserSelectedSiteIds.set(user.selectedSiteIds || (user.siteId ? [user.siteId] : []));
     this.formUserSelectedWarehouseIds.set(user.selectedWarehouseIds || (user.warehouseId ? [user.warehouseId] : []));
-    if (user.roles && user.roles.length > 0) {
+    if (user.roles && user.roles.length > 0 && user.roles[0]) {
       this.formUserRole = user.roles[0];
+    } else if (user.role && user.role !== 'Viewer') {
+      this.formUserRole = user.role.split(',')[0].trim();
+    } else if (user.roleName) {
+      this.formUserRole = user.roleName;
     } else {
-      this.formUserRole = 'Viewer';
+      this.formUserRole = user.siteId ? 'Site Admin' : 'Super Admin';
     }
-    this.formUserIsActive = user.status === 'Active';
+    this.formUserIsActive = user.status === 'Active' || user.isActive === true;
     this.isUserModalOpen.set(true);
   }
 
